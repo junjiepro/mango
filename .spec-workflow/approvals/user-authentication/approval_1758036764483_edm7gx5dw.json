@@ -1,0 +1,45 @@
+{
+  "id": "approval_1758036764483_edm7gx5dw",
+  "title": "User Authentication System - Requirements",
+  "filePath": "d:\\Projects\\mango\\.spec-workflow\\specs\\user-authentication\\requirements.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-16T15:32:44.484Z",
+  "category": "spec",
+  "categoryName": "user-authentication",
+  "response": "Feedback Summary (3 comments):\n\nGeneral Comments:\n1. 登录、注册、忘记密码和修改密码等功能注意使用supabase自带的功能，避免重复造轮子\n\nSpecific Text Comments:\n1. \"- Should we support social login (Google, GitHub, ...\": 当前阶段不需要这些功能\n2. \"- Session Management: JWT with refresh tokens\": supabase.js库中已包含相关功能，不需另外处理\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"selection\",\n      \"comment\": \"当前阶段不需要这些功能\",\n      \"timestamp\": \"2025-09-16T15:53:52.710Z\",\n      \"selectedText\": \"- Should we support social login (Google, GitHub, etc.)?\\n- Do we need to implement 2FA?\\n- What are the password complexity requirements?\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1758038032710_4ep282xlp\"\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"supabase.js库中已包含相关功能，不需另外处理\",\n      \"timestamp\": \"2025-09-16T15:55:05.571Z\",\n      \"selectedText\": \"- Session Management: JWT with refresh tokens\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1758038105571_yd6byet7p\"\n    },\n    {\n      \"type\": \"general\",\n      \"comment\": \"登录、注册、忘记密码和修改密码等功能注意使用supabase自带的功能，避免重复造轮子\",\n      \"timestamp\": \"2025-09-16T15:56:10.829Z\",\n      \"id\": \"comment_1758038170829_cydp9j99o\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (3 comments):\\n\\nGeneral Comments:\\n1. 登录、注册、忘记密码和修改密码等功能注意使用supabase自带的功能，避免重复造轮子\\n\\nSpecific Text Comments:\\n1. \\\"- Should we support social login (Google, GitHub, ...\\\": 当前阶段不需要这些功能\\n2. \\\"- Session Management: JWT with refresh tokens\\\": supabase.js库中已包含相关功能，不需另外处理\\n\",\n  \"timestamp\": \"2025-09-16T15:56:13.851Z\"\n}",
+  "respondedAt": "2025-09-16T15:56:14.164Z",
+  "comments": [
+    {
+      "type": "selection",
+      "comment": "当前阶段不需要这些功能",
+      "timestamp": "2025-09-16T15:53:52.710Z",
+      "selectedText": "- Should we support social login (Google, GitHub, etc.)?\n- Do we need to implement 2FA?\n- What are the password complexity requirements?",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1758038032710_4ep282xlp"
+    },
+    {
+      "type": "selection",
+      "comment": "supabase.js库中已包含相关功能，不需另外处理",
+      "timestamp": "2025-09-16T15:55:05.571Z",
+      "selectedText": "- Session Management: JWT with refresh tokens",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1758038105571_yd6byet7p"
+    },
+    {
+      "type": "general",
+      "comment": "登录、注册、忘记密码和修改密码等功能注意使用supabase自带的功能，避免重复造轮子",
+      "timestamp": "2025-09-16T15:56:10.829Z",
+      "id": "comment_1758038170829_cydp9j99o"
+    }
+  ]
+}
