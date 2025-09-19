@@ -1,36 +1,10 @@
 'use client';
 
-import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import AuthStatus from '@/components/AuthStatus';
 
 export default function Home() {
-  interface User {
-    id: string;
-    email?: string;
-    last_sign_in_at?: string;
-  }
-
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const supabase = createClient();
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setLoading(false);
-    };
-
-    getUser();
-  }, [supabase]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.refresh();
-    router.push('/login');
-  };
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -40,47 +14,69 @@ export default function Home() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <h1 className="text-2xl font-bold mb-4">Welcome to Mango</h1>
-        <p className="mb-6">Please sign in to continue</p>
-        <button
-          onClick={() => router.push('/login')}
-          className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition-colors"
-        >
-          Go to Login
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold">Welcome, {user.email}!</h1>
-          <button
-            onClick={handleLogout}
-            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
-          >
-            Sign Out
-          </button>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            欢迎来到 Mango
+          </h1>
+          <p className="text-lg text-gray-600">
+            基于 Next.js 15 和 Supabase 的现代认证系统演示
+          </p>
         </div>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Your Account</h2>
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-gray-500">Email</p>
-              <p>{user.email}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Last Sign In</p>
-              <p>{user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : 'N/A'}</p>
+
+        <AuthStatus />
+
+        {user && (
+          <div className="mt-8 max-w-2xl mx-auto">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold mb-4">功能演示</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={() => window.location.href = '/dashboard'}
+                  className="p-4 text-left border rounded-lg hover:bg-gray-50"
+                >
+                  <h3 className="font-medium">用户控制台</h3>
+                  <p className="text-sm text-gray-600">管理你的个人资料和设置</p>
+                </button>
+
+                <button
+                  onClick={() => window.location.href = '/dashboard/profile'}
+                  className="p-4 text-left border rounded-lg hover:bg-gray-50"
+                >
+                  <h3 className="font-medium">个人资料</h3>
+                  <p className="text-sm text-gray-600">查看和更新个人信息</p>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {!user && (
+          <div className="mt-8 max-w-md mx-auto">
+            <div className="bg-white rounded-lg shadow p-6 text-center">
+              <h2 className="text-xl font-semibold mb-4">开始使用</h2>
+              <p className="text-gray-600 mb-6">
+                注册或登录以体验完整的认证功能
+              </p>
+              <div className="space-y-3">
+                <button
+                  onClick={() => window.location.href = '/register'}
+                  className="w-full bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+                >
+                  立即注册
+                </button>
+                <button
+                  onClick={() => window.location.href = '/login'}
+                  className="w-full bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+                >
+                  已有账号？登录
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
