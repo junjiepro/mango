@@ -2,9 +2,14 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import AuthStatus from '@/components/AuthStatus';
+import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const { user, loading } = useAuth();
+  const t = useTranslations('pages.home');
+  const tCommon = useTranslations('common');
+  const router = useRouter();
 
   if (loading) {
     return (
@@ -19,10 +24,10 @@ export default function Home() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            欢迎来到 Mango
+            {t('title')}
           </h1>
           <p className="text-lg text-gray-600">
-            基于 Next.js 15 和 Supabase 的现代认证系统演示
+            {t('subtitle')}
           </p>
         </div>
 
@@ -31,22 +36,22 @@ export default function Home() {
         {user && (
           <div className="mt-8 max-w-2xl mx-auto">
             <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold mb-4">功能演示</h2>
+              <h2 className="text-xl font-semibold mb-4">{t('featuresTitle')}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button
-                  onClick={() => window.location.href = '/dashboard'}
+                  onClick={() => router.push('/dashboard')}
                   className="p-4 text-left border rounded-lg hover:bg-gray-50"
                 >
-                  <h3 className="font-medium">用户控制台</h3>
-                  <p className="text-sm text-gray-600">管理你的个人资料和设置</p>
+                  <h3 className="font-medium">{t('dashboard.title')}</h3>
+                  <p className="text-sm text-gray-600">{t('dashboard.description')}</p>
                 </button>
 
                 <button
-                  onClick={() => window.location.href = '/dashboard/profile'}
+                  onClick={() => router.push('/dashboard/profile')}
                   className="p-4 text-left border rounded-lg hover:bg-gray-50"
                 >
-                  <h3 className="font-medium">个人资料</h3>
-                  <p className="text-sm text-gray-600">查看和更新个人信息</p>
+                  <h3 className="font-medium">{t('profile.title')}</h3>
+                  <p className="text-sm text-gray-600">{t('profile.description')}</p>
                 </button>
               </div>
             </div>
@@ -56,22 +61,22 @@ export default function Home() {
         {!user && (
           <div className="mt-8 max-w-md mx-auto">
             <div className="bg-white rounded-lg shadow p-6 text-center">
-              <h2 className="text-xl font-semibold mb-4">开始使用</h2>
+              <h2 className="text-xl font-semibold mb-4">{t('getStarted.title')}</h2>
               <p className="text-gray-600 mb-6">
-                注册或登录以体验完整的认证功能
+                {t('getStarted.description')}
               </p>
               <div className="space-y-3">
                 <button
-                  onClick={() => window.location.href = '/register'}
+                  onClick={() => router.push('/register')}
                   className="w-full bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
                 >
-                  立即注册
+                  {t('getStarted.registerButton')}
                 </button>
                 <button
-                  onClick={() => window.location.href = '/login'}
+                  onClick={() => router.push('/login')}
                   className="w-full bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
                 >
-                  已有账号？登录
+                  {t('getStarted.loginButton')}
                 </button>
               </div>
             </div>

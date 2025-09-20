@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { loginSchema, type LoginFormData } from '@/lib/validations/auth'
 import { useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 
 export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
@@ -16,6 +17,8 @@ export default function LoginForm() {
   const { signIn } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const t = useTranslations('auth.login')
+  const tCommon = useTranslations('common')
 
   const {
     register,
@@ -70,20 +73,22 @@ export default function LoginForm() {
         switch (error.message) {
           case 'Invalid login credentials':
           case 'Invalid email or password':
-            errorMessage = '邮箱或密码错误，请检查后重试'
+            errorMessage = t('errors.invalidCredentials')
             break
           case 'Email not confirmed':
-            errorMessage = '请先验证您的邮箱地址'
+            errorMessage = t('errors.emailNotConfirmed')
             break
           case 'Too many requests':
-            errorMessage = '登录尝试过于频繁，请稍后再试'
+            errorMessage = t('errors.tooManyRequests')
             break
           case 'Account temporarily locked':
-            errorMessage = '账户已临时锁定，请稍后再试'
+            errorMessage = t('errors.accountLocked')
             break
           default:
             if (errorMessage.includes('rate limit')) {
-              errorMessage = '登录请求过于频繁，请稍后再试'
+              errorMessage = t('errors.rateLimit')
+            } else {
+              errorMessage = t('errors.generic')
             }
             break
         }
@@ -95,7 +100,7 @@ export default function LoginForm() {
       } else {
         setMessage({
           type: 'success',
-          text: '登录成功！正在跳转...'
+          text: t('success')
         })
         reset()
         // 短暂延迟后跳转到控制台
@@ -106,7 +111,7 @@ export default function LoginForm() {
     } catch (error) {
       setMessage({
         type: 'error',
-        text: '登录过程中发生错误，请稍后重试。'
+        text: t('errors.generic')
       })
     } finally {
       setIsLoading(false)
@@ -118,15 +123,15 @@ export default function LoginForm() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-            登录您的账户
+            {t('title')}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            还没有账户？{' '}
+            {t('noAccount')}{' '}
             <Link
               href="/register"
               className="font-medium text-indigo-600 hover:text-indigo-500"
             >
-              立即注册
+              {t('registerLink')}
             </Link>
           </p>
         </div>
@@ -136,7 +141,7 @@ export default function LoginForm() {
             {/* 邮箱输入 */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                邮箱地址
+                {tCommon('email')}
               </label>
               <input
                 {...register('email')}
@@ -148,7 +153,7 @@ export default function LoginForm() {
                     ? 'border-red-300 text-red-900 placeholder-red-300'
                     : 'border-gray-300'
                 }`}
-                placeholder="请输入邮箱地址"
+                placeholder={t('emailPlaceholder')}
                 disabled={isLoading}
               />
               {errors.email && (
@@ -159,7 +164,7 @@ export default function LoginForm() {
             {/* 密码输入 */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                密码
+                {tCommon('password')}
               </label>
               <input
                 {...register('password')}
@@ -171,7 +176,7 @@ export default function LoginForm() {
                     ? 'border-red-300 text-red-900 placeholder-red-300'
                     : 'border-gray-300'
                 }`}
-                placeholder="请输入密码"
+                placeholder={t('passwordPlaceholder')}
                 disabled={isLoading}
               />
               {errors.password && (
@@ -193,7 +198,7 @@ export default function LoginForm() {
                 disabled={isLoading}
               />
               <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                记住我
+                {t('rememberMe')}
               </label>
             </div>
 
@@ -202,7 +207,7 @@ export default function LoginForm() {
                 href="/forgot-password"
                 className="font-medium text-indigo-600 hover:text-indigo-500"
               >
-                忘记密码？
+                {t('forgotPassword')}
               </Link>
             </div>
           </div>
@@ -251,10 +256,10 @@ export default function LoginForm() {
               {isLoading ? (
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                  登录中...
+                  {t('loadingButton')}
                 </div>
               ) : (
-                '登录'
+                t('button')
               )}
             </button>
           </div>
@@ -266,17 +271,17 @@ export default function LoginForm() {
                 <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-50 text-gray-500">或者</span>
+                <span className="px-2 bg-gray-50 text-gray-500">{tCommon('or')}</span>
               </div>
             </div>
 
             <div className="mt-4 text-center text-sm text-gray-600">
-              需要帮助？{' '}
+              {t('needHelp')}{' '}
               <Link
                 href="/help"
                 className="font-medium text-indigo-600 hover:text-indigo-500"
               >
-                联系客服
+                {t('contactSupport')}
               </Link>
             </div>
           </div>

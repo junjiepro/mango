@@ -1,0 +1,151 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "or": "or",
+    "email": "Email address",
+    "password": "Password",
+    "confirmPassword": "Confirm password",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "close": "Close",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Info",
+    "help": "Help"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in to your account",
+      "button": "Sign in",
+      "loadingButton": "Signing in...",
+      "emailPlaceholder": "Enter your email address",
+      "passwordPlaceholder": "Enter your password",
+      "rememberMe": "Remember me",
+      "forgotPassword": "Forgot your password?",
+      "noAccount": "Don't have an account?",
+      "registerLink": "Sign up now",
+      "needHelp": "Need help?",
+      "contactSupport": "Contact support",
+      "success": "Login successful! Redirecting...",
+      "errors": {
+        "invalidCredentials": "Invalid email or password, please check and try again",
+        "emailNotConfirmed": "Please verify your email address first",
+        "tooManyRequests": "Too many login attempts, please try again later",
+        "accountLocked": "Account temporarily locked, please try again later",
+        "rateLimit": "Too many login requests, please try again later",
+        "generic": "An error occurred during login, please try again later."
+      }
+    },
+    "register": {
+      "title": "Create new account",
+      "button": "Create account",
+      "loadingButton": "Creating account...",
+      "emailPlaceholder": "Enter your email address",
+      "passwordPlaceholder": "Enter your password",
+      "confirmPasswordPlaceholder": "Enter your password again",
+      "hasAccount": "or",
+      "loginLink": "Sign in to existing account",
+      "success": "Registration successful! Please check your email to verify your account.",
+      "error": "An error occurred during registration, please try again later.",
+      "passwordRequirements": {
+        "title": "Password requirements:",
+        "minLength": "At least 6 characters",
+        "lowercase": "At least one lowercase letter",
+        "uppercase": "At least one uppercase letter",
+        "number": "At least one number"
+      }
+    },
+    "forgotPassword": {
+      "title": "Reset password",
+      "button": "Send reset link",
+      "loadingButton": "Sending...",
+      "emailPlaceholder": "Enter your email address",
+      "success": "Reset link has been sent to your email",
+      "error": "An error occurred while sending reset link, please try again later.",
+      "backToLogin": "Back to login"
+    },
+    "resetPassword": {
+      "title": "Set new password",
+      "button": "Update password",
+      "loadingButton": "Updating...",
+      "passwordPlaceholder": "Enter new password",
+      "confirmPasswordPlaceholder": "Enter new password again",
+      "success": "Password updated successfully!",
+      "error": "An error occurred while updating password, please try again later."
+    }
+  },
+  "navigation": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "profile": "Profile",
+    "settings": "Settings",
+    "logout": "Sign out",
+    "login": "Sign in",
+    "register": "Sign up",
+    "welcome": "Welcome"
+  },
+  "pages": {
+    "home": {
+      "title": "Welcome to Mango",
+      "subtitle": "A modern authentication system demo built with Next.js 15 and Supabase",
+      "featuresTitle": "Feature Demo",
+      "dashboard": {
+        "title": "User Dashboard",
+        "description": "Manage your profile and settings"
+      },
+      "profile": {
+        "title": "Profile",
+        "description": "View and update personal information"
+      },
+      "getStarted": {
+        "title": "Get Started",
+        "description": "Sign up or sign in to experience the complete authentication features",
+        "registerButton": "Sign up now",
+        "loginButton": "Already have an account? Sign in"
+      }
+    },
+    "dashboard": {
+      "title": "User Dashboard",
+      "welcome": "Welcome back",
+      "statistics": "Statistics",
+      "recentActivity": "Recent Activity"
+    },
+    "profile": {
+      "title": "Profile",
+      "personalInfo": "Personal Information",
+      "accountSettings": "Account Settings",
+      "updateProfile": "Update Profile"
+    }
+  },
+  "validation": {
+    "required": "This field is required",
+    "emailInvalid": "Please enter a valid email address",
+    "passwordTooShort": "Password must be at least 6 characters",
+    "passwordMismatch": "Passwords do not match",
+    "passwordWeak": "Password is too weak, please refer to password requirements"
+  },
+  "messages": {
+    "confirmDelete": "Are you sure you want to delete? This action cannot be undone.",
+    "saveSuccess": "Saved successfully!",
+    "updateSuccess": "Updated successfully!",
+    "deleteSuccess": "Deleted successfully!",
+    "networkError": "Network connection error, please check your connection and try again.",
+    "serverError": "Server error, please try again later.",
+    "permissionDenied": "Insufficient permissions to perform this action."
+  },
+  "errors": {
+    "translation_error": "Translation Error",
+    "translation_error_message": "There was an error loading translations. Please try refreshing the page.",
+    "refresh_page": "Refresh Page",
+    "fallback_text": "Translation not available",
+    "loading_translations": "Loading translations...",
+    "translation_failed": "Translation loading failed"
+  }
+}

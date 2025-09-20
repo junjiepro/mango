@@ -7,12 +7,15 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { registerSchema, type RegisterFormData } from '@/lib/validations/auth'
+import { useTranslations } from 'next-intl'
 
 export default function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const { signUp } = useAuth()
   const router = useRouter()
+  const t = useTranslations('auth.register')
+  const tCommon = useTranslations('common')
 
   const {
     register,
@@ -38,7 +41,7 @@ export default function RegisterForm() {
       } else {
         setMessage({
           type: 'success',
-          text: '注册成功！请检查您的邮箱以验证账户。'
+          text: t('success')
         })
         reset()
         // 可选：延迟跳转到登录页面
@@ -49,7 +52,7 @@ export default function RegisterForm() {
     } catch (error) {
       setMessage({
         type: 'error',
-        text: '注册过程中发生错误，请稍后重试。'
+        text: t('error')
       })
     } finally {
       setIsLoading(false)
@@ -61,15 +64,15 @@ export default function RegisterForm() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-            创建新账户
+            {t('title')}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            或者{' '}
+            {t('hasAccount')}{' '}
             <Link
               href="/login"
               className="font-medium text-indigo-600 hover:text-indigo-500"
             >
-              登录现有账户
+              {t('loginLink')}
             </Link>
           </p>
         </div>
@@ -79,7 +82,7 @@ export default function RegisterForm() {
             {/* 邮箱输入 */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                邮箱地址
+                {tCommon('email')}
               </label>
               <input
                 {...register('email')}
@@ -91,7 +94,7 @@ export default function RegisterForm() {
                     ? 'border-red-300 text-red-900 placeholder-red-300'
                     : 'border-gray-300'
                 }`}
-                placeholder="请输入邮箱地址"
+                placeholder={t('emailPlaceholder')}
                 disabled={isLoading}
               />
               {errors.email && (
@@ -102,7 +105,7 @@ export default function RegisterForm() {
             {/* 密码输入 */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                密码
+                {tCommon('password')}
               </label>
               <input
                 {...register('password')}
@@ -114,7 +117,7 @@ export default function RegisterForm() {
                     ? 'border-red-300 text-red-900 placeholder-red-300'
                     : 'border-gray-300'
                 }`}
-                placeholder="请输入密码"
+                placeholder={t('passwordPlaceholder')}
                 disabled={isLoading}
               />
               {errors.password && (
@@ -125,7 +128,7 @@ export default function RegisterForm() {
             {/* 确认密码输入 */}
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                确认密码
+                {tCommon('confirmPassword')}
               </label>
               <input
                 {...register('confirmPassword')}
@@ -137,7 +140,7 @@ export default function RegisterForm() {
                     ? 'border-red-300 text-red-900 placeholder-red-300'
                     : 'border-gray-300'
                 }`}
-                placeholder="请再次输入密码"
+                placeholder={t('confirmPasswordPlaceholder')}
                 disabled={isLoading}
               />
               {errors.confirmPassword && (
@@ -175,22 +178,22 @@ export default function RegisterForm() {
               {isLoading ? (
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                  注册中...
+                  {t('loadingButton')}
                 </div>
               ) : (
-                '注册账户'
+                t('button')
               )}
             </button>
           </div>
 
           {/* 密码要求说明 */}
           <div className="mt-4 text-xs text-gray-500">
-            <p className="font-medium mb-1">密码要求：</p>
+            <p className="font-medium mb-1">{t('passwordRequirements.title')}</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>至少6个字符</li>
-              <li>包含至少一个小写字母</li>
-              <li>包含至少一个大写字母</li>
-              <li>包含至少一个数字</li>
+              <li>{t('passwordRequirements.minLength')}</li>
+              <li>{t('passwordRequirements.lowercase')}</li>
+              <li>{t('passwordRequirements.uppercase')}</li>
+              <li>{t('passwordRequirements.number')}</li>
             </ul>
           </div>
         </form>

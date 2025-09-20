@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { registerSchema } from '@/lib/validations/auth'
+import { env } from '@/lib/env'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
@@ -48,7 +49,7 @@ export async function registerAction(
       email: validatedData.email,
       password: validatedData.password,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`,
+        emailRedirectTo: `${env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
         data: {
           // 可以添加额外的用户元数据
           created_via: 'registration_form',

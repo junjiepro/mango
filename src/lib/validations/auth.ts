@@ -65,8 +65,39 @@ export const resetPasswordSchema = z.object({
   }
 )
 
+// 更新密码表单验证schema
+export const updatePasswordSchema = z.object({
+  currentPassword: z
+    .string()
+    .min(1, '请输入当前密码'),
+  newPassword: z
+    .string()
+    .min(8, '新密码至少需要8个字符')
+    .max(100, '新密码不能超过100个字符')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      '新密码必须包含至少一个小写字母、一个大写字母和一个数字'
+    ),
+  confirmPassword: z
+    .string()
+    .min(1, '请确认新密码')
+}).refine(
+  (data) => data.newPassword === data.confirmPassword,
+  {
+    message: '确认密码不匹配',
+    path: ['confirmPassword']
+  }
+).refine(
+  (data) => data.currentPassword !== data.newPassword,
+  {
+    message: '新密码不能与当前密码相同',
+    path: ['newPassword']
+  }
+)
+
 // 导出类型
 export type RegisterFormData = z.infer<typeof registerSchema>
 export type LoginFormData = z.infer<typeof loginSchema>
 export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>
+export type UpdatePasswordFormData = z.infer<typeof updatePasswordSchema>

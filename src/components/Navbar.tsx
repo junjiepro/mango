@@ -2,11 +2,14 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslations } from 'next-intl';
+import LanguageSwitcher from './LanguageSwitcher';
 
 export default function Navbar() {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const t = useTranslations('navigation');
 
   const handleLogout = async () => {
     const { error } = await signOut();
@@ -17,8 +20,13 @@ export default function Navbar() {
     }
   };
 
-  // Don't show navbar on auth pages
-  if (pathname === '/login' || pathname === '/register' || pathname === '/forgot-password') {
+  // Don't show navbar on auth pages - check for locale-aware paths
+  const authPaths = ['/login', '/register', '/forgot-password'];
+  const shouldHideNavbar = authPaths.some(path =>
+    pathname === path || pathname.endsWith(path)
+  );
+
+  if (shouldHideNavbar) {
     return null;
   }
 
@@ -30,7 +38,8 @@ export default function Navbar() {
             <div className="flex-shrink-0 flex items-center">
               <span className="text-xl font-bold text-indigo-600">Mango</span>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center space-x-4">
+              <LanguageSwitcher />
               <div className="animate-pulse h-6 w-24 bg-gray-200 rounded"></div>
             </div>
           </div>
@@ -52,22 +61,23 @@ export default function Navbar() {
             </button>
           </div>
           <div className="flex items-center space-x-4">
+            <LanguageSwitcher />
             {user ? (
               <>
                 <span className="text-sm text-gray-700">
-                  欢迎, {user.email}
+                  {t('welcome')}, {user.email}
                 </span>
                 <button
                   onClick={() => router.push('/dashboard')}
                   className="text-sm text-gray-700 hover:text-gray-900"
                 >
-                  控制台
+                  {t('dashboard')}
                 </button>
                 <button
                   onClick={handleLogout}
                   className="text-sm text-red-600 hover:text-red-800"
                 >
-                  退出登录
+                  {t('logout')}
                 </button>
               </>
             ) : (
@@ -76,13 +86,13 @@ export default function Navbar() {
                   onClick={() => router.push('/login')}
                   className="text-sm text-gray-700 hover:text-gray-900"
                 >
-                  登录
+                  {t('login')}
                 </button>
                 <button
                   onClick={() => router.push('/register')}
                   className="ml-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
-                  注册
+                  {t('register')}
                 </button>
               </>
             )}
