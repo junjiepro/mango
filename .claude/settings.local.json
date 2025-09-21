@@ -1,4 +1,12 @@
 {
+  "permissions": {
+    "allow": [
+      "mcp__spec-workflow__spec-workflow-guide",
+      "mcp__spec-workflow__approvals",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs"
+    ]
+  },
   "enabledMcpjsonServers": [
     "supabase-mcp-server",
     "spec-workflow"

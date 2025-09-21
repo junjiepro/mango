@@ -1,0 +1,33 @@
+{
+  "id": "approval_1758444832719_fuxglfv1s",
+  "title": "AI Agent MCP Tools 设计文档审批 (修订版)",
+  "filePath": ".spec-workflow/specs/ai-agent-mcp-tools/design.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-21T08:53:52.719Z",
+  "category": "spec",
+  "categoryName": "ai-agent-mcp-tools",
+  "response": "Feedback Summary (3 comments):\n\nGeneral Comments:\n1. 首先我们是要实现一个通用易扩展的Agent，要考虑非技术用户和技术用户的需求。MCP功能是该Agent的一个可配置模块\n2. Agent需要考虑多模态输入输出，对于各种类型的输入输出要提供友好的查看编辑界面\n3. Agent对于工具调用和分步处理提供友好的显示，详略得当\n\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"general\",\n      \"comment\": \"首先我们是要实现一个通用易扩展的Agent，要考虑非技术用户和技术用户的需求。MCP功能是该Agent的一个可配置模块\",\n      \"timestamp\": \"2025-09-21T09:43:55.704Z\",\n      \"id\": \"comment_1758447835704_irwuy40o5\"\n    },\n    {\n      \"type\": \"general\",\n      \"comment\": \"Agent需要考虑多模态输入输出，对于各种类型的输入输出要提供友好的查看编辑界面\",\n      \"timestamp\": \"2025-09-21T09:47:02.300Z\",\n      \"id\": \"comment_1758448022300_dqqzpjqyt\"\n    },\n    {\n      \"type\": \"general\",\n      \"comment\": \"Agent对于工具调用和分步处理提供友好的显示，详略得当\",\n      \"timestamp\": \"2025-09-21T09:50:08.803Z\",\n      \"id\": \"comment_1758448208803_xuj1koiun\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (3 comments):\\n\\nGeneral Comments:\\n1. 首先我们是要实现一个通用易扩展的Agent，要考虑非技术用户和技术用户的需求。MCP功能是该Agent的一个可配置模块\\n2. Agent需要考虑多模态输入输出，对于各种类型的输入输出要提供友好的查看编辑界面\\n3. Agent对于工具调用和分步处理提供友好的显示，详略得当\\n\\n\",\n  \"timestamp\": \"2025-09-21T09:50:18.691Z\"\n}",
+  "respondedAt": "2025-09-21T09:50:19.013Z",
+  "comments": [
+    {
+      "type": "general",
+      "comment": "首先我们是要实现一个通用易扩展的Agent，要考虑非技术用户和技术用户的需求。MCP功能是该Agent的一个可配置模块",
+      "timestamp": "2025-09-21T09:43:55.704Z",
+      "id": "comment_1758447835704_irwuy40o5"
+    },
+    {
+      "type": "general",
+      "comment": "Agent需要考虑多模态输入输出，对于各种类型的输入输出要提供友好的查看编辑界面",
+      "timestamp": "2025-09-21T09:47:02.300Z",
+      "id": "comment_1758448022300_dqqzpjqyt"
+    },
+    {
+      "type": "general",
+      "comment": "Agent对于工具调用和分步处理提供友好的显示，详略得当",
+      "timestamp": "2025-09-21T09:50:08.803Z",
+      "id": "comment_1758448208803_xuj1koiun"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "approval_1758449102142_tnfo4t2rk",
+  "title": "AI Agent 通用智能代理平台设计文档审批",
+  "filePath": ".spec-workflow/specs/ai-agent-mcp-tools/design.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-21T10:05:02.142Z",
+  "category": "spec",
+  "categoryName": "ai-agent-mcp-tools",
+  "response": "Feedback Summary (2 comments):\n\nGeneral Comments:\n1. 对于代码块、文件类型，考虑使用相关代码编辑器组件显示与编辑，对于html，提供网页预览\n2. 使用context7和deepwiki工具，查看@modelcontextprotocol/sdk、vercel ai sdk和vercel ai elements等库的使用说明，可以参考复用相关库的示例与说明，使得我们的设计能考虑到各技术栈的最佳实践\n\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"general\",\n      \"comment\": \"对于代码块、文件类型，考虑使用相关代码编辑器组件显示与编辑，对于html，提供网页预览\",\n      \"timestamp\": \"2025-09-21T13:47:40.416Z\",\n      \"id\": \"comment_1758462460416_k8ukm26vy\"\n    },\n    {\n      \"type\": \"general\",\n      \"comment\": \"使用context7和deepwiki工具，查看@modelcontextprotocol/sdk、vercel ai sdk和vercel ai elements等库的使用说明，可以参考复用相关库的示例与说明，使得我们的设计能考虑到各技术栈的最佳实践\",\n      \"timestamp\": \"2025-09-21T13:52:47.950Z\",\n      \"id\": \"comment_1758462767950_pn27cl439\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (2 comments):\\n\\nGeneral Comments:\\n1. 对于代码块、文件类型，考虑使用相关代码编辑器组件显示与编辑，对于html，提供网页预览\\n2. 使用context7和deepwiki工具，查看@modelcontextprotocol/sdk、vercel ai sdk和vercel ai elements等库的使用说明，可以参考复用相关库的示例与说明，使得我们的设计能考虑到各技术栈的最佳实践\\n\\n\",\n  \"timestamp\": \"2025-09-21T13:52:49.106Z\"\n}",
+  "respondedAt": "2025-09-21T13:52:49.430Z",
+  "comments": [
+    {
+      "type": "general",
+      "comment": "对于代码块、文件类型，考虑使用相关代码编辑器组件显示与编辑，对于html，提供网页预览",
+      "timestamp": "2025-09-21T13:47:40.416Z",
+      "id": "comment_1758462460416_k8ukm26vy"
+    },
+    {
+      "type": "general",
+      "comment": "使用context7和deepwiki工具，查看@modelcontextprotocol/sdk、vercel ai sdk和vercel ai elements等库的使用说明，可以参考复用相关库的示例与说明，使得我们的设计能考虑到各技术栈的最佳实践",
+      "timestamp": "2025-09-21T13:52:47.950Z",
+      "id": "comment_1758462767950_pn27cl439"
+    }
+  ]
+}

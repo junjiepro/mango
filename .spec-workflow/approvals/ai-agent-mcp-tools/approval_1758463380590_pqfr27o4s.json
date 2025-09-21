@@ -1,0 +1,12 @@
+{
+  "id": "approval_1758463380590_pqfr27o4s",
+  "title": "AI Agent 任务拆解文档审批",
+  "filePath": ".spec-workflow/specs/ai-agent-mcp-tools/tasks.md",
+  "type": "document",
+  "status": "approved",
+  "createdAt": "2025-09-21T14:03:00.590Z",
+  "category": "spec",
+  "categoryName": "ai-agent-mcp-tools",
+  "response": "通过仪表板批准",
+  "respondedAt": "2025-09-21T14:03:58.943Z"
+}
