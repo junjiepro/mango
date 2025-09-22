@@ -4,7 +4,15 @@
       "mcp__spec-workflow__spec-workflow-guide",
       "mcp__spec-workflow__approvals",
       "mcp__context7__resolve-library-id",
-      "mcp__context7__get-library-docs"
+      "mcp__context7__get-library-docs",
+      "Bash(npm run dev:*)",
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "mcp__Playwright__browser_navigate",
+      "mcp__Playwright__browser_snapshot",
+      "mcp__Playwright__browser_select_option",
+      "mcp__Playwright__browser_close",
+      "mcp__Playwright__browser_wait_for"
     ]
   },
   "enabledMcpjsonServers": [

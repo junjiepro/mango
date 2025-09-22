@@ -86,6 +86,7 @@
     "dashboard": "Dashboard",
     "profile": "Profile",
     "settings": "Settings",
+    "aiAgent": "AI Agent",
     "logout": "Sign out",
     "login": "Sign in",
     "register": "Sign up",
@@ -122,6 +123,128 @@
       "personalInfo": "Personal Information",
       "accountSettings": "Account Settings",
       "updateProfile": "Update Profile"
+    }
+  },
+  "aiAgent": {
+    "title": "AI Agent",
+    "subtitle": "Intelligent AI Assistant with multimodal capabilities and MCP tool integration",
+    "welcome": {
+      "title": "Welcome to AI Agent",
+      "description": "Start conversing with your intelligent AI assistant"
+    },
+    "features": {
+      "intelligent": "Intelligent Conversation",
+      "intelligentDesc": "Natural language understanding and generation powered by advanced AI models",
+      "multimodal": "Multimodal Support",
+      "multimodalDesc": "Support for text, code, images, audio, and other content types",
+      "tools": "Tool Integration",
+      "toolsDesc": "Integrated MCP tools to extend AI assistant capabilities"
+    },
+    "mode": {
+      "simple": {
+        "title": "Simple Mode",
+        "description": "Simplified interface focused on conversation experience"
+      },
+      "advanced": {
+        "title": "Advanced Mode",
+        "description": "Full features including tool management and technical options"
+      }
+    },
+    "quickActions": {
+      "title": "Quick Actions",
+      "askQuestion": "Ask Question",
+      "analyzeContent": "Analyze Content",
+      "createContent": "Create Content",
+      "manageMCP": "Manage MCP Tools",
+      "viewSessions": "View Sessions",
+      "configure": "Configure Settings"
+    },
+    "conversation": {
+      "title": "AI Conversation",
+      "placeholder": "Enter your question or instruction...",
+      "send": "Send",
+      "clear": "Clear Conversation",
+      "newSession": "New Session",
+      "loading": "AI is thinking...",
+      "error": "Conversation error, please try again",
+      "empty": "No conversation content yet, start chatting with the AI assistant!"
+    },
+    "session": {
+      "current": "Current Session",
+      "viewDetails": "View Details",
+      "create": "Create New Session",
+      "delete": "Delete Session",
+      "archive": "Archive Session",
+      "export": "Export Session",
+      "settings": "Session Settings"
+    },
+    "plugins": {
+      "title": "Plugin Management",
+      "subtitle": "Manage MCP server connections and plugin configurations",
+      "overview": "Overview",
+      "servers": "MCP Servers",
+      "plugins": "Plugins",
+      "marketplace": "Marketplace",
+      "install": "Install",
+      "uninstall": "Uninstall",
+      "enable": "Enable",
+      "disable": "Disable",
+      "configure": "Configure",
+      "monitor": "Monitor",
+      "status": {
+        "connected": "Connected",
+        "connecting": "Connecting",
+        "disconnected": "Disconnected",
+        "error": "Error",
+        "active": "Active",
+        "loading": "Loading",
+        "disabled": "Disabled"
+      }
+    },
+    "tools": {
+      "title": "Tool Execution",
+      "execution": "Execution Process",
+      "result": "Execution Result",
+      "error": "Execution Error",
+      "parameters": "Parameters",
+      "output": "Output",
+      "duration": "Duration",
+      "steps": "Execution Steps"
+    },
+    "content": {
+      "text": "Text",
+      "code": "Code",
+      "html": "HTML",
+      "image": "Image",
+      "audio": "Audio",
+      "file": "File",
+      "edit": "Edit",
+      "view": "View",
+      "download": "Download",
+      "upload": "Upload"
+    },
+    "settings": {
+      "title": "AI Agent Settings",
+      "general": "General Settings",
+      "model": "Model Settings",
+      "plugins": "Plugin Settings",
+      "privacy": "Privacy Settings",
+      "advanced": "Advanced Settings"
+    },
+    "errors": {
+      "sessionNotFound": "Session not found",
+      "pluginError": "Plugin error",
+      "connectionFailed": "Connection failed",
+      "toolExecutionFailed": "Tool execution failed",
+      "unauthorizedAccess": "Access denied",
+      "rateLimitExceeded": "Rate limit exceeded"
+    },
+    "success": {
+      "sessionCreated": "Session created successfully",
+      "pluginInstalled": "Plugin installed successfully",
+      "serverConnected": "Server connected successfully",
+      "settingsSaved": "Settings saved successfully",
+      "dataExported": "Data exported successfully"
     }
   },
   "validation": {

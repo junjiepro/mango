@@ -6,7 +6,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { I18nErrorBoundary } from '@/components/I18nErrorBoundary';
-import { TranslationPreloader } from '@/lib/i18n-performance';
+import { TranslationPreloader } from '@/components/i18n/I18nPerformanceHooks';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,11 +26,14 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({
   children,
-  params: { locale }
+  params
 }: Readonly<{
   children: React.ReactNode;
-  params: { locale: string };
+  params: Promise<{ locale: string }>;
 }>) {
+  // Await params before using
+  const { locale } = await params;
+
   // 提供服务器端消息给客户端组件
   const messages = await getMessages();
 

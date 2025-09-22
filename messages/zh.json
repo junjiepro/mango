@@ -86,6 +86,7 @@
     "dashboard": "控制台",
     "profile": "个人资料",
     "settings": "设置",
+    "aiAgent": "AI助手",
     "logout": "退出登录",
     "login": "登录",
     "register": "注册",
@@ -122,6 +123,128 @@
       "personalInfo": "个人信息",
       "accountSettings": "账户设置",
       "updateProfile": "更新资料"
+    }
+  },
+  "aiAgent": {
+    "title": "AI助手",
+    "subtitle": "智能AI助手，配备多模态处理和MCP工具集成",
+    "welcome": {
+      "title": "欢迎使用AI助手",
+      "description": "开始与您的智能AI助手对话"
+    },
+    "features": {
+      "intelligent": "智能对话",
+      "intelligentDesc": "基于先进AI模型的自然语言理解和生成",
+      "multimodal": "多模态支持",
+      "multimodalDesc": "支持文本、代码、图像、音频等多种内容类型",
+      "tools": "工具集成",
+      "toolsDesc": "集成MCP工具，扩展AI助手的能力边界"
+    },
+    "mode": {
+      "simple": {
+        "title": "简单模式",
+        "description": "简化界面，专注于对话体验"
+      },
+      "advanced": {
+        "title": "高级模式",
+        "description": "完整功能，包含工具管理和技术选项"
+      }
+    },
+    "quickActions": {
+      "title": "快速操作",
+      "askQuestion": "提问咨询",
+      "analyzeContent": "内容分析",
+      "createContent": "内容创作",
+      "manageMCP": "管理MCP工具",
+      "viewSessions": "查看会话",
+      "configure": "配置设置"
+    },
+    "conversation": {
+      "title": "AI对话",
+      "placeholder": "输入您的问题或指令...",
+      "send": "发送",
+      "clear": "清空对话",
+      "newSession": "新建对话",
+      "loading": "AI正在思考...",
+      "error": "对话出现错误，请重试",
+      "empty": "还没有对话内容，开始与AI助手交流吧！"
+    },
+    "session": {
+      "current": "当前会话",
+      "viewDetails": "查看详情",
+      "create": "创建新会话",
+      "delete": "删除会话",
+      "archive": "归档会话",
+      "export": "导出会话",
+      "settings": "会话设置"
+    },
+    "plugins": {
+      "title": "插件管理",
+      "subtitle": "管理MCP服务器连接和插件配置",
+      "overview": "概览",
+      "servers": "MCP服务器",
+      "plugins": "插件",
+      "marketplace": "应用商店",
+      "install": "安装",
+      "uninstall": "卸载",
+      "enable": "启用",
+      "disable": "禁用",
+      "configure": "配置",
+      "monitor": "监控",
+      "status": {
+        "connected": "已连接",
+        "connecting": "连接中",
+        "disconnected": "未连接",
+        "error": "错误",
+        "active": "运行中",
+        "loading": "加载中",
+        "disabled": "已禁用"
+      }
+    },
+    "tools": {
+      "title": "工具执行",
+      "execution": "执行过程",
+      "result": "执行结果",
+      "error": "执行错误",
+      "parameters": "参数",
+      "output": "输出",
+      "duration": "耗时",
+      "steps": "执行步骤"
+    },
+    "content": {
+      "text": "文本",
+      "code": "代码",
+      "html": "HTML",
+      "image": "图像",
+      "audio": "音频",
+      "file": "文件",
+      "edit": "编辑",
+      "view": "查看",
+      "download": "下载",
+      "upload": "上传"
+    },
+    "settings": {
+      "title": "AI助手设置",
+      "general": "常规设置",
+      "model": "模型设置",
+      "plugins": "插件设置",
+      "privacy": "隐私设置",
+      "advanced": "高级设置"
+    },
+    "errors": {
+      "sessionNotFound": "找不到会话",
+      "pluginError": "插件错误",
+      "connectionFailed": "连接失败",
+      "toolExecutionFailed": "工具执行失败",
+      "unauthorizedAccess": "访问被拒绝",
+      "rateLimitExceeded": "请求频率过高"
+    },
+    "success": {
+      "sessionCreated": "会话创建成功",
+      "pluginInstalled": "插件安装成功",
+      "serverConnected": "服务器连接成功",
+      "settingsSaved": "设置保存成功",
+      "dataExported": "数据导出成功"
     }
   },
   "validation": {

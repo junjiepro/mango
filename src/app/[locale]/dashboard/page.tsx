@@ -1,7 +1,8 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from '@/i18n/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'

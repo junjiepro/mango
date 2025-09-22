@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useRouter } from '@/i18n/navigation'
+import { Link } from '@/i18n/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/lib/validations/auth'
 

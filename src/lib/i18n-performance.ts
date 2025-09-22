@@ -1,6 +1,9 @@
 /**
  * I18n 性能优化工具
  * 提供翻译文件懒加载、缓存和性能监控功能
+ *
+ * 这个文件只包含服务器端的性能管理器类
+ * React Hooks 已移至客户端组件文件
  */
 
 interface TranslationCache {
@@ -207,102 +210,8 @@ class I18nPerformanceManager {
 // 创建单例实例
 export const i18nPerformanceManager = new I18nPerformanceManager()
 
-/**
- * React Hook：用于性能优化的翻译加载
- */
-export function useOptimizedTranslations(locale: string) {
-  const [translations, setTranslations] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
 
-  useEffect(() => {
-    let mounted = true
 
-    const loadTranslations = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-
-        const messages = await i18nPerformanceManager.loadTranslations(locale)
-
-        if (mounted) {
-          setTranslations(messages)
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(err instanceof Error ? err : new Error('Unknown error'))
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    loadTranslations()
-
-    return () => {
-      mounted = false
-    }
-  }, [locale])
-
-  return { translations, loading, error }
-}
-
-/**
- * 性能监控 Hook
- */
-export function useI18nPerformanceMonitor() {
-  const [metrics, setMetrics] = useState<PerformanceMetrics>(
-    i18nPerformanceManager.getMetrics()
-  )
-
-  const updateMetrics = () => {
-    setMetrics(i18nPerformanceManager.getMetrics())
-  }
-
-  const resetMetrics = () => {
-    i18nPerformanceManager.resetMetrics()
-    updateMetrics()
-  }
-
-  useEffect(() => {
-    // 定期更新指标
-    const interval = setInterval(updateMetrics, 5000)
-    return () => clearInterval(interval)
-  }, [])
-
-  return {
-    metrics,
-    updateMetrics,
-    resetMetrics,
-    cacheStatus: i18nPerformanceManager.getCacheStatus()
-  }
-}
-
-/**
- * 翻译预加载器组件
- */
-interface TranslationPreloaderProps {
-  locales: string[]
-  children: React.ReactNode
-}
-
-export function TranslationPreloader({ locales, children }: TranslationPreloaderProps) {
-  const [preloaded, setPreloaded] = useState(false)
-
-  useEffect(() => {
-    i18nPerformanceManager.preloadTranslations(locales).then(() => {
-      setPreloaded(true)
-    })
-  }, [locales])
-
-  // 可以选择在预加载完成前显示加载指示器
-  // 但为了不影响用户体验，我们直接渲染子组件
-  return <>{children}</>
-}
 
 // 导出默认实例和工具函数
 export default i18nPerformanceManager
-
-import { useEffect, useState } from 'react'

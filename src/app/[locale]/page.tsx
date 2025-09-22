@@ -3,7 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import AuthStatus from '@/components/AuthStatus';
 import { useTranslations } from 'next-intl';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 
 export default function Home() {
   const { user, loading } = useAuth();

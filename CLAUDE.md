@@ -192,6 +192,30 @@ Use `npm run validate:env` to check environment configuration before deployment.
 - **Bundle analysis**: Monitor bundle size with build output
 - **Lazy loading**: Implemented for translation files
 
+## Database Migrations
+
+### Supabase Migrations
+The project uses Supabase migrations for database schema management:
+
+- **Location**: `supabase/migrations/`
+- **Schema Migration**: `20241201000000_ai_agent_schema.sql`
+- **Functions Migration**: `20241201000001_ai_agent_functions.sql`
+
+### Applying Migrations
+```bash
+# Using Supabase CLI
+supabase db push
+
+# Or manually via SQL Editor in Supabase Dashboard
+```
+
+### AI Agent Schema
+- **7 main tables**: sessions, messages, plugins, servers, etc.
+- **Row Level Security**: User data isolation
+- **Performance indexes**: Optimized for queries
+- **Full-text search**: pg_trgm enabled
+- **Secure functions**: Protected with explicit search_path
+
 ## Troubleshooting
 
 ### Common Issues

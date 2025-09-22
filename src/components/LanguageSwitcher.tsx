@@ -1,8 +1,8 @@
 'use client';
 
 import { useLocale } from 'next-intl';
-import { usePathname, useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { usePathname, useRouter } from '@/i18n/navigation';
+import { useTransition } from 'react';
 
 export default function LanguageSwitcher() {
   const [isPending, startTransition] = useTransition();
@@ -17,12 +17,8 @@ export default function LanguageSwitcher() {
 
   const onSelectChange = (locale: string) => {
     startTransition(() => {
-      // 更新 cookie 以持久化语言选择
-      document.cookie = `NEXT_LOCALE=${locale}; path=/; max-age=31536000; SameSite=Lax`;
-
-      // 构建新的 URL
-      const newPathname = pathname.replace(`/${localActive}`, `/${locale}`);
-      router.replace(newPathname);
+      // Use direct URL navigation to ensure complete page reload with new locale
+      window.location.href = `/${locale}${pathname === '/' ? '' : pathname}`;
     });
   };
 
