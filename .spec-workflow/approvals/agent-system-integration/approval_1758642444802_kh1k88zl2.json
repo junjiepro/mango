@@ -1,0 +1,27 @@
+{
+  "id": "approval_1758642444802_kh1k88zl2",
+  "title": "Agent 系统整合技术设计文档",
+  "filePath": ".spec-workflow/specs/agent-system-integration/design.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-23T15:47:24.802Z",
+  "category": "spec",
+  "categoryName": "agent-system-integration",
+  "response": "Feedback Summary (1 comments):\n\nSpecific Text Comments:\n1. \"- **UI 组件库**: 最大化复用现有的 shadcn/ui 组件\n  - `Button`, ...\": 另外，对于AI相关的UI组件可以考虑使用引入vercel ai elements\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"selection\",\n      \"comment\": \"另外，对于AI相关的UI组件可以考虑使用引入vercel ai elements\",\n      \"timestamp\": \"2025-09-23T15:53:41.648Z\",\n      \"selectedText\": \"- **UI 组件库**: 最大化复用现有的 shadcn/ui 组件\\n  - `Button`, `Card`, `Input`, `Alert` 等基础组件\\n  - `Tabs`, `Dialog`, `Badge` 等复合组件\\n  - 新增必要的 Agent 特定组件\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#ffeb3b\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1758642811641_85s8brc1g\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (1 comments):\\n\\nSpecific Text Comments:\\n1. \\\"- **UI 组件库**: 最大化复用现有的 shadcn/ui 组件\\n  - `Button`, ...\\\": 另外，对于AI相关的UI组件可以考虑使用引入vercel ai elements\\n\",\n  \"timestamp\": \"2025-09-23T15:53:49.740Z\"\n}",
+  "respondedAt": "2025-09-23T15:53:50.051Z",
+  "comments": [
+    {
+      "type": "selection",
+      "comment": "另外，对于AI相关的UI组件可以考虑使用引入vercel ai elements",
+      "timestamp": "2025-09-23T15:53:41.648Z",
+      "selectedText": "- **UI 组件库**: 最大化复用现有的 shadcn/ui 组件\n  - `Button`, `Card`, `Input`, `Alert` 等基础组件\n  - `Tabs`, `Dialog`, `Badge` 等复合组件\n  - 新增必要的 Agent 特定组件",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#ffeb3b",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1758642811641_85s8brc1g"
+    }
+  ]
+}

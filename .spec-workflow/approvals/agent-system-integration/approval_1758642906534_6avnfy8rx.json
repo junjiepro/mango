@@ -1,0 +1,21 @@
+{
+  "id": "approval_1758642906534_6avnfy8rx",
+  "title": "Agent 系统整合技术设计文档（已更新 Vercel AI Elements）",
+  "filePath": ".spec-workflow/specs/agent-system-integration/design.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-23T15:55:06.534Z",
+  "category": "spec",
+  "categoryName": "agent-system-integration",
+  "response": "Feedback Summary (1 comments):\n\nGeneral Comments:\n1. vercel ai elements的UI组件已经在src\\components\\ai-elements下，设计实现时可参考使用\n\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"general\",\n      \"comment\": \"vercel ai elements的UI组件已经在src\\\\components\\\\ai-elements下，设计实现时可参考使用\",\n      \"timestamp\": \"2025-09-23T15:59:40.696Z\",\n      \"id\": \"comment_1758643180696_a8gzuwnrg\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (1 comments):\\n\\nGeneral Comments:\\n1. vercel ai elements的UI组件已经在src\\\\components\\\\ai-elements下，设计实现时可参考使用\\n\\n\",\n  \"timestamp\": \"2025-09-23T15:59:42.403Z\"\n}",
+  "respondedAt": "2025-09-23T15:59:42.711Z",
+  "comments": [
+    {
+      "type": "general",
+      "comment": "vercel ai elements的UI组件已经在src\\components\\ai-elements下，设计实现时可参考使用",
+      "timestamp": "2025-09-23T15:59:40.696Z",
+      "id": "comment_1758643180696_a8gzuwnrg"
+    }
+  ]
+}
