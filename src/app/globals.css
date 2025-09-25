@@ -16,6 +16,18 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-ai-assistant: var(--ai-assistant);
+  --color-ai-assistant-foreground: var(--ai-assistant-foreground);
+  --color-ai-user: var(--ai-user);
+  --color-ai-user-foreground: var(--ai-user-foreground);
+  --color-ai-thinking: var(--ai-thinking);
+  --color-ai-thinking-foreground: var(--ai-thinking-foreground);
+  --color-ai-code: var(--ai-code);
+  --color-ai-code-foreground: var(--ai-code-foreground);
+  --color-ai-artifact: var(--ai-artifact);
+  --color-ai-artifact-foreground: var(--ai-artifact-foreground);
+  --color-ai-accent: var(--ai-accent);
+  --color-ai-accent-foreground: var(--ai-accent-foreground);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -76,6 +88,18 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --ai-assistant: oklch(0.646 0.222 41.116);
+  --ai-assistant-foreground: oklch(0.985 0 0);
+  --ai-user: oklch(0.398 0.07 227.392);
+  --ai-user-foreground: oklch(0.985 0 0);
+  --ai-thinking: oklch(0.828 0.189 84.429);
+  --ai-thinking-foreground: oklch(0.145 0 0);
+  --ai-code: oklch(0.269 0 0);
+  --ai-code-foreground: oklch(0.985 0 0);
+  --ai-artifact: oklch(0.97 0 0);
+  --ai-artifact-foreground: oklch(0.145 0 0);
+  --ai-accent: oklch(0.769 0.188 70.08);
+  --ai-accent-foreground: oklch(0.145 0 0);
 }
 
 .dark {
@@ -110,6 +134,18 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --ai-assistant: oklch(0.696 0.17 162.48);
+  --ai-assistant-foreground: oklch(0.145 0 0);
+  --ai-user: oklch(0.488 0.243 264.376);
+  --ai-user-foreground: oklch(0.985 0 0);
+  --ai-thinking: oklch(0.645 0.246 16.439);
+  --ai-thinking-foreground: oklch(0.985 0 0);
+  --ai-code: oklch(0.205 0 0);
+  --ai-code-foreground: oklch(0.985 0 0);
+  --ai-artifact: oklch(0.269 0 0);
+  --ai-artifact-foreground: oklch(0.985 0 0);
+  --ai-accent: oklch(0.627 0.265 303.9);
+  --ai-accent-foreground: oklch(0.985 0 0);
 }
 
 @layer base {

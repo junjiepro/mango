@@ -1,507 +1,700 @@
 /**
- * AI Agent 对话接口组件
- * 使用 Vercel AI Elements 实现对话功能，支持多模态内容
+ * AI Agent 对话接口组件 - 优化版本
+ * 集成 AI Elements 提供更好的对话体验，支持流式响应和多模态内容
  */
 
-'use client'
+"use client";
 
-import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { useChat } from '@ai-sdk/react'
-import { useTranslations } from 'next-intl'
-import { useAuth } from '@/contexts/AuthContext'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
-import type { MultimodalContent, UserMode } from '@/types/ai-agent'
-
-// Icons
-const SendIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-  </svg>
-)
-
-const AttachIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-  </svg>
-)
-
-const LoadingIcon = () => (
-  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-  </svg>
-)
-
-const BotIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-  </svg>
-)
-
-const UserIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-  </svg>
-)
-
-/**
- * 消息角色类型
- */
-type MessageRole = 'user' | 'assistant' | 'system'
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useChat } from "@ai-sdk/react";
+import { useTranslations } from "next-intl";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  Message,
+  MessageContent,
+  MessageAvatar,
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+  PromptInput,
+  PromptInputBody,
+  PromptInputTextarea,
+  PromptInputSubmit,
+  PromptInputAttachment,
+  CodeBlock,
+  CodeBlockCopyButton,
+  Loader,
+  ChainOfThought,
+  ChainOfThoughtStep,
+  ChainOfThoughtHeader,
+  ChainOfThoughtContent,
+  Suggestions,
+  Suggestion,
+  PromptInputAttachments,
+  PromptInputToolbar,
+  PromptInputTools,
+  PromptInputButton,
+} from "@/components/ai-elements";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import {
+  Bot,
+  User,
+  Code,
+  Lightbulb,
+  BookOpen,
+  Calculator,
+  Brain,
+  Sparkles,
+  FileText,
+  Image as ImageIcon,
+  Play,
+} from "lucide-react";
+import type { MultimodalContent, UserMode } from "@/types/ai-agent";
 
 /**
  * 扩展的消息接口
  */
-interface ConversationMessage {
-  id: string
-  role: MessageRole
-  content: string
-  multimodal?: MultimodalContent[]
-  timestamp: string
-  isStreaming?: boolean
-  toolCalls?: any[]
-  error?: string
+interface EnhancedMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  multimodal?: MultimodalContent[];
+  timestamp: string;
+  isStreaming?: boolean;
+  toolCalls?: any[];
+  error?: string;
+  thinking?: string[];
+  codeBlocks?: { language: string; code: string; title?: string }[];
 }
 
 /**
  * 对话接口属性
  */
 interface ConversationInterfaceProps {
-  mode: UserMode
-  sessionId?: string
-  onSessionChange?: (sessionId: string) => void
-  className?: string
+  mode: UserMode;
+  sessionId?: string;
+  onSessionChange?: (sessionId: string) => void;
+  className?: string;
 }
 
 /**
- * AI Agent 对话接口组件
+ * 示例建议
+ */
+const getModeSuggestions = (mode: UserMode, t: any) => {
+  const suggestions = {
+    simple: ["帮我解释一个概念", "写一段代码", "翻译这段文字", "总结一下要点"],
+    advanced: [
+      "分析这个算法的复杂度",
+      "设计一个系统架构",
+      "调试这个问题",
+      "优化代码性能",
+      "生成测试用例",
+      "解释设计模式",
+    ],
+  };
+  return suggestions[mode] || suggestions.simple;
+};
+
+/**
+ * AI Agent 对话接口组件 - 优化版本
  */
 export default function ConversationInterface({
   mode,
   sessionId,
   onSessionChange,
-  className
+  className,
 }: ConversationInterfaceProps) {
-  const { user } = useAuth()
-  const t = useTranslations('aiAgent.conversation')
+  const { user } = useAuth();
+  const t = useTranslations("aiAgent.conversation");
 
-  // 聊天状态
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    isLoading,
-    error,
-    reload,
-    stop
-  } = useChat({
-    api: '/api/ai-agent',
+  // 聊天状态 - 尝试使用完整的 useChat API
+  const chatResult = useChat({
+    api: "/api/ai-agent",
     initialMessages: [],
+    body: {
+      mode,
+      sessionId,
+      userId: user?.id,
+    },
     onFinish: (message) => {
-      console.log('Message finished:', message)
+      console.log("Message finished:", message);
+      // 可以在这里处理会话ID更新
+      if (chatResult.data?.sessionId && onSessionChange) {
+        onSessionChange(chatResult.data.sessionId);
+      }
     },
     onError: (error) => {
-      console.error('Chat error:', error)
-    }
-  })
+      console.error("Chat error:", error);
+    },
+  });
+
+  // 解构结果，如果不存在则使用默认值
+  const { messages, error, reload, stop, data } = chatResult;
+
+  // 检查是否存在 input 和 handleSubmit，如果不存在则使用本地状态
+  const input = (chatResult as any).input;
+  const handleSubmit = (chatResult as any).handleSubmit;
+  const handleInputChange = (chatResult as any).handleInputChange;
+  const isLoading = (chatResult as any).isLoading;
+
+  // 本地状态作为后备
+  const [localInput, setLocalInput] = useState("");
+  const [localIsLoading, setLocalIsLoading] = useState(false);
 
   // 组件状态
-  const [multimodalFiles, setMultimodalFiles] = useState<File[]>([])
-  const [isComposing, setIsComposing] = useState(false)
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false)
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(true);
 
-  // 引用
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  // 建议列表
+  const suggestions = getModeSuggestions(mode, t);
 
-  // 滚动到底部
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [])
+  // 输入处理 - 使用 useChat 提供的或本地状态
+  const actualInput = input !== undefined ? input : localInput;
+  const actualIsLoading = isLoading !== undefined ? isLoading : localIsLoading;
+  const actualHandleInputChange =
+    handleInputChange ||
+    useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setLocalInput(e.target.value);
+    }, []);
 
-  // 检查是否需要显示"滚动到底部"按钮
-  const checkScrollPosition = useCallback(() => {
-    const container = messagesContainerRef.current
-    if (!container) return
-
-    const { scrollTop, scrollHeight, clientHeight } = container
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
-    setShowScrollToBottom(!isNearBottom && messages.length > 0)
-  }, [messages.length])
-
-  // 自动滚动到底部（新消息时）
-  useEffect(() => {
-    if (messages.length > 0 && !showScrollToBottom) {
-      scrollToBottom()
-    }
-  }, [messages.length, showScrollToBottom, scrollToBottom])
-
-  // 监听滚动位置
-  useEffect(() => {
-    const container = messagesContainerRef.current
-    if (!container) return
-
-    container.addEventListener('scroll', checkScrollPosition)
-    return () => container.removeEventListener('scroll', checkScrollPosition)
-  }, [checkScrollPosition])
-
-  // 处理文件上传
-  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || [])
-    setMultimodalFiles(prev => [...prev, ...files])
-  }, [])
-
-  // 移除文件
-  const removeFile = useCallback((index: number) => {
-    setMultimodalFiles(prev => prev.filter((_, i) => i !== index))
-  }, [])
+  // 处理建议点击
+  const handleSuggestionClick = useCallback(
+    (suggestion: string) => {
+      if (input !== undefined) {
+        // 如果 useChat 提供了 input，我们需要通过其他方式设置
+        // 这可能需要调用 handleInputChange
+        if (handleInputChange) {
+          handleInputChange({ target: { value: suggestion } } as any);
+        }
+      } else {
+        setLocalInput(suggestion);
+      }
+      setShowSuggestions(false);
+    },
+    [input, handleInputChange]
+  );
 
   // 处理消息提交
-  const handleMessageSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault()
+  // 处理 PromptInput 提交
+  const handlePromptSubmit = useCallback(
+    (message: { text?: string; files?: any[] }, event: React.FormEvent) => {
+      event.preventDefault();
+      if (
+        !message.text?.trim() &&
+        (!message.files || message.files.length === 0)
+      )
+        return;
+      if (actualIsLoading) return;
 
-    if (!input.trim() && multimodalFiles.length === 0) return
-    if (isLoading) return
+      setShowSuggestions(false);
 
-    // TODO: 处理多模态内容
-    if (multimodalFiles.length > 0) {
-      console.log('Multimodal files to process:', multimodalFiles)
-      // 这里需要处理文件上传和转换为 MultimodalContent
-    }
+      // 处理附件
+      if (message.files && message.files.length > 0) {
+        setAttachments(message.files);
+      }
 
-    handleSubmit(e)
-    setMultimodalFiles([])
+      // 如果 useChat 提供了 handleSubmit，使用它
+      if (handleSubmit) {
+        // 创建模拟的事件对象给 useChat 的 handleSubmit
+        const syntheticEvent = {
+          ...event,
+          currentTarget: {
+            ...event.currentTarget,
+            message: { value: message.text || "" },
+          },
+        };
+        handleSubmit(syntheticEvent as any);
+      } else {
+        // 否则使用手动实现的提交逻辑
+        // TODO: 实现手动提交逻辑
+        console.log("Manual submit:", message.text);
+      }
 
-    // 重置文本区域高度
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-    }
-  }, [input, multimodalFiles, isLoading, handleSubmit])
+      // 清理输入和附件状态
+      if (input !== undefined) {
+        // 如果使用 useChat 的 input，可能需要特殊处理来清空
+      } else {
+        setLocalInput("");
+      }
+      setTimeout(() => setAttachments([]), 100);
+    },
+    [actualIsLoading, handleSubmit, input]
+  );
 
-  // 处理键盘事件
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
-      e.preventDefault()
-      handleMessageSubmit(e as any)
-    }
-  }, [handleMessageSubmit, isComposing])
+  const handleMessageSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!actualInput.trim() && attachments.length === 0) return;
+      if (actualIsLoading) return;
 
-  // 自动调整文本区域高度
-  const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    handleInputChange(e)
+      setShowSuggestions(false);
 
-    // 自动调整高度
-    const textarea = e.target
-    textarea.style.height = 'auto'
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`
-  }, [handleInputChange])
+      if (handleSubmit) {
+        handleSubmit(e);
+      }
+      setAttachments([]);
+    },
+    [actualInput, attachments, actualIsLoading, handleSubmit]
+  );
 
-  // 格式化时间戳
-  const formatTimestamp = useCallback((timestamp: string | Date) => {
-    const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  }, [])
+  // 处理文件附件
+  const handleFileSelect = useCallback((files: File[]) => {
+    setAttachments((prev) => [...prev, ...files]);
+  }, []);
 
-  // 获取消息发送者信息
-  const getMessageSender = useCallback((role: MessageRole) => {
-    switch (role) {
-      case 'user':
-        return {
-          name: user?.email?.split('@')[0] || t('you'),
-          icon: UserIcon,
-          bgColor: 'bg-blue-500',
-          textColor: 'text-blue-600'
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // 渲染消息内容 - 改进版本，支持更好的流式响应和工具调用
+  const renderMessageContent = useCallback(
+    (message: any) => {
+      const content = message.content || "";
+
+      // 处理空内容或仅有工具调用的情况
+      if (!content && !message.toolInvocations?.length) {
+        return null;
+      }
+
+      // 改进的代码块检测，支持更多语言
+      const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+      const parts = [];
+      let lastIndex = 0;
+      let match;
+
+      while ((match = codeBlockRegex.exec(content)) !== null) {
+        // 添加代码块前的文本
+        if (match.index > lastIndex) {
+          const textContent = content.slice(lastIndex, match.index).trim();
+          if (textContent) {
+            parts.push({
+              type: "text",
+              content: textContent,
+            });
+          }
         }
-      case 'assistant':
-        return {
-          name: t('assistant'),
-          icon: BotIcon,
-          bgColor: 'bg-indigo-500',
-          textColor: 'text-indigo-600'
-        }
-      default:
-        return {
-          name: t('system'),
-          icon: BotIcon,
-          bgColor: 'bg-gray-500',
-          textColor: 'text-gray-600'
-        }
-    }
-  }, [user, t])
 
-  return (
-    <div className={cn("flex flex-col h-full bg-white", className)}>
-      {/* 消息列表 */}
-      <div
-        ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
-        onScroll={checkScrollPosition}
-      >
-        {messages.length === 0 ? (
-          // 欢迎界面
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
-              <BotIcon />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {t('welcome.title')}
-            </h3>
-            <p className="text-gray-500 max-w-md">
-              {mode === 'simple' ? t('welcome.simple') : t('welcome.advanced')}
-            </p>
-            {mode === 'advanced' && (
-              <div className="mt-6 grid grid-cols-2 gap-3 w-full max-w-md">
-                <Card className="p-3 hover:bg-gray-50 cursor-pointer">
-                  <p className="text-sm font-medium">{t('suggestions.analyzeCode')}</p>
-                </Card>
-                <Card className="p-3 hover:bg-gray-50 cursor-pointer">
-                  <p className="text-sm font-medium">{t('suggestions.debugIssue')}</p>
-                </Card>
-                <Card className="p-3 hover:bg-gray-50 cursor-pointer">
-                  <p className="text-sm font-medium">{t('suggestions.explainConcept')}</p>
-                </Card>
-                <Card className="p-3 hover:bg-gray-50 cursor-pointer">
-                  <p className="text-sm font-medium">{t('suggestions.generateCode')}</p>
-                </Card>
-              </div>
-            )}
-          </div>
-        ) : (
-          // 消息列表
-          messages.map((message) => {
-            const sender = getMessageSender(message.role as MessageRole)
-            const SenderIcon = sender.icon
-            const isUser = message.role === 'user'
+        // 添加代码块
+        parts.push({
+          type: "code",
+          language: match[1] || "text",
+          content: match[2].trim(),
+        });
 
+        lastIndex = match.index + match[0].length;
+      }
+
+      // 添加剩余文本
+      if (lastIndex < content.length) {
+        const textContent = content.slice(lastIndex).trim();
+        if (textContent) {
+          parts.push({
+            type: "text",
+            content: textContent,
+          });
+        }
+      }
+
+      // 如果没有解析到任何内容但有文本，则作为纯文本处理
+      if (parts.length === 0 && content) {
+        parts.push({
+          type: "text",
+          content: content.trim(),
+        });
+      }
+
+      return (
+        <div className="space-y-3">
+          {/* 渲染文本和代码块 */}
+          {parts.map((part, index) => {
+            if (part.type === "code") {
+              return (
+                <CodeBlock
+                  key={`code-${index}`}
+                  className="not-prose"
+                  code={part.content}
+                  language={part.language || "text"}
+                >
+                  <CodeBlockCopyButton />
+                </CodeBlock>
+              );
+            }
             return (
               <div
-                key={message.id}
-                className={cn(
-                  "flex space-x-3",
-                  isUser ? "justify-end" : "justify-start"
-                )}
+                key={`text-${index}`}
+                className="whitespace-pre-wrap leading-relaxed"
               >
-                {!isUser && (
-                  <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-white", sender.bgColor)}>
-                    <SenderIcon />
-                  </div>
-                )}
+                {part.content}
+              </div>
+            );
+          })}
 
-                <div className={cn("max-w-3xl", isUser ? "order-first" : "")}>
-                  <div className={cn(
-                    "rounded-lg px-4 py-2",
-                    isUser
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 text-gray-900"
-                  )}>
-                    <div className="whitespace-pre-wrap">{message.content}</div>
-
-                    {/* 工具调用显示 */}
-                    {message.toolInvocations && message.toolInvocations.length > 0 && (
-                      <div className="mt-2 space-y-2">
-                        {message.toolInvocations.map((tool: any, index: number) => (
-                          <div key={index} className="bg-black/10 rounded p-2 text-xs">
-                            <div className="flex items-center space-x-2">
-                              <LoadingIcon />
-                              <span>{t('toolExecution', { tool: tool.toolName })}</span>
-                            </div>
+          {/* 工具调用显示 - 改进版本，支持更多状态 */}
+          {message.toolInvocations && message.toolInvocations.length > 0 && (
+            <div className="mt-4">
+              <ChainOfThought>
+                {message.toolInvocations.map((tool: any, index: number) => (
+                  <ChainOfThoughtStep key={`tool-${index}`}>
+                    <ChainOfThoughtHeader>
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center space-x-2">
+                          <Brain className="h-4 w-4 text-blue-500" />
+                          <span className="text-sm font-medium">
+                            {tool.toolName || "Unknown Tool"}
+                          </span>
+                        </div>
+                        {tool.state && (
+                          <div className="flex items-center space-x-1">
+                            {tool.state === "call" && (
+                              <>
+                                <Loader className="h-3 w-3" />
+                                <span className="text-xs text-muted-foreground">
+                                  调用中...
+                                </span>
+                              </>
+                            )}
+                            {tool.state === "result" && (
+                              <span className="text-xs text-green-600">
+                                ✓ 完成
+                              </span>
+                            )}
                           </div>
-                        ))}
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </ChainOfThoughtHeader>
+                    <ChainOfThoughtContent>
+                      {/* 工具参数显示 */}
+                      {tool.args && Object.keys(tool.args).length > 0 && (
+                        <div className="mb-2">
+                          <div className="text-xs text-muted-foreground mb-1">
+                            参数:
+                          </div>
+                          <div className="bg-muted p-2 rounded text-xs font-mono">
+                            {JSON.stringify(tool.args, null, 2)}
+                          </div>
+                        </div>
+                      )}
 
-                  <div className={cn(
-                    "flex items-center space-x-2 mt-1 text-xs text-gray-500",
-                    isUser ? "justify-end" : "justify-start"
-                  )}>
-                    <span className={sender.textColor}>{sender.name}</span>
-                    <span>•</span>
-                    <span>{formatTimestamp(new Date())}</span>
-                    {message.role === 'assistant' && mode === 'advanced' && (
-                      <>
-                        <span>•</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {t('gpt4')}
-                        </Badge>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {isUser && (
-                  <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-white", sender.bgColor)}>
-                    <SenderIcon />
-                  </div>
-                )}
-              </div>
-            )
-          })
-        )}
-
-        {/* 加载指示器 */}
-        {isLoading && (
-          <div className="flex space-x-3">
-            <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white">
-              <BotIcon />
+                      {/* 工具结果显示 */}
+                      {tool.result && (
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">
+                            结果:
+                          </div>
+                          <div className="bg-muted p-2 rounded text-xs font-mono overflow-auto max-h-40">
+                            {typeof tool.result === "string"
+                              ? tool.result
+                              : JSON.stringify(tool.result, null, 2)}
+                          </div>
+                        </div>
+                      )}
+                    </ChainOfThoughtContent>
+                  </ChainOfThoughtStep>
+                ))}
+              </ChainOfThought>
             </div>
-            <div className="bg-gray-100 rounded-lg px-4 py-2">
-              <div className="flex items-center space-x-2">
-                <LoadingIcon />
-                <span className="text-gray-600">{t('thinking')}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 错误显示 */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-5 h-5 text-red-500">⚠️</div>
-              <div>
-                <p className="text-red-800 font-medium">{t('error.title')}</p>
-                <p className="text-red-600 text-sm mt-1">{error.message}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => reload()}
-                  className="mt-2"
-                >
-                  {t('error.retry')}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* 滚动到底部按钮 */}
-      {showScrollToBottom && (
-        <div className="absolute bottom-32 right-8">
-          <Button
-            variant="secondary"
-            size="icon"
-            onClick={scrollToBottom}
-            className="rounded-full shadow-lg"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-            </svg>
-          </Button>
-        </div>
-      )}
-
-      {/* 输入区域 */}
-      <div className="border-t border-gray-200 p-4">
-        {/* 多模态文件预览 */}
-        {multimodalFiles.length > 0 && (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {multimodalFiles.map((file, index) => (
-              <div key={index} className="flex items-center space-x-2 bg-gray-100 rounded-lg px-3 py-2">
-                <span className="text-sm text-gray-700">{file.name}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeFile(index)}
-                  className="h-4 w-4 p-0"
-                >
-                  ×
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 输入表单 */}
-        <form onSubmit={handleMessageSubmit} className="flex items-end space-x-2">
-          <div className="flex-1 relative">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={handleTextareaChange}
-              onKeyDown={handleKeyDown}
-              onCompositionStart={() => setIsComposing(true)}
-              onCompositionEnd={() => setIsComposing(false)}
-              placeholder={t('placeholder')}
-              disabled={isLoading}
-              className="w-full resize-none border border-gray-300 rounded-lg px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ minHeight: '48px', maxHeight: '120px' }}
-            />
-
-            {/* 附件按钮 */}
-            {mode === 'advanced' && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isLoading}
-                className="absolute right-2 bottom-2 h-8 w-8"
-              >
-                <AttachIcon />
-              </Button>
-            )}
-          </div>
-
-          {/* 发送按钮 */}
-          <Button
-            type="submit"
-            disabled={(!input.trim() && multimodalFiles.length === 0) || isLoading}
-            className="h-12 px-4"
-          >
-            {isLoading ? (
-              <LoadingIcon />
-            ) : (
-              <>
-                <SendIcon />
-                <span className="sr-only">{t('send')}</span>
-              </>
-            )}
-          </Button>
-
-          {/* 停止生成按钮 */}
-          {isLoading && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={stop}
-              className="h-12 px-4"
-            >
-              {t('stop')}
-            </Button>
           )}
-        </form>
-
-        {/* 隐藏的文件输入 */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt,.md"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-
-        {/* 输入提示 */}
-        <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-          <span>
-            {mode === 'simple'
-              ? t('hints.simple')
-              : t('hints.advanced')
-            }
-          </span>
-          <span>{t('hints.enter')}</span>
         </div>
+      );
+    },
+    [t]
+  );
+
+  // 获取用户头像URL
+  const getUserAvatar = useCallback(() => {
+    return user?.user_metadata?.avatar_url || "/default-user-avatar.png";
+  }, [user]);
+
+  return (
+    <div className={cn("flex flex-col h-full", className)}>
+      <Conversation className="flex-1">
+        <ConversationContent className="space-y-4">
+          {messages.length === 0 ? (
+            <ConversationEmptyState
+              title={t("welcome.title", "开始您的AI对话")}
+              description={
+                mode === "simple"
+                  ? t(
+                      "welcome.simple",
+                      "我是您的AI助手，有什么可以帮助您的吗？"
+                    )
+                  : t(
+                      "welcome.advanced",
+                      "我是您的高级AI助手，支持代码分析、文档生成、问题调试等功能。"
+                    )
+              }
+              icon={<Bot className="h-12 w-12" />}
+            >
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="mt-6 w-full max-w-2xl">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    试试这些建议：
+                  </p>
+                  <Suggestions>
+                    {suggestions.map((suggestion, index) => (
+                      <Suggestion
+                        key={index}
+                        suggestion={suggestion}
+                        onClick={handleSuggestionClick}
+                      >
+                        {suggestion}
+                      </Suggestion>
+                    ))}
+                  </Suggestions>
+                </div>
+              )}
+            </ConversationEmptyState>
+          ) : (
+            messages
+              .map((message, messageIndex) => {
+                const isUser = message.role === "user";
+                const messageContent = renderMessageContent(message);
+
+                // 跳过空消息（除了有工具调用的情况）
+                if (!messageContent && !message.toolInvocations?.length) {
+                  return null;
+                }
+
+                return (
+                  <Message
+                    key={message.id}
+                    from={message.role}
+                    className={cn(
+                      "animate-in fade-in slide-in-from-bottom-2",
+                      isUser ? "user-message" : "assistant-message"
+                    )}
+                  >
+                    <MessageAvatar
+                      src={isUser ? getUserAvatar() : "/ai-avatar.png"}
+                      name={isUser ? "User" : "AI Assistant"}
+                      className={cn(
+                        "transition-all duration-200",
+                        isUser ? "border-blue-200" : "border-green-200"
+                      )}
+                    />
+                    <MessageContent variant="contained">
+                      {messageContent}
+
+                      {/* 流式加载指示器 - 仅对最后一条Assistant消息 */}
+                      {!isUser &&
+                        messageIndex === messages.length - 1 &&
+                        isLoading &&
+                        !message.content && (
+                          <div className="flex items-center space-x-2 mt-2">
+                            <Loader className="h-4 w-4 text-blue-500" />
+                            <span className="text-sm text-muted-foreground animate-pulse">
+                              {t("thinking", "AI正在思考...")}
+                            </span>
+                          </div>
+                        )}
+
+                      {/* 消息元信息 */}
+                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50 text-xs text-muted-foreground">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">
+                            {isUser
+                              ? user?.email?.split("@")[0] || "You"
+                              : "AI Assistant"}
+                          </span>
+                          {!isUser && mode === "advanced" && (
+                            <>
+                              <span>•</span>
+                              <Badge
+                                variant="secondary"
+                                className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 border-blue-200"
+                              >
+                                {t("gpt4", "GPT-4")}
+                              </Badge>
+                            </>
+                          )}
+                        </div>
+                        <span className="text-xs opacity-60">
+                          {new Date(
+                            message.createdAt || Date.now()
+                          ).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    </MessageContent>
+                  </Message>
+                );
+              })
+              .filter(Boolean)
+          )}
+
+          {/* 独立的流式加载指示器 - 仅在没有消息内容时显示 */}
+          {isLoading &&
+            !messages.some((m) => m.role === "assistant" && !m.content) && (
+              <Message from="assistant">
+                <MessageAvatar src="/ai-avatar.png" name="AI Assistant" />
+                <MessageContent variant="contained">
+                  <div className="flex items-center space-x-3">
+                    <Loader className="h-4 w-4 text-blue-500" />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">
+                        {t("thinking", "AI正在思考...")}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {mode === "advanced"
+                          ? t("advanced.processing", "正在处理您的复杂请求...")
+                          : t("simple.processing", "请稍候...")}
+                      </span>
+                    </div>
+                  </div>
+                </MessageContent>
+              </Message>
+            )}
+
+          {/* 改进的错误显示 */}
+          {error && (
+            <div className="mx-4">
+              <Card className="border-destructive/50 bg-destructive/5 shadow-lg">
+                <CardContent className="p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-destructive/20 flex items-center justify-center">
+                        <span className="text-destructive text-sm font-bold">
+                          !
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-destructive mb-1">
+                        {t("error.title", "连接异常")}
+                      </h4>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        {error.message ||
+                          t("error.default", "AI服务暂时不可用，请稍后重试")}
+                      </p>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={reload}
+                          className="h-8 px-3 text-xs border-destructive/30 hover:bg-destructive/10"
+                        >
+                          <Sparkles className="h-3 w-3 mr-1.5" />
+                          {t("error.retry", "重新发送")}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.location.reload()}
+                          className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          {t("error.refresh", "刷新页面")}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </ConversationContent>
+
+        <ConversationScrollButton />
+      </Conversation>
+
+      {/* 输入区域 - 改进版本，更好的可访问性和用户体验 */}
+      <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <PromptInput
+          className="border-none"
+          onSubmit={handlePromptSubmit}
+          maxFiles={5}
+          maxFileSize={10 * 1024 * 1024} // 10MB
+          accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt,.md,.js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.cs,.rb,.go,.rs,.php,.html,.css,.json,.xml,.yaml,.yml"
+          multiple
+          globalDrop={mode === "advanced"}
+        >
+          <PromptInputBody>
+            {/* 附件预览区域 - 使用内置的 PromptInput 附件系统 */}
+            <PromptInputAttachments>
+              {(attachment) => (
+                <PromptInputAttachment
+                  data={attachment}
+                  className="bg-background border border-border/50"
+                />
+              )}
+            </PromptInputAttachments>
+
+            {/* 输入区域 */}
+            <div className="flex items-end space-x-3 p-4">
+              <div className="flex-1 relative">
+                <PromptInputTextarea
+                  placeholder={
+                    mode === "simple"
+                      ? t("placeholder")
+                      : t("placeholderAdvanced")
+                  }
+                  className={cn(
+                    "min-h-[52px] max-h-[140px] resize-none transition-all duration-200",
+                    "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50",
+                    "placeholder:text-muted-foreground/60"
+                  )}
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                {/* 发送按钮 */}
+                <PromptInputSubmit
+                  status={isLoading ? "streaming" : undefined}
+                  className={cn(
+                    "h-11 w-11 rounded-lg transition-all duration-200",
+                    "bg-blue-500 hover:bg-blue-600 text-white",
+                    "disabled:opacity-50 disabled:cursor-not-allowed",
+                    "focus:ring-2 focus:ring-blue-500/20",
+                    "shadow-lg hover:shadow-xl"
+                  )}
+                  title={isLoading ? t("stop") : t("send")}
+                />
+              </div>
+            </div>
+
+            {/* 工具栏 */}
+            <PromptInputToolbar className="px-4 pb-3">
+              <PromptInputTools>
+                <span className="text-xs text-muted-foreground/80">
+                  {mode === "simple" ? t("hints.simple") : t("hints.advanced")}
+                </span>
+                {/* 文件上传 - 仅高级模式 */}
+                {mode === "advanced" && (
+                  <PromptInputButton
+                    onClick={() => {
+                      // 文件上传将由 PromptInput 的内置功能处理
+                      const fileInput = document.querySelector(
+                        'input[type="file"]'
+                      ) as HTMLInputElement;
+                      fileInput?.click();
+                    }}
+                    className={cn(
+                      "h-8 px-2 rounded border-dashed border-border/50",
+                      "hover:border-blue-500/50 hover:bg-blue-50/50 transition-all duration-200"
+                    )}
+                    title="添加文件"
+                  >
+                    <FileText className="h-3 w-3 mr-1" />
+                    <span className="text-xs">文件</span>
+                  </PromptInputButton>
+                )}
+              </PromptInputTools>
+              <div className="flex items-center space-x-3 text-xs text-muted-foreground/80">
+                <span className="hidden sm:block">{t("hints.shortcuts")}</span>
+                <span className="flex items-center space-x-1">
+                  <Sparkles className="h-3 w-3" />
+                  <span>{mode === "simple" ? "简单模式" : "高级模式"}</span>
+                </span>
+              </div>
+            </PromptInputToolbar>
+          </PromptInputBody>
+        </PromptInput>
       </div>
     </div>
-  )
+  );
 }

@@ -1,0 +1,416 @@
+name: Mango AI Agent - CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18'
+  SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+jobs:
+  # Code Quality & Testing
+  quality-check:
+    name: Code Quality & Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Lint code
+      run: npm run lint
+
+    - name: Type check
+      run: npx tsc --noEmit
+
+    - name: Run unit tests
+      run: npm run test:coverage
+
+    - name: Validate environment
+      run: npm run validate:env
+
+    - name: Validate translations
+      run: npm run validate:translations
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage/lcov.info
+        fail_ci_if_error: true
+
+  # Agent Feature E2E Testing
+  e2e-tests:
+    name: Agent E2E Tests
+    runs-on: ubuntu-latest
+    needs: quality-check
+
+    services:
+      supabase:
+        image: supabase/supabase-db:latest
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Playwright
+      run: npx playwright install --with-deps
+
+    - name: Setup test database
+      run: |
+        npm run db:migrate:test
+        npm run db:seed:test
+
+    - name: Build application
+      run: npm run build
+      env:
+        NEXT_PUBLIC_AGENT_SYSTEM_ENABLED: 'true'
+        NEXT_PUBLIC_AGENT_ONBOARDING: 'true'
+        NEXT_PUBLIC_PERFORMANCE_MONITORING: 'true'
+
+    - name: Run Agent E2E tests
+      run: npm run test:e2e
+      env:
+        CI: true
+        PLAYWRIGHT_HEADLESS: true
+
+    - name: Upload E2E test results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: e2e-test-results
+        path: test-results/
+        retention-days: 7
+
+    - name: Upload Playwright report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 30
+
+  # Performance Testing
+  performance-tests:
+    name: Agent Performance Tests
+    runs-on: ubuntu-latest
+    needs: quality-check
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build application
+      run: npm run build
+
+    - name: Run performance tests
+      run: npm run test:performance
+
+    - name: Check performance budgets
+      run: npm run performance:check-budgets
+
+    - name: Generate performance report
+      run: npm run performance:report
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-report
+        path: performance-report/
+        retention-days: 30
+
+  # Security & Accessibility
+  security-audit:
+    name: Security & Accessibility Audit
+    runs-on: ubuntu-latest
+    needs: quality-check
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run security audit
+      run: npm audit --audit-level moderate
+
+    - name: Build application
+      run: npm run build
+
+    - name: Run accessibility tests
+      run: npm run test:a11y
+
+    - name: Generate security report
+      run: npm run security:report
+
+  # Database Migration Testing
+  database-migration:
+    name: Database Migration Tests
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '[db-migration]') || github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Supabase CLI
+      uses: supabase/setup-cli@v1
+      with:
+        version: latest
+
+    - name: Test database migrations
+      run: |
+        supabase start
+        supabase db push
+        supabase db test
+
+    - name: Validate Agent schema
+      run: |
+        supabase db sql --file supabase/tests/agent-schema-test.sql
+
+  # Staging Deployment
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [quality-check, e2e-tests, performance-tests, security-audit]
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    environment: staging
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build application
+      run: npm run build
+      env:
+        NEXT_PUBLIC_AGENT_SYSTEM_ENABLED: 'true'
+        NEXT_PUBLIC_AGENT_ONBOARDING: 'true'
+        NEXT_PUBLIC_AGENT_ADVANCED_MODE: 'false'  # Gradual rollout
+        NEXT_PUBLIC_PERFORMANCE_MONITORING: 'true'
+
+    - name: Deploy to Vercel Staging
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.ORG_ID }}
+        vercel-project-id: ${{ secrets.PROJECT_ID }}
+        working-directory: ./
+        scope: ${{ secrets.TEAM_ID }}
+
+    - name: Run deployment health check
+      run: |
+        sleep 30  # Wait for deployment
+        curl -f ${{ env.VERCEL_URL }}/api/health
+        curl -f ${{ env.VERCEL_URL }}/api/performance/health
+
+    - name: Run post-deployment Agent tests
+      run: npm run test:agent-integration
+      env:
+        TEST_BASE_URL: ${{ env.VERCEL_URL }}
+
+  # Production Deployment
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[deploy]')
+    environment: production
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Pre-deployment database backup
+      run: |
+        supabase db backup create --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+    - name: Build production application
+      run: npm run build
+      env:
+        NODE_ENV: production
+        # Feature flags for phased rollout
+        NEXT_PUBLIC_AGENT_SYSTEM_ENABLED: ${{ secrets.AGENT_SYSTEM_ENABLED }}
+        NEXT_PUBLIC_AGENT_ONBOARDING: ${{ secrets.AGENT_ONBOARDING_ENABLED }}
+        NEXT_PUBLIC_PERFORMANCE_MONITORING: 'true'
+
+    - name: Deploy to Vercel Production
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.ORG_ID }}
+        vercel-project-id: ${{ secrets.PROJECT_ID }}
+        vercel-args: '--prod'
+        working-directory: ./
+        scope: ${{ secrets.TEAM_ID }}
+
+    - name: Apply database migrations
+      run: |
+        supabase db push --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+    - name: Production health check
+      run: |
+        sleep 60  # Wait for deployment and migration
+        curl -f https://mango-agent.vercel.app/api/health
+        curl -f https://mango-agent.vercel.app/api/performance/health
+
+    - name: Enable monitoring alerts
+      run: |
+        curl -X POST https://mango-agent.vercel.app/api/monitoring/enable \
+          -H "Authorization: Bearer ${{ secrets.MONITORING_TOKEN }}"
+
+    - name: Send deployment notification
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        fields: repo,message,commit,author,action,eventName,ref,workflow
+
+  # Rollback Job (Manual Trigger)
+  rollback-production:
+    name: Rollback Production Deployment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: production
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Immediate feature flag rollback
+      run: |
+        # Disable all Agent features immediately
+        vercel env rm NEXT_PUBLIC_AGENT_SYSTEM_ENABLED --yes --token ${{ secrets.VERCEL_TOKEN }}
+        vercel env add NEXT_PUBLIC_AGENT_SYSTEM_ENABLED false --token ${{ secrets.VERCEL_TOKEN }}
+
+    - name: Rollback to previous deployment
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.ORG_ID }}
+        vercel-project-id: ${{ secrets.PROJECT_ID }}
+        vercel-args: '--prod --force'
+        working-directory: ./
+
+    - name: Database rollback (if needed)
+      run: |
+        # Only if database rollback is required
+        supabase db reset --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --to-migration ${{ github.event.inputs.migration_target }}
+      if: github.event.inputs.database_rollback == 'true'
+
+    - name: Verify rollback success
+      run: |
+        sleep 30
+        curl -f https://mango-agent.vercel.app/api/health
+
+    - name: Send rollback notification
+      uses: 8398a7/action-slack@v3
+      with:
+        status: 'success'
+        channel: '#incidents'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        text: '🚨 Production rollback completed successfully'
+
+  # Performance Monitoring
+  monitor-performance:
+    name: Post-Deployment Performance Monitoring
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: success()
+
+    steps:
+    - name: Setup monitoring
+      run: |
+        # Monitor for 2 hours post-deployment
+        for i in {1..24}; do
+          echo "Monitoring check $i/24"
+
+          # Check response times
+          response_time=$(curl -w "%{time_total}" -s -o /dev/null https://mango-agent.vercel.app/)
+          if (( $(echo "$response_time > 3.0" | bc -l) )); then
+            echo "⚠️ High response time: ${response_time}s"
+          fi
+
+          # Check error rates
+          error_rate=$(curl -s https://mango-agent.vercel.app/api/performance | jq '.error_rate')
+          if (( $(echo "$error_rate > 0.01" | bc -l) )); then
+            echo "⚠️ High error rate: ${error_rate}%"
+          fi
+
+          sleep 300  # 5 minutes
+        done
+
+    - name: Generate monitoring report
+      run: |
+        curl -s https://mango-agent.vercel.app/api/performance/report > monitoring-report.json
+
+    - name: Upload monitoring results
+      uses: actions/upload-artifact@v3
+      with:
+        name: monitoring-report
+        path: monitoring-report.json
+        retention-days: 7

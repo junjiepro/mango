@@ -90,7 +90,9 @@
     "logout": "Sign out",
     "login": "Sign in",
     "register": "Sign up",
-    "welcome": "Welcome"
+    "welcome": "Welcome",
+    "chat": "Chat",
+    "userRole": "AI User"
   },
   "pages": {
     "home": {
@@ -127,31 +129,36 @@
   },
   "aiAgent": {
     "title": "AI Agent",
-    "subtitle": "Intelligent AI Assistant with multimodal capabilities and MCP tool integration",
+    "subtitle": "Intelligent conversation assistant",
+    "loading": "Loading...",
     "welcome": {
       "title": "Welcome to AI Agent",
       "description": "Start conversing with your intelligent AI assistant"
     },
-    "features": {
-      "intelligent": "Intelligent Conversation",
-      "intelligentDesc": "Natural language understanding and generation powered by advanced AI models",
-      "multimodal": "Multimodal Support",
-      "multimodalDesc": "Support for text, code, images, audio, and other content types",
-      "tools": "Tool Integration",
-      "toolsDesc": "Integrated MCP tools to extend AI assistant capabilities"
+    "sidebar": {
+      "chat": "AI Chat",
+      "chatDesc": "Converse with AI assistant",
+      "history": "Chat History",
+      "historyDesc": "View historical conversation records",
+      "plugins": "Plugin Management",
+      "pluginsDesc": "Manage AI assistant plugins",
+      "settings": "Settings",
+      "settingsDesc": "AI assistant personalization settings"
     },
-    "mode": {
-      "simple": {
-        "title": "Simple Mode",
-        "description": "Simplified interface focused on conversation experience"
-      },
-      "advanced": {
-        "title": "Advanced Mode",
-        "description": "Full features including tool management and technical options"
-      }
+    "modes": {
+      "title": "Operation Mode",
+      "simple": "Simple",
+      "advanced": "Advanced",
+      "advancedDescription": "Includes plugin management, advanced settings, and more"
+    },
+    "status": {
+      "connected": "AI assistant connected",
+      "plugins": "plugins",
+      "tools": "tools"
     },
     "quickActions": {
       "title": "Quick Actions",
+      "mode": "Mode",
       "askQuestion": "Ask Question",
       "analyzeContent": "Analyze Content",
       "createContent": "Create Content",
@@ -159,15 +166,245 @@
       "viewSessions": "View Sessions",
       "configure": "Configure Settings"
     },
+    "features": {
+      "title": "Features",
+      "intelligent": "Intelligent Conversation",
+      "intelligentDesc": "Natural language understanding and generation powered by advanced AI models",
+      "multimodal": "Multimodal Support",
+      "multimodalDesc": "Support for text, code, images, audio, and other content types",
+      "tools": "Tool Integration",
+      "toolsDesc": "Integrated MCP tools to extend AI assistant capabilities",
+      "memory": "Contextual Memory",
+      "memoryDesc": "Remember conversation history for coherent interactive experience"
+    },
+    "homepage": {
+      "hero": {
+        "title": "Your Intelligent AI Assistant",
+        "subtitle": "Experience Next-Generation AI Conversation System",
+        "description": "Integrated with advanced AI models, multimodal processing capabilities, and rich tool ecosystem to provide you with an unparalleled intelligent assistant experience.",
+        "getStarted": "Start Conversation",
+        "learnMore": "Learn More"
+      },
+      "suggestions": [
+        "Write a Python function to calculate Fibonacci sequence",
+        "Help me analyze the performance of this code",
+        "Explain the gradient descent algorithm in machine learning",
+        "Create a design plan for a simple to-do list application"
+      ],
+      "demo": {
+        "title": "Feature Demo",
+        "subtitle": "Experience the Power of AI Assistant",
+        "scenarios": {
+          "codeHelp": {
+            "title": "Code Assistant",
+            "user": "Help me write a quicksort algorithm",
+            "assistant": "I'll write a Python version of quicksort algorithm for you..."
+          },
+          "analysis": {
+            "title": "Data Analysis",
+            "user": "Analyze the trends in this sales data",
+            "assistant": "Based on the data you provided, I found several important trends..."
+          },
+          "creative": {
+            "title": "Creative Writing",
+            "user": "Write a modern poem about spring",
+            "assistant": "Spring breeze gently caresses the edge of the city, awakening sleeping dreams..."
+          },
+          "problemSolving": {
+            "title": "Problem Solving",
+            "user": "How to optimize website loading speed?",
+            "assistant": "Website loading speed can be optimized from the following aspects..."
+          }
+        },
+        "playDemo": "Play Demo",
+        "pauseDemo": "Pause Demo",
+        "tryNow": "Try Now"
+      }
+    },
+    "dashboard": {
+      "title": "AI Agent Activity Center",
+      "subtitle": "View your AI assistant usage and activity statistics",
+      "stats": {
+        "totalConversations": "Total Conversations",
+        "todayConversations": "Today's Conversations",
+        "averageResponse": "Average Response",
+        "favoriteModel": "Favorite Model"
+      },
+      "charts": {
+        "featureUsage": "Feature Usage",
+        "featureUsageDesc": "Your most frequently used AI assistant features",
+        "recentActivity": "Recent Conversations",
+        "recentActivityDesc": "Your recent conversations with AI assistant"
+      },
+      "quickActions": {
+        "title": "Quick Actions",
+        "description": "Start new AI conversations or manage your settings",
+        "newChat": "Start New Chat",
+        "profile": "Profile Settings",
+        "agentSettings": "Agent Configuration"
+      },
+      "conversationCard": {
+        "messages": "messages",
+        "completed": "completed",
+        "viewAll": "View All Conversations"
+      }
+    },
+    "profile": {
+      "title": "Profile Settings",
+      "subtitle": "Manage your account information and AI Agent preferences",
+      "tabs": {
+        "account": "Account Info",
+        "agent": "Agent Settings"
+      },
+      "basic": {
+        "title": "Basic Settings",
+        "subtitle": "Configure your AI Agent basic preferences",
+        "mode": "Agent Mode",
+        "theme": "Appearance Theme",
+        "language": "Interface Language"
+      },
+      "conversation": {
+        "title": "Conversation Settings",
+        "subtitle": "Customize your conversation experience",
+        "autoSave": "Auto-save conversations",
+        "autoSaveDesc": "Automatically save conversation records to cloud",
+        "showTimestamps": "Show timestamps",
+        "showTimestampsDesc": "Display time information in messages",
+        "showTyping": "Typing indicator",
+        "showTypingDesc": "Show AI typing animation",
+        "historyLimit": "History limit",
+        "historyLimitDesc": "Keep recent {count} messages"
+      },
+      "aiSettings": {
+        "title": "AI Model Settings",
+        "subtitle": "Configure AI model behavior and performance",
+        "model": "AI Model",
+        "streaming": "Streaming responses",
+        "streamingDesc": "Real-time display of AI response process",
+        "tools": "Enable tool calling",
+        "toolsDesc": "Allow AI to use external tools",
+        "memory": "Enable long-term memory",
+        "memoryDesc": "AI remembers contextual information",
+        "temperature": "Creativity (Temperature)",
+        "temperatureDesc": "Current value: {value} (higher values are more creative)",
+        "maxTokens": "Maximum response length",
+        "maxTokensDesc": "Current limit: {count} tokens"
+      },
+      "uiPreferences": {
+        "title": "UI Preferences",
+        "subtitle": "Customize interface display and interaction",
+        "sidebarCollapsed": "Collapse sidebar by default",
+        "sidebarCollapsedDesc": "Automatically collapse sidebar on startup",
+        "compactMode": "Compact mode",
+        "compactModeDesc": "Reduce interface spacing and padding",
+        "codePreview": "Show code preview",
+        "codePreviewDesc": "Display code highlighting in conversations",
+        "animations": "Enable animations",
+        "animationsDesc": "Interface transitions and interaction animations"
+      },
+      "privacy": {
+        "title": "Privacy Settings",
+        "subtitle": "Manage your data privacy and security",
+        "analytics": "Collect analytics data",
+        "analyticsDesc": "Help us improve product experience",
+        "sharing": "Allow conversation sharing",
+        "sharingDesc": "Enable conversation sharing link feature",
+        "personalization": "Enable personalized recommendations",
+        "personalizationDesc": "Provide personalized suggestions based on usage history"
+      },
+      "success": "Agent preferences updated successfully"
+    },
     "conversation": {
+      "welcome": {
+        "title": "Welcome to AI Assistant",
+        "simple": "I am your AI assistant, how can I help you?"
+      },
+      "hints": {
+        "simple": "Simple mode",
+        "advanced": "Advanced mode",
+        "shortcuts": "Shortcuts: Ctrl+Enter Send, Shift+Enter New Line"
+      },
       "title": "AI Conversation",
       "placeholder": "Enter your question or instruction...",
+      "placeholderAdvanced": "Type message... (supports Markdown, code blocks, @mentions, etc.)",
       "send": "Send",
+      "sending": "Sending...",
+      "stop": "Stop",
       "clear": "Clear Conversation",
       "newSession": "New Session",
       "loading": "AI is thinking...",
+      "typing": "Typing...",
       "error": "Conversation error, please try again",
-      "empty": "No conversation content yet, start chatting with the AI assistant!"
+      "empty": "No conversation content yet, start chatting with the AI assistant!",
+      "retry": "Regenerate",
+      "copy": "Copy",
+      "copied": "Copied",
+      "edit": "Edit",
+      "delete": "Delete",
+      "regenerate": "Regenerate",
+      "continue": "Continue",
+      "interrupt": "Interrupt",
+      "attachFile": "Attach File",
+      "voice": "Voice Input",
+      "image": "Image Input"
+    },
+    "sessionHistory": {
+      "title": "Chat History",
+      "subtitle": "Manage your AI assistant conversation records",
+      "search": {
+        "placeholder": "Search conversations...",
+        "filters": "Filter Options",
+        "dateRange": "Date Range",
+        "messageType": "Message Type",
+        "status": "Status",
+        "clear": "Clear Filters"
+      },
+      "filters": {
+        "all": "All",
+        "today": "Today",
+        "week": "This Week",
+        "month": "This Month",
+        "types": {
+          "text": "Text",
+          "code": "Code",
+          "image": "Image",
+          "file": "File"
+        },
+        "statuses": {
+          "active": "Active",
+          "completed": "Completed",
+          "archived": "Archived"
+        }
+      },
+      "actions": {
+        "batchActions": "Batch Actions",
+        "selectAll": "Select All",
+        "deselectAll": "Deselect All",
+        "archive": "Archive",
+        "export": "Export",
+        "delete": "Delete",
+        "restore": "Restore"
+      },
+      "session": {
+        "messages": "messages",
+        "duration": "duration",
+        "lastActive": "last active",
+        "view": "View",
+        "continue": "Continue Chat",
+        "archive": "Archive",
+        "export": "Export",
+        "delete": "Delete",
+        "rename": "Rename"
+      },
+      "empty": {
+        "title": "No conversation records",
+        "description": "Start your first AI conversation!",
+        "startChat": "Start Chatting"
+      },
+      "stats": {
+        "total": "Total {count} sessions",
+        "selected": "{count} selected"
+      }
     },
     "session": {
       "current": "Current Session",
@@ -176,7 +413,9 @@
       "delete": "Delete Session",
       "archive": "Archive Session",
       "export": "Export Session",
-      "settings": "Session Settings"
+      "settings": "Session Settings",
+      "rename": "Rename Session",
+      "duplicate": "Duplicate Session"
     },
     "plugins": {
       "title": "Plugin Management",
@@ -209,7 +448,10 @@
       "parameters": "Parameters",
       "output": "Output",
       "duration": "Duration",
-      "steps": "Execution Steps"
+      "steps": "Execution Steps",
+      "thinking": "Thinking...",
+      "calling": "Calling tool",
+      "processing": "Processing..."
     },
     "content": {
       "text": "Text",
@@ -221,7 +463,10 @@
       "edit": "Edit",
       "view": "View",
       "download": "Download",
-      "upload": "Upload"
+      "upload": "Upload",
+      "copy": "Copy Code",
+      "run": "Run",
+      "language": "Language"
     },
     "settings": {
       "title": "AI Agent Settings",
@@ -231,20 +476,89 @@
       "privacy": "Privacy Settings",
       "advanced": "Advanced Settings"
     },
+    "navigation": {
+      "brand": "Mango AI",
+      "activityCenter": "Activity Center",
+      "welcome": "Welcome, {email}",
+      "logout": "Sign Out",
+      "profile": "Profile Settings",
+      "settings": "Agent Configuration",
+      "newChat": "New Chat",
+      "history": "History"
+    },
     "errors": {
       "sessionNotFound": "Session not found",
       "pluginError": "Plugin error",
       "connectionFailed": "Connection failed",
       "toolExecutionFailed": "Tool execution failed",
       "unauthorizedAccess": "Access denied",
-      "rateLimitExceeded": "Rate limit exceeded"
+      "rateLimitExceeded": "Rate limit exceeded",
+      "loadingFailed": "Loading failed",
+      "saveFailed": "Save failed",
+      "networkError": "Network connection error"
     },
     "success": {
       "sessionCreated": "Session created successfully",
       "pluginInstalled": "Plugin installed successfully",
       "serverConnected": "Server connected successfully",
       "settingsSaved": "Settings saved successfully",
-      "dataExported": "Data exported successfully"
+      "dataExported": "Data exported successfully",
+      "messageDeleted": "Message deleted successfully",
+      "conversationArchived": "Conversation archived successfully"
+    },
+    "onboarding": {
+      "title": "Welcome to AI Agent",
+      "subtitle": "Let's explore the powerful features of your AI assistant in just a few minutes",
+      "progress": {
+        "step": "Step {current} of {total}"
+      },
+      "steps": {
+        "welcome": {
+          "title": "Meet Your AI Assistant",
+          "description": "Explore the infinite possibilities of next-generation intelligent conversation",
+          "features": {
+            "intelligent": "🧠 Intelligent Conversation - Deep understanding of your needs and context",
+            "multimodal": "🎯 Multimodal Support - Process text, code, images, and more",
+            "tools": "🛠️ Tool Integration - Connect external services to extend capabilities"
+          },
+          "suggestion": "Try asking me: Write a Python quicksort function"
+        },
+        "conversation": {
+          "title": "Start Intelligent Conversations",
+          "description": "Experience natural, fluid AI conversations and get professional help and advice",
+          "features": {
+            "naturalLanguage": "💬 Natural Language Understanding - As easy as chatting with a friend",
+            "codeGeneration": "⌨️ Code Generation & Analysis - Your best assistant for programming",
+            "multiModal": "🖼️ Multimedia Processing - Support for images, documents and more"
+          },
+          "tryExample": "Try Conversation Example"
+        },
+        "features": {
+          "title": "Personalization Settings",
+          "description": "Customize your exclusive AI assistant experience based on your habits and preferences",
+          "modes": "🎛️ Simple/Advanced Modes - Choose the interface complexity that suits you",
+          "plugins": "🔌 Plugin Management - Install and configure various feature extensions",
+          "preferences": "⚙️ Preference Settings - Adjust model parameters and interface options",
+          "exploreSettings": "Explore Settings"
+        },
+        "history": {
+          "title": "Conversation History Management",
+          "description": "Easily manage and find your historical conversations, making every interaction valuable",
+          "autoSave": "💾 Auto Save - All conversations safely stored, never lost",
+          "search": "🔍 Smart Search - Quickly find needed historical conversation content",
+          "export": "📤 Export & Share - Export and share valuable conversations"
+        }
+      },
+      "interactive": {
+        "suggestion": "💡 Try this suggestion:",
+        "actions": "🎯 Quick Actions:"
+      },
+      "navigation": {
+        "previous": "Previous",
+        "next": "Next",
+        "skip": "Skip Guide",
+        "complete": "Get Started"
+      }
     }
   },
   "validation": {

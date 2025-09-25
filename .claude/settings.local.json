@@ -12,7 +12,21 @@
       "mcp__Playwright__browser_snapshot",
       "mcp__Playwright__browser_select_option",
       "mcp__Playwright__browser_close",
-      "mcp__Playwright__browser_wait_for"
+      "mcp__Playwright__browser_wait_for",
+      "mcp__serena__list_dir",
+      "mcp__serena__activate_project",
+      "mcp__serena__get_current_config",
+      "mcp__serena__find_file",
+      "mcp__serena__search_for_pattern",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx next build:*)",
+      "mcp__mcp-deepwiki__deepwiki_fetch",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__find_symbol",
+      "Bash(npm run lint)",
+      "Bash(npx eslint:*)",
+      "Bash(set SKIP_ENV_VALIDATION=true)"
     ]
   },
   "enabledMcpjsonServers": [

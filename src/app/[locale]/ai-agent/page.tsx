@@ -5,9 +5,12 @@ import { notFound } from 'next/navigation'
 
 import { requireAuth } from '@/lib/supabase/auth-helpers'
 import { AgentLayout } from '@/components/ai-agent'
-import { ConversationInterface } from '@/components/ai-agent'
 import { ContentRenderer } from '@/components/ai-agent'
 import { ToolExecutionVisualizer } from '@/components/ai-agent'
+import { QuickActions } from '@/components/ai-agent/QuickActions'
+import { MCPPluginButton } from '@/components/ai-agent/MCPPluginButton'
+import { SessionInfo } from '@/components/ai-agent/SessionInfo'
+import { ConversationWrapper } from '@/components/ai-agent/ConversationWrapper'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,12 +27,12 @@ import {
 } from 'lucide-react'
 
 interface AIAgentPageProps {
-  params: { locale: string }
-  searchParams: {
+  params: Promise<{ locale: string }>
+  searchParams: Promise<{
     mode?: 'simple' | 'advanced'
     session?: string
     tab?: string
-  }
+  }>
 }
 
 export async function generateMetadata({ params }: AIAgentPageProps): Promise<Metadata> {
@@ -118,84 +121,23 @@ function WelcomePanel({ userMode }: { userMode: 'simple' | 'advanced' }) {
   )
 }
 
-function QuickActions({ userMode }: { userMode: 'simple' | 'advanced' }) {
-  const t = useTranslations('aiAgent')
-
-  const simpleActions = [
-    { key: 'help', icon: MessageSquare, label: t('quickActions.askQuestion') },
-    { key: 'analyze', icon: Brain, label: t('quickActions.analyzeContent') },
-    { key: 'create', icon: Sparkles, label: t('quickActions.createContent') }
-  ]
-
-  const advancedActions = [
-    ...simpleActions,
-    { key: 'tools', icon: Zap, label: t('quickActions.manageMCP') },
-    { key: 'sessions', icon: History, label: t('quickActions.viewSessions') },
-    { key: 'settings', icon: Settings, label: t('quickActions.configure') }
-  ]
-
-  const actions = userMode === 'simple' ? simpleActions : advancedActions
-
-  return (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle className="text-lg">{t('quickActions.title')}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {actions.map((action) => (
-            <Button
-              key={action.key}
-              variant="outline"
-              className="h-auto p-4 justify-start"
-              onClick={() => {
-                // Handle quick action
-                console.log(`Quick action: ${action.key}`)
-              }}
-            >
-              <action.icon className="h-4 w-4 mr-2" />
-              <span className="text-sm">{action.label}</span>
-            </Button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function SessionInfo({ sessionId, userMode }: { sessionId?: string; userMode: 'simple' | 'advanced' }) {
-  const t = useTranslations('aiAgent')
-
-  if (!sessionId || userMode === 'simple') {
-    return null
-  }
-
-  return (
-    <Alert className="mb-4">
-      <Info className="h-4 w-4" />
-      <AlertDescription>
-        {t('session.current')}: {sessionId.slice(0, 8)}...
-        <Button variant="link" size="sm" className="h-auto p-0 ml-2">
-          {t('session.viewDetails')}
-        </Button>
-      </AlertDescription>
-    </Alert>
-  )
-}
-
 export default async function AIAgentPage({ params, searchParams }: AIAgentPageProps) {
   // Validate authentication
   const { user } = await requireAuth()
 
+  // Await params and searchParams (Next.js 15 requirement)
+  const resolvedParams = await params
+  const resolvedSearchParams = await searchParams
+
   // Validate locale
-  if (!['zh', 'en'].includes(params.locale)) {
+  if (!['zh', 'en'].includes(resolvedParams.locale)) {
     notFound()
   }
 
   // Get user preferences
-  const userMode = (searchParams.mode || 'simple') as 'simple' | 'advanced'
-  const sessionId = searchParams.session
-  const activeTab = searchParams.tab || 'chat'
+  const userMode = (resolvedSearchParams.mode || 'simple') as 'simple' | 'advanced'
+  const sessionId = resolvedSearchParams.session
+  const activeTab = resolvedSearchParams.tab || 'chat'
 
   return (
     <AgentLayout defaultMode={userMode} className="min-h-screen">
@@ -254,19 +196,9 @@ export default async function AIAgentPage({ params, searchParams }: AIAgentPageP
               </CardHeader>
               <CardContent>
                 <Suspense fallback={<ConversationSkeleton />}>
-                  <ConversationInterface
+                  <ConversationWrapper
                     mode={userMode}
                     sessionId={sessionId}
-                    onSessionChange={(newSessionId) => {
-                      // Update URL with new session
-                      const url = new URL(window.location.href)
-                      if (newSessionId) {
-                        url.searchParams.set('session', newSessionId)
-                      } else {
-                        url.searchParams.delete('session')
-                      }
-                      window.history.pushState(null, '', url.toString())
-                    }}
                     className="min-h-[400px]"
                   />
                 </Suspense>
@@ -288,11 +220,7 @@ export default async function AIAgentPage({ params, searchParams }: AIAgentPageP
                   <p className="text-muted-foreground mb-4">
                     管理和配置Model Context Protocol工具
                   </p>
-                  <Button className="w-full" onClick={() => {
-                    window.location.href = `/${params.locale}/ai-agent/plugins`
-                  }}>
-                    管理MCP插件
-                  </Button>
+                  <MCPPluginButton className="w-full" />
                 </CardContent>
               </Card>
 
