@@ -92,7 +92,8 @@
     "register": "注册",
     "welcome": "欢迎",
     "chat": "聊天",
-    "userRole": "AI 用户"
+    "userRole": "AI 用户",
+    "getStarted": "开始使用"
   },
   "pages": {
     "home": {

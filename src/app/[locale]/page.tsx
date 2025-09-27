@@ -1,15 +1,21 @@
-'use client';
+"use client";
 
-import { useAuth } from '@/contexts/AuthContext';
-import AuthStatus from '@/components/AuthStatus';
-import { useTranslations } from 'next-intl';
-import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion';
-import { Actions, Action } from '@/components/ai-elements/actions';
-import AgentFeaturePreview from '@/components/AgentFeaturePreview';
+import { useAuth } from "@/contexts/AuthContext";
+import AuthStatus from "@/components/AuthStatus";
+import { useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion";
+import { Actions, Action } from "@/components/ai-elements/actions";
+import AgentFeaturePreview from "@/components/AgentFeaturePreview";
 import {
   Bot,
   Sparkles,
@@ -24,13 +30,13 @@ import {
   Code,
   Search,
   PenTool,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function Home() {
   const { user, loading } = useAuth();
-  const t = useTranslations('pages.home');
-  const tCommon = useTranslations('common');
+  const t = useTranslations("pages.home");
+  const tCommon = useTranslations("common");
   const router = useRouter();
 
   // Sample suggestions for different user types
@@ -38,7 +44,7 @@ export default function Home() {
     "什么是AI助手？",
     "如何开始使用？",
     "有哪些功能？",
-    "查看演示"
+    "查看演示",
   ];
 
   const userSuggestions = [
@@ -47,7 +53,7 @@ export default function Home() {
     "创建一个计划",
     "解释一个概念",
     "翻译文本",
-    "头脑风暴"
+    "头脑风暴",
   ];
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -65,14 +71,14 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex items-center space-x-2">
           <Bot className="h-8 w-8 animate-pulse text-primary" />
-          <div className="text-lg font-medium">{tCommon('loading')}</div>
+          <div className="text-lg font-medium">{tCommon("loading")}</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
+    <div className="min-h-screen px-2.5 bg-gradient-to-br from-background via-background to-muted/30">
       {/* Hero Section */}
       <section className="container py-16 md:py-24">
         <div className="text-center space-y-6 max-w-4xl mx-auto">
@@ -86,7 +92,7 @@ export default function Home() {
 
           {/* Main Heading */}
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
-            欢迎来到{' '}
+            欢迎来到{" "}
             <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
               Mango AI
             </span>
@@ -121,17 +127,19 @@ export default function Home() {
           {/* Suggestions */}
           <div className="mb-8">
             <h2 className="text-2xl font-semibold text-center mb-6">
-              {user ? '试试这些对话开场白' : '探索AI助手能为您做什么'}
+              {user ? "试试这些对话开场白" : "探索AI助手能为您做什么"}
             </h2>
             <Suggestions className="justify-center">
-              {(user ? userSuggestions : guestSuggestions).map((suggestion, index) => (
-                <Suggestion
-                  key={index}
-                  suggestion={suggestion}
-                  onClick={handleSuggestionClick}
-                  className="hover:scale-105 transition-transform"
-                />
-              ))}
+              {(user ? userSuggestions : guestSuggestions).map(
+                (suggestion, index) => (
+                  <Suggestion
+                    key={index}
+                    suggestion={suggestion}
+                    onClick={handleSuggestionClick}
+                    className="hover:scale-105 transition-transform"
+                  />
+                )
+              )}
             </Suggestions>
           </div>
 
@@ -140,12 +148,12 @@ export default function Home() {
             <CardHeader className="text-center">
               <CardTitle className="flex items-center justify-center space-x-2">
                 <Sparkles className="h-5 w-5 text-primary" />
-                <span>{user ? '继续您的AI之旅' : '开始您的AI之旅'}</span>
+                <span>{user ? "继续您的AI之旅" : "开始您的AI之旅"}</span>
               </CardTitle>
               <CardDescription>
                 {user
-                  ? '直接开始对话，或查看您的活动历史'
-                  : '注册即可体验完整的AI助手功能'}
+                  ? "直接开始对话，或查看您的活动历史"
+                  : "注册即可体验完整的AI助手功能"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -153,7 +161,7 @@ export default function Home() {
                 // Logged in user actions
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Button
-                    onClick={() => router.push('/ai-agent')}
+                    onClick={() => router.push("/ai-agent")}
                     className="flex items-center space-x-2"
                     size="lg"
                   >
@@ -163,7 +171,7 @@ export default function Home() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => router.push('/dashboard')}
+                    onClick={() => router.push("/dashboard")}
                     className="flex items-center space-x-2"
                     size="lg"
                   >
@@ -175,7 +183,7 @@ export default function Home() {
                 // Guest user actions
                 <div className="space-y-3">
                   <Button
-                    onClick={() => router.push('/register')}
+                    onClick={() => router.push("/register")}
                     className="w-full flex items-center justify-center space-x-2"
                     size="lg"
                   >
@@ -185,7 +193,7 @@ export default function Home() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => router.push('/login')}
+                    onClick={() => router.push("/login")}
                     className="w-full flex items-center justify-center space-x-2"
                     size="lg"
                   >
@@ -199,16 +207,28 @@ export default function Home() {
                 <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
                   <span>快速功能：</span>
                   <Actions>
-                    <Action tooltip="代码助手" onClick={() => handleSuggestionClick("帮我写代码")}>
+                    <Action
+                      tooltip="代码助手"
+                      onClick={() => handleSuggestionClick("帮我写代码")}
+                    >
                       <Code className="h-4 w-4" />
                     </Action>
-                    <Action tooltip="创意助手" onClick={() => handleSuggestionClick("头脑风暴")}>
+                    <Action
+                      tooltip="创意助手"
+                      onClick={() => handleSuggestionClick("头脑风暴")}
+                    >
                       <Wand2 className="h-4 w-4" />
                     </Action>
-                    <Action tooltip="学习助手" onClick={() => handleSuggestionClick("解释概念")}>
+                    <Action
+                      tooltip="学习助手"
+                      onClick={() => handleSuggestionClick("解释概念")}
+                    >
                       <Search className="h-4 w-4" />
                     </Action>
-                    <Action tooltip="写作助手" onClick={() => handleSuggestionClick("帮我写作")}>
+                    <Action
+                      tooltip="写作助手"
+                      onClick={() => handleSuggestionClick("帮我写作")}
+                    >
                       <PenTool className="h-4 w-4" />
                     </Action>
                   </Actions>
@@ -225,7 +245,9 @@ export default function Home() {
       {/* Features Grid */}
       <section className="container pb-16">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">为什么选择 Mango AI？</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">
+            为什么选择 Mango AI？
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="text-center hover:shadow-lg transition-shadow">
               <CardHeader>
@@ -277,13 +299,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* Auth Status - Keep for debugging */}
-      {process.env.NODE_ENV === 'development' && (
-        <section className="container pb-8">
-          <AuthStatus />
-        </section>
-      )}
     </div>
   );
 }

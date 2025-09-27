@@ -92,7 +92,8 @@
     "register": "Sign up",
     "welcome": "Welcome",
     "chat": "Chat",
-    "userRole": "AI User"
+    "userRole": "AI User",
+    "getStarted": "Get Started"
   },
   "pages": {
     "home": {
