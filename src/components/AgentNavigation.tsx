@@ -1,19 +1,19 @@
-'use client';
+"use client";
 
-import { usePathname, useRouter } from '@/i18n/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
+import { usePathname, useRouter } from "@/i18n/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import LanguageSwitcher from './LanguageSwitcher';
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import LanguageSwitcher from "./LanguageSwitcher";
 import {
   Bot,
   MessageSquare,
@@ -22,28 +22,28 @@ import {
   LogOut,
   Sparkles,
   Activity,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function AgentNavigation() {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const t = useTranslations('navigation');
+  const t = useTranslations("navigation");
 
   const handleLogout = async () => {
     const { error } = await signOut();
     if (!error) {
-      router.push('/login');
+      router.push("/login");
     } else {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     }
   };
 
   // Don't show navbar on auth pages - check for locale-aware paths
-  const authPaths = ['/login', '/register', '/forgot-password'];
-  const shouldHideNavbar = authPaths.some(path =>
-    pathname === path || pathname.endsWith(path)
+  const authPaths = ["/login", "/register", "/forgot-password"];
+  const shouldHideNavbar = authPaths.some(
+    (path) => pathname === path || pathname.endsWith(path)
   );
 
   if (shouldHideNavbar) {
@@ -51,12 +51,12 @@ export default function AgentNavigation() {
   }
 
   // Check if current path is AI Agent related
-  const isAgentPath = pathname.includes('/agent') || pathname.includes('/chat');
-  const isDashboard = pathname.includes('/dashboard');
+  const isAgentPath = pathname.includes("/agent") || pathname.includes("/chat");
+  const isDashboard = pathname.includes("/dashboard");
 
   if (loading) {
     return (
-      <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="flex items-center space-x-2">
@@ -74,12 +74,12 @@ export default function AgentNavigation() {
   }
 
   return (
-    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
         {/* Logo and Brand */}
         <div className="flex items-center space-x-6">
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.push("/")}
             className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
           >
             <Bot className="h-6 w-6 text-primary" />
@@ -93,31 +93,22 @@ export default function AgentNavigation() {
           {user && (
             <div className="hidden md:flex items-center space-x-1">
               <Button
-                variant={isAgentPath ? 'default' : 'ghost'}
+                variant={isAgentPath ? "default" : "ghost"}
                 size="sm"
-                onClick={() => router.push('/agent')}
+                onClick={() => router.push("/agent")}
                 className="flex items-center space-x-2"
               >
                 <Sparkles className="h-4 w-4" />
-                <span>{t('aiAgent', 'AI Assistant')}</span>
+                <span>{t("aiAgent", "AI Assistant")}</span>
               </Button>
               <Button
-                variant={isDashboard ? 'default' : 'ghost'}
+                variant={isDashboard ? "default" : "ghost"}
                 size="sm"
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push("/dashboard")}
                 className="flex items-center space-x-2"
               >
                 <Activity className="h-4 w-4" />
-                <span>{t('dashboard')}</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push('/chat')}
-                className="flex items-center space-x-2"
-              >
-                <MessageSquare className="h-4 w-4" />
-                <span>{t('chat', 'Chat')}</span>
+                <span>{t("dashboard")}</span>
               </Button>
             </div>
           )}
@@ -135,9 +126,12 @@ export default function AgentNavigation() {
                   className="relative h-8 w-8 rounded-full"
                 >
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.user_metadata?.avatar_url} alt={user.email || ''} />
+                    <AvatarImage
+                      src={user.user_metadata?.avatar_url}
+                      alt={user.email || ""}
+                    />
                     <AvatarFallback>
-                      {user.email?.slice(0, 2).toUpperCase() || 'ME'}
+                      {user.email?.slice(0, 2).toUpperCase() || "ME"}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -147,7 +141,7 @@ export default function AgentNavigation() {
                   <div className="flex flex-col space-y-1 leading-none">
                     <p className="font-medium text-sm">{user.email}</p>
                     <p className="text-xs text-muted-foreground">
-                      {t('userRole', 'AI User')}
+                      {t("userRole", "AI User")}
                     </p>
                   </div>
                 </div>
@@ -156,48 +150,41 @@ export default function AgentNavigation() {
                 {/* Mobile Navigation Items */}
                 <div className="md:hidden">
                   <DropdownMenuItem
-                    onClick={() => router.push('/agent')}
+                    onClick={() => router.push("/agent")}
                     className={cn(
                       "flex items-center space-x-2",
                       isAgentPath && "bg-accent"
                     )}
                   >
                     <Sparkles className="h-4 w-4" />
-                    <span>{t('aiAgent', 'AI Assistant')}</span>
+                    <span>{t("aiAgent", "AI Assistant")}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => router.push('/dashboard')}
+                    onClick={() => router.push("/dashboard")}
                     className={cn(
                       "flex items-center space-x-2",
                       isDashboard && "bg-accent"
                     )}
                   >
                     <Activity className="h-4 w-4" />
-                    <span>{t('dashboard')}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => router.push('/chat')}
-                    className="flex items-center space-x-2"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    <span>{t('chat', 'Chat')}</span>
+                    <span>{t("dashboard")}</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </div>
 
                 <DropdownMenuItem
-                  onClick={() => router.push('/dashboard/profile')}
+                  onClick={() => router.push("/dashboard/profile")}
                   className="flex items-center space-x-2"
                 >
                   <User className="h-4 w-4" />
-                  <span>{t('profile', 'Profile')}</span>
+                  <span>{t("profile", "Profile")}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => router.push('/dashboard/settings')}
+                  onClick={() => router.push("/dashboard/settings")}
                   className="flex items-center space-x-2"
                 >
                   <Settings className="h-4 w-4" />
-                  <span>{t('settings', 'Settings')}</span>
+                  <span>{t("settings", "Settings")}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -205,7 +192,7 @@ export default function AgentNavigation() {
                   className="flex items-center space-x-2 text-red-600 focus:text-red-600"
                 >
                   <LogOut className="h-4 w-4" />
-                  <span>{t('logout')}</span>
+                  <span>{t("logout")}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -214,17 +201,17 @@ export default function AgentNavigation() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.push('/login')}
+                onClick={() => router.push("/login")}
               >
-                {t('login')}
+                {t("login")}
               </Button>
               <Button
                 size="sm"
-                onClick={() => router.push('/register')}
+                onClick={() => router.push("/register")}
                 className="flex items-center space-x-2"
               >
                 <Sparkles className="h-4 w-4" />
-                <span>{t('getStarted', 'Get Started')}</span>
+                <span>{t("getStarted", "Get Started")}</span>
               </Button>
             </div>
           )}

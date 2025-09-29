@@ -1,6 +1,6 @@
 /**
- * AI Agent 对话接口组件 - 优化版本
- * 集成 AI Elements 提供更好的对话体验，支持流式响应和多模态内容
+ * AI Agent 对话接口组件 - AI SDK 5.0 优化版本
+ * 基于传输架构，支持流式响应和多模态内容
  */
 
 "use client";
@@ -53,23 +53,7 @@ import {
   Image as ImageIcon,
   Play,
 } from "lucide-react";
-import type { MultimodalContent, UserMode } from "@/types/ai-agent";
-
-/**
- * 扩展的消息接口
- */
-interface EnhancedMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  multimodal?: MultimodalContent[];
-  timestamp: string;
-  isStreaming?: boolean;
-  toolCalls?: any[];
-  error?: string;
-  thinking?: string[];
-  codeBlocks?: { language: string; code: string; title?: string }[];
-}
+import type { UIMessage, UserMode } from "@/types/ai-agent";
 
 /**
  * 对话接口属性
@@ -100,7 +84,7 @@ const getModeSuggestions = (mode: UserMode, t: any) => {
 };
 
 /**
- * AI Agent 对话接口组件 - 优化版本
+ * AI Agent 对话接口组件 - AI SDK 5.0 优化版本
  */
 export default function ConversationInterface({
   mode,
@@ -111,134 +95,118 @@ export default function ConversationInterface({
   const { user } = useAuth();
   const t = useTranslations("aiAgent.conversation");
 
-  // 聊天状态 - 尝试使用完整的 useChat API
-  const chatResult = useChat({
-    api: "/api/ai-agent",
-    initialMessages: [],
-    body: {
-      mode,
-      sessionId,
-      userId: user?.id,
+  // 本地状态管理 - AI SDK 5.0 不再管理输入状态
+  const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(true);
+
+  // AI SDK 5.0 useChat hook
+  const {
+    messages,
+    status,
+    error,
+    sendMessage,
+    regenerate,
+    stop,
+    clearError,
+    resumeStream,
+    addToolResult,
+    setMessages,
+  } = useChat({
+    transport: {
+      api: "/api/ai-agent",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: {
+        mode,
+        sessionId,
+        userId: user?.id,
+      },
     },
-    onFinish: (message) => {
-      console.log("Message finished:", message);
-      // 可以在这里处理会话ID更新
-      if (chatResult.data?.sessionId && onSessionChange) {
-        onSessionChange(chatResult.data.sessionId);
+    id: sessionId,
+    onFinish: ({ message, messages, isAbort, isDisconnect, isError }) => {
+      if (!isAbort && !isDisconnect && !isError) {
+        console.log("Message finished:", message);
+        // 处理会话ID更新
+        if (message.metadata?.sessionId && onSessionChange) {
+          onSessionChange(message.metadata.sessionId);
+        }
       }
     },
     onError: (error) => {
       console.error("Chat error:", error);
     },
+    onToolCall: async ({ toolCall }) => {
+      // 处理工具调用
+      console.log("Tool call:", toolCall);
+      // 这里可以添加工具调用的具体逻辑
+    },
+    onData: (dataPart) => {
+      // 处理数据部分
+      console.log("Data part:", dataPart);
+    },
   });
 
-  // 解构结果，如果不存在则使用默认值
-  const { messages, error, reload, stop, data } = chatResult;
-
-  // 检查是否存在 input 和 handleSubmit，如果不存在则使用本地状态
-  const input = (chatResult as any).input;
-  const handleSubmit = (chatResult as any).handleSubmit;
-  const handleInputChange = (chatResult as any).handleInputChange;
-  const isLoading = (chatResult as any).isLoading;
-
-  // 本地状态作为后备
-  const [localInput, setLocalInput] = useState("");
-  const [localIsLoading, setLocalIsLoading] = useState(false);
-
-  // 组件状态
-  const [attachments, setAttachments] = useState<File[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(true);
+  // 计算是否正在加载
+  const isLoading = status === "streaming" || status === "submitted";
 
   // 建议列表
   const suggestions = getModeSuggestions(mode, t);
 
-  // 输入处理 - 使用 useChat 提供的或本地状态
-  const actualInput = input !== undefined ? input : localInput;
-  const actualIsLoading = isLoading !== undefined ? isLoading : localIsLoading;
-  const actualHandleInputChange =
-    handleInputChange ||
-    useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setLocalInput(e.target.value);
-    }, []);
-
   // 处理建议点击
-  const handleSuggestionClick = useCallback(
-    (suggestion: string) => {
-      if (input !== undefined) {
-        // 如果 useChat 提供了 input，我们需要通过其他方式设置
-        // 这可能需要调用 handleInputChange
-        if (handleInputChange) {
-          handleInputChange({ target: { value: suggestion } } as any);
-        }
-      } else {
-        setLocalInput(suggestion);
-      }
-      setShowSuggestions(false);
-    },
-    [input, handleInputChange]
-  );
+  const handleSuggestionClick = useCallback((suggestion: string) => {
+    setInput(suggestion);
+    setShowSuggestions(false);
+  }, []);
 
-  // 处理消息提交
-  // 处理 PromptInput 提交
+  // 处理消息提交 - 使用 AI SDK 5.0 的 sendMessage
   const handlePromptSubmit = useCallback(
-    (message: { text?: string; files?: any[] }, event: React.FormEvent) => {
+    async (
+      message: { text?: string; files?: any[] },
+      event: React.FormEvent
+    ) => {
       event.preventDefault();
-      if (
-        !message.text?.trim() &&
-        (!message.files || message.files.length === 0)
-      )
+
+      const messageText = message.text?.trim() || input.trim();
+      if (!messageText && (!message.files || message.files.length === 0)) {
         return;
-      if (actualIsLoading) return;
+      }
+
+      if (isLoading) return;
 
       setShowSuggestions(false);
 
-      // 处理附件
-      if (message.files && message.files.length > 0) {
-        setAttachments(message.files);
-      }
-
-      // 如果 useChat 提供了 handleSubmit，使用它
-      if (handleSubmit) {
-        // 创建模拟的事件对象给 useChat 的 handleSubmit
-        const syntheticEvent = {
-          ...event,
-          currentTarget: {
-            ...event.currentTarget,
-            message: { value: message.text || "" },
+      try {
+        // 准备消息选项
+        const messageOptions = {
+          data: {
+            mode,
+            sessionId,
+            userId: user?.id,
+            files: message.files || attachments,
           },
         };
-        handleSubmit(syntheticEvent as any);
-      } else {
-        // 否则使用手动实现的提交逻辑
-        // TODO: 实现手动提交逻辑
-        console.log("Manual submit:", message.text);
-      }
 
-      // 清理输入和附件状态
-      if (input !== undefined) {
-        // 如果使用 useChat 的 input，可能需要特殊处理来清空
-      } else {
-        setLocalInput("");
+        // 使用 AI SDK 5.0 的 sendMessage
+        await sendMessage(messageText, messageOptions);
+
+        // 清理状态
+        setInput("");
+        setAttachments([]);
+      } catch (error) {
+        console.error("Failed to send message:", error);
       }
-      setTimeout(() => setAttachments([]), 100);
     },
-    [actualIsLoading, handleSubmit, input]
+    [input, isLoading, sendMessage, mode, sessionId, user?.id, attachments]
   );
 
-  const handleMessageSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!actualInput.trim() && attachments.length === 0) return;
-      if (actualIsLoading) return;
-
-      setShowSuggestions(false);
-
-      if (handleSubmit) {
-        handleSubmit(e);
-      }
-      setAttachments([]);
+  // 处理输入变化
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setInput(e.target.value);
     },
-    [actualInput, attachments, actualIsLoading, handleSubmit]
+    []
   );
 
   // 处理文件附件
@@ -250,47 +218,178 @@ export default function ConversationInterface({
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  // 渲染消息内容 - 改进版本，支持更好的流式响应和工具调用
-  const renderMessageContent = useCallback(
-    (message: any) => {
-      const content = message.content || "";
+  // 渲染消息内容 - 使用AI SDK 5.0的消息格式
+  const renderMessageContent = useCallback((message: any) => {
+    // 处理 AI SDK 5.0 的 parts 结构
+    if (message.parts && Array.isArray(message.parts)) {
+      return (
+        <div className="space-y-3">
+          {message.parts.map((part: any, index: number) => {
+            switch (part.type) {
+              case "text":
+                // 检查文本中是否包含代码块
+                const content = part.text || part.content || "";
+                const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+                const parts = [];
+                let lastIndex = 0;
+                let match;
 
-      // 处理空内容或仅有工具调用的情况
-      if (!content && !message.toolInvocations?.length) {
-        return null;
-      }
+                while ((match = codeBlockRegex.exec(content)) !== null) {
+                  // 添加代码块前的文本
+                  if (match.index > lastIndex) {
+                    const textContent = content
+                      .slice(lastIndex, match.index)
+                      .trim();
+                    if (textContent) {
+                      parts.push({
+                        type: "text",
+                        content: textContent,
+                      });
+                    }
+                  }
 
-      // 改进的代码块检测，支持更多语言
-      const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
-      const parts = [];
-      let lastIndex = 0;
-      let match;
+                  // 添加代码块
+                  parts.push({
+                    type: "code",
+                    language: match[1] || "text",
+                    content: match[2].trim(),
+                  });
 
-      while ((match = codeBlockRegex.exec(content)) !== null) {
-        // 添加代码块前的文本
-        if (match.index > lastIndex) {
-          const textContent = content.slice(lastIndex, match.index).trim();
-          if (textContent) {
-            parts.push({
-              type: "text",
-              content: textContent,
-            });
-          }
-        }
+                  lastIndex = match.index + match[0].length;
+                }
 
-        // 添加代码块
-        parts.push({
-          type: "code",
-          language: match[1] || "text",
-          content: match[2].trim(),
-        });
+                // 添加剩余文本
+                if (lastIndex < content.length) {
+                  const textContent = content.slice(lastIndex).trim();
+                  if (textContent) {
+                    parts.push({
+                      type: "text",
+                      content: textContent,
+                    });
+                  }
+                }
 
-        lastIndex = match.index + match[0].length;
-      }
+                // 如果没有解析到任何内容但有文本，则作为纯文本处理
+                if (parts.length === 0 && content) {
+                  parts.push({
+                    type: "text",
+                    content: content.trim(),
+                  });
+                }
 
-      // 添加剩余文本
-      if (lastIndex < content.length) {
-        const textContent = content.slice(lastIndex).trim();
+                return parts.map((textPart, textIndex) => {
+                  if (textPart.type === "code") {
+                    return (
+                      <CodeBlock
+                        key={`text-code-${index}-${textIndex}`}
+                        className="not-prose"
+                        code={textPart.content}
+                        language={textPart.language || "text"}
+                      >
+                        <CodeBlockCopyButton />
+                      </CodeBlock>
+                    );
+                  }
+                  return (
+                    <div
+                      key={`text-content-${index}-${textIndex}`}
+                      className="whitespace-pre-wrap leading-relaxed"
+                    >
+                      {textPart.content}
+                    </div>
+                  );
+                });
+
+              case "tool-call":
+                return (
+                  <div key={`tool-call-${index}`}>
+                    <ChainOfThought>
+                      <ChainOfThoughtStep>
+                        <ChainOfThoughtHeader>
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center space-x-2">
+                              <Brain className="h-4 w-4 text-blue-500" />
+                              <span className="text-sm font-medium">
+                                {part.toolName || "Tool Call"}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Loader className="h-3 w-3" />
+                              <span className="text-xs text-muted-foreground">
+                                调用中...
+                              </span>
+                            </div>
+                          </div>
+                        </ChainOfThoughtHeader>
+                        <ChainOfThoughtContent>
+                          {part.args && Object.keys(part.args).length > 0 && (
+                            <div className="bg-muted p-2 rounded text-xs font-mono">
+                              {JSON.stringify(part.args, null, 2)}
+                            </div>
+                          )}
+                        </ChainOfThoughtContent>
+                      </ChainOfThoughtStep>
+                    </ChainOfThought>
+                  </div>
+                );
+
+              case "tool-result":
+                return (
+                  <div key={`tool-result-${index}`}>
+                    <ChainOfThought>
+                      <ChainOfThoughtStep>
+                        <ChainOfThoughtHeader>
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center space-x-2">
+                              <Brain className="h-4 w-4 text-green-500" />
+                              <span className="text-sm font-medium">
+                                Tool Result
+                              </span>
+                            </div>
+                            <span className="text-xs text-green-600">
+                              ✓ 完成
+                            </span>
+                          </div>
+                        </ChainOfThoughtHeader>
+                        <ChainOfThoughtContent>
+                          <div className="bg-muted p-2 rounded text-xs font-mono overflow-auto max-h-40">
+                            {typeof part.result === "string"
+                              ? part.result
+                              : JSON.stringify(part.result, null, 2)}
+                          </div>
+                        </ChainOfThoughtContent>
+                      </ChainOfThoughtStep>
+                    </ChainOfThought>
+                  </div>
+                );
+
+              default:
+                return (
+                  <div
+                    key={`unknown-${index}`}
+                    className="whitespace-pre-wrap leading-relaxed"
+                  >
+                    {part.text || part.content || ""}
+                  </div>
+                );
+            }
+          })}
+        </div>
+      );
+    }
+
+    // 兼容性处理：如果没有parts结构，回退到原有逻辑
+    const content = message.content || "";
+    if (!content) return null;
+
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        const textContent = content.slice(lastIndex, match.index).trim();
         if (textContent) {
           parts.push({
             type: "text",
@@ -299,110 +398,59 @@ export default function ConversationInterface({
         }
       }
 
-      // 如果没有解析到任何内容但有文本，则作为纯文本处理
-      if (parts.length === 0 && content) {
+      parts.push({
+        type: "code",
+        language: match[1] || "text",
+        content: match[2].trim(),
+      });
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < content.length) {
+      const textContent = content.slice(lastIndex).trim();
+      if (textContent) {
         parts.push({
           type: "text",
-          content: content.trim(),
+          content: textContent,
         });
       }
+    }
 
-      return (
-        <div className="space-y-3">
-          {/* 渲染文本和代码块 */}
-          {parts.map((part, index) => {
-            if (part.type === "code") {
-              return (
-                <CodeBlock
-                  key={`code-${index}`}
-                  className="not-prose"
-                  code={part.content}
-                  language={part.language || "text"}
-                >
-                  <CodeBlockCopyButton />
-                </CodeBlock>
-              );
-            }
+    if (parts.length === 0 && content) {
+      parts.push({
+        type: "text",
+        content: content.trim(),
+      });
+    }
+
+    return (
+      <div className="space-y-3">
+        {parts.map((part, index) => {
+          if (part.type === "code") {
             return (
-              <div
-                key={`text-${index}`}
-                className="whitespace-pre-wrap leading-relaxed"
+              <CodeBlock
+                key={`code-${index}`}
+                className="not-prose"
+                code={part.content}
+                language={part.language || "text"}
               >
-                {part.content}
-              </div>
+                <CodeBlockCopyButton />
+              </CodeBlock>
             );
-          })}
-
-          {/* 工具调用显示 - 改进版本，支持更多状态 */}
-          {message.toolInvocations && message.toolInvocations.length > 0 && (
-            <div className="mt-4">
-              <ChainOfThought>
-                {message.toolInvocations.map((tool: any, index: number) => (
-                  <ChainOfThoughtStep key={`tool-${index}`}>
-                    <ChainOfThoughtHeader>
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center space-x-2">
-                          <Brain className="h-4 w-4 text-blue-500" />
-                          <span className="text-sm font-medium">
-                            {tool.toolName || "Unknown Tool"}
-                          </span>
-                        </div>
-                        {tool.state && (
-                          <div className="flex items-center space-x-1">
-                            {tool.state === "call" && (
-                              <>
-                                <Loader className="h-3 w-3" />
-                                <span className="text-xs text-muted-foreground">
-                                  调用中...
-                                </span>
-                              </>
-                            )}
-                            {tool.state === "result" && (
-                              <span className="text-xs text-green-600">
-                                ✓ 完成
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </ChainOfThoughtHeader>
-                    <ChainOfThoughtContent>
-                      {/* 工具参数显示 */}
-                      {tool.args && Object.keys(tool.args).length > 0 && (
-                        <div className="mb-2">
-                          <div className="text-xs text-muted-foreground mb-1">
-                            参数:
-                          </div>
-                          <div className="bg-muted p-2 rounded text-xs font-mono">
-                            {JSON.stringify(tool.args, null, 2)}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 工具结果显示 */}
-                      {tool.result && (
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">
-                            结果:
-                          </div>
-                          <div className="bg-muted p-2 rounded text-xs font-mono overflow-auto max-h-40">
-                            {typeof tool.result === "string"
-                              ? tool.result
-                              : JSON.stringify(tool.result, null, 2)}
-                          </div>
-                        </div>
-                      )}
-                    </ChainOfThoughtContent>
-                  </ChainOfThoughtStep>
-                ))}
-              </ChainOfThought>
+          }
+          return (
+            <div
+              key={`text-${index}`}
+              className="whitespace-pre-wrap leading-relaxed"
+            >
+              {part.content}
             </div>
-          )}
-        </div>
-      );
-    },
-    [t]
-  );
+          );
+        })}
+      </div>
+    );
+  }, []);
 
   // 获取用户头像URL
   const getUserAvatar = useCallback(() => {
@@ -454,8 +502,8 @@ export default function ConversationInterface({
                 const isUser = message.role === "user";
                 const messageContent = renderMessageContent(message);
 
-                // 跳过空消息（除了有工具调用的情况）
-                if (!messageContent && !message.toolInvocations?.length) {
+                // 跳过空消息
+                if (!messageContent) {
                   return null;
                 }
 
@@ -479,11 +527,10 @@ export default function ConversationInterface({
                     <MessageContent variant="contained">
                       {messageContent}
 
-                      {/* 流式加载指示器 - 仅对最后一条Assistant消息 */}
+                      {/* 流式加载指示器 - 仅对最后一条Assistant消息且正在流式传输时 */}
                       {!isUser &&
                         messageIndex === messages.length - 1 &&
-                        isLoading &&
-                        !message.content && (
+                        status === "streaming" && (
                           <div className="flex items-center space-x-2 mt-2">
                             <Loader className="h-4 w-4 text-blue-500" />
                             <span className="text-sm text-muted-foreground animate-pulse">
@@ -528,28 +575,27 @@ export default function ConversationInterface({
               .filter(Boolean)
           )}
 
-          {/* 独立的流式加载指示器 - 仅在没有消息内容时显示 */}
-          {isLoading &&
-            !messages.some((m) => m.role === "assistant" && !m.content) && (
-              <Message from="assistant">
-                <MessageAvatar src="/ai-avatar.png" name="AI Assistant" />
-                <MessageContent variant="contained">
-                  <div className="flex items-center space-x-3">
-                    <Loader className="h-4 w-4 text-blue-500" />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">
-                        {t("thinking", "AI正在思考...")}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {mode === "advanced"
-                          ? t("advanced.processing", "正在处理您的复杂请求...")
-                          : t("simple.processing", "请稍候...")}
-                      </span>
-                    </div>
+          {/* 独立的流式加载指示器 - 仅在提交状态且没有消息时显示 */}
+          {status === "submitted" && messages.length === 0 && (
+            <Message from="assistant">
+              <MessageAvatar src="/ai-avatar.png" name="AI Assistant" />
+              <MessageContent variant="contained">
+                <div className="flex items-center space-x-3">
+                  <Loader className="h-4 w-4 text-blue-500" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">
+                      {t("thinking", "AI正在思考...")}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {mode === "advanced"
+                        ? t("advanced.processing", "正在处理您的复杂请求...")
+                        : t("simple.processing", "请稍候...")}
+                    </span>
                   </div>
-                </MessageContent>
-              </Message>
-            )}
+                </div>
+              </MessageContent>
+            </Message>
+          )}
 
           {/* 改进的错误显示 */}
           {error && (
@@ -576,7 +622,7 @@ export default function ConversationInterface({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={reload}
+                          onClick={() => clearError()}
                           className="h-8 px-3 text-xs border-destructive/30 hover:bg-destructive/10"
                         >
                           <Sparkles className="h-3 w-3 mr-1.5" />
@@ -603,7 +649,7 @@ export default function ConversationInterface({
       </Conversation>
 
       {/* 输入区域 - 改进版本，更好的可访问性和用户体验 */}
-      <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <PromptInput
           className="border-none"
           onSubmit={handlePromptSubmit}
@@ -628,10 +674,12 @@ export default function ConversationInterface({
             <div className="flex items-end space-x-3 p-4">
               <div className="flex-1 relative">
                 <PromptInputTextarea
+                  value={input}
+                  onChange={handleInputChange}
                   placeholder={
                     mode === "simple"
-                      ? t("placeholder")
-                      : t("placeholderAdvanced")
+                      ? t("placeholder", "输入您的问题...")
+                      : t("placeholderAdvanced", "详细描述您的需求...")
                   }
                   className={cn(
                     "min-h-[52px] max-h-[140px] resize-none transition-all duration-200",
@@ -652,7 +700,7 @@ export default function ConversationInterface({
                     "focus:ring-2 focus:ring-blue-500/20",
                     "shadow-lg hover:shadow-xl"
                   )}
-                  title={isLoading ? t("stop") : t("send")}
+                  title={isLoading ? t("stop", "停止") : t("send", "发送")}
                 />
               </div>
             </div>
@@ -661,7 +709,9 @@ export default function ConversationInterface({
             <PromptInputToolbar className="px-4 pb-3">
               <PromptInputTools>
                 <span className="text-xs text-muted-foreground/80">
-                  {mode === "simple" ? t("hints.simple") : t("hints.advanced")}
+                  {mode === "simple"
+                    ? t("hints.simple", "按Enter发送，Shift+Enter换行")
+                    : t("hints.advanced", "支持代码、文件等复杂输入")}
                 </span>
                 {/* 文件上传 - 仅高级模式 */}
                 {mode === "advanced" && (
@@ -685,7 +735,9 @@ export default function ConversationInterface({
                 )}
               </PromptInputTools>
               <div className="flex items-center space-x-3 text-xs text-muted-foreground/80">
-                <span className="hidden sm:block">{t("hints.shortcuts")}</span>
+                <span className="hidden sm:block">
+                  {t("hints.shortcuts", "Enter发送 • Shift+Enter换行")}
+                </span>
                 <span className="flex items-center space-x-1">
                   <Sparkles className="h-3 w-3" />
                   <span>{mode === "simple" ? "简单模式" : "高级模式"}</span>

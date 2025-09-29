@@ -1,10 +1,108 @@
 /**
- * AI Agent 核心类型定义
+ * AI Agent 核心类型定义 - AI SDK 5.0 兼容版本
  * 支持多模态内容、插件架构和 MCP 集成的智能代理系统
  */
 
 import type { User, Session } from '@supabase/supabase-js'
 import type { Locale } from './i18n'
+
+// ========================================
+// AI SDK 5.0 兼容类型
+// ========================================
+
+/**
+ * AI SDK 5.0 UIMessage 类型
+ */
+export interface UIMessage {
+  id: string
+  role: 'user' | 'assistant' | 'system' | 'tool'
+  parts: UIMessagePart[]
+  metadata?: unknown
+  createdAt?: string
+  updatedAt?: string
+}
+
+/**
+ * UI 消息部分类型
+ */
+export type UIMessagePart =
+  | UITextPart
+  | UIToolCallPart
+  | UIToolResultPart
+  | UIImagePart
+  | UIFilePart
+
+/**
+ * 文本部分
+ */
+export interface UITextPart {
+  type: 'text'
+  text: string
+}
+
+/**
+ * 工具调用部分
+ */
+export interface UIToolCallPart {
+  type: 'tool-call'
+  toolCallId: string
+  toolName: string
+  args: Record<string, unknown>
+}
+
+/**
+ * 工具结果部分
+ */
+export interface UIToolResultPart {
+  type: 'tool-result'
+  toolCallId: string
+  toolName: string
+  result: unknown
+  isError?: boolean
+}
+
+/**
+ * 图像部分
+ */
+export interface UIImagePart {
+  type: 'image'
+  image: string | Uint8Array
+  mimeType?: string
+}
+
+/**
+ * 文件部分
+ */
+export interface UIFilePart {
+  type: 'file'
+  data: string | Uint8Array
+  mimeType: string
+  filename?: string
+}
+
+/**
+ * 创建消息选项
+ */
+export interface CreateUIMessage {
+  id?: string
+  role: 'user' | 'assistant' | 'system'
+  content: string | Array<UIMessagePart>
+  metadata?: unknown
+}
+
+/**
+ * 聊天请求选项
+ */
+export interface ChatRequestOptions {
+  headers?: Record<string, string> | Headers
+  body?: object
+  data?: unknown
+}
+
+/**
+ * 用户模式类型
+ */
+export type UserMode = 'simple' | 'advanced'
 
 // ========================================
 // 会话管理类型

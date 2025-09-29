@@ -1,21 +1,21 @@
-import { Suspense } from 'react'
-import { Metadata } from 'next'
-import { useTranslations } from 'next-intl'
-import { notFound } from 'next/navigation'
+import { Suspense } from "react";
+import { Metadata } from "next";
+import { useTranslations } from "next-intl";
+import { notFound } from "next/navigation";
 
-import { requireAuth } from '@/lib/supabase/auth-helpers'
-import { AgentLayout } from '@/components/ai-agent'
-import { ContentRenderer } from '@/components/ai-agent'
-import { ToolExecutionVisualizer } from '@/components/ai-agent'
-import { QuickActions } from '@/components/ai-agent/QuickActions'
-import { MCPPluginButton } from '@/components/ai-agent/MCPPluginButton'
-import { SessionInfo } from '@/components/ai-agent/SessionInfo'
-import { ConversationWrapper } from '@/components/ai-agent/ConversationWrapper'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { requireAuth } from "@/lib/supabase/auth-helpers";
+import { AgentLayout } from "@/components/ai-agent";
+import { ContentRenderer } from "@/components/ai-agent";
+import { ToolExecutionVisualizer } from "@/components/ai-agent";
+import { QuickActions } from "@/components/ai-agent/QuickActions";
+import { MCPPluginButton } from "@/components/ai-agent/MCPPluginButton";
+import { SessionInfo } from "@/components/ai-agent/SessionInfo";
+import { ConversationWrapper } from "@/components/ai-agent/ConversationWrapper";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Brain,
   MessageSquare,
@@ -23,29 +23,32 @@ import {
   History,
   Zap,
   Info,
-  Sparkles
-} from 'lucide-react'
+  Sparkles,
+} from "lucide-react";
 
 interface AIAgentPageProps {
-  params: Promise<{ locale: string }>
+  params: Promise<{ locale: string }>;
   searchParams: Promise<{
-    mode?: 'simple' | 'advanced'
-    session?: string
-    tab?: string
-  }>
+    mode?: "simple" | "advanced";
+    session?: string;
+    tab?: string;
+  }>;
 }
 
-export async function generateMetadata({ params }: AIAgentPageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: AIAgentPageProps): Promise<Metadata> {
   return {
-    title: 'AI Agent - Mango',
-    description: 'Intelligent AI Assistant with multimodal capabilities and MCP tool integration',
-    keywords: ['AI', 'Agent', 'Assistant', 'MCP', 'Tools', 'Multimodal'],
+    title: "AI Agent - Mango",
+    description:
+      "Intelligent AI Assistant with multimodal capabilities and MCP tool integration",
+    keywords: ["AI", "Agent", "Assistant", "MCP", "Tools", "Multimodal"],
     openGraph: {
-      title: 'AI Agent - Mango',
-      description: 'Advanced AI Assistant with comprehensive tool integration',
-      type: 'website'
-    }
-  }
+      title: "AI Agent - Mango",
+      description: "Advanced AI Assistant with comprehensive tool integration",
+      type: "website",
+    },
+  };
 }
 
 // Loading components
@@ -56,18 +59,18 @@ function ConversationSkeleton() {
       <div className="h-32 bg-gray-200 rounded-lg animate-pulse" />
       <div className="h-16 bg-gray-200 rounded-lg animate-pulse" />
     </div>
-  )
+  );
 }
 
-function WelcomePanel({ userMode }: { userMode: 'simple' | 'advanced' }) {
-  const t = useTranslations('aiAgent')
+function WelcomePanel({ userMode }: { userMode: "simple" | "advanced" }) {
+  const t = useTranslations("aiAgent");
 
   return (
     <Card className="mb-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
-          {t('welcome.title')}
+          {t("welcome.title")}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -75,30 +78,30 @@ function WelcomePanel({ userMode }: { userMode: 'simple' | 'advanced' }) {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Brain className="h-4 w-4 text-blue-500" />
-              <span className="font-medium">{t('features.intelligent')}</span>
+              <span className="font-medium">{t("features.intelligent")}</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              {t('features.intelligentDesc')}
+              {t("features.intelligentDesc")}
             </p>
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-green-500" />
-              <span className="font-medium">{t('features.multimodal')}</span>
+              <span className="font-medium">{t("features.multimodal")}</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              {t('features.multimodalDesc')}
+              {t("features.multimodalDesc")}
             </p>
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-orange-500" />
-              <span className="font-medium">{t('features.tools')}</span>
+              <span className="font-medium">{t("features.tools")}</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              {t('features.toolsDesc')}
+              {t("features.toolsDesc")}
             </p>
           </div>
         </div>
@@ -118,26 +121,31 @@ function WelcomePanel({ userMode }: { userMode: 'simple' | 'advanced' }) {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
-export default async function AIAgentPage({ params, searchParams }: AIAgentPageProps) {
+export default async function AIAgentPage({
+  params,
+  searchParams,
+}: AIAgentPageProps) {
   // Validate authentication
-  const { user } = await requireAuth()
+  const { user } = await requireAuth();
 
   // Await params and searchParams (Next.js 15 requirement)
-  const resolvedParams = await params
-  const resolvedSearchParams = await searchParams
+  const resolvedParams = await params;
+  const resolvedSearchParams = await searchParams;
 
   // Validate locale
-  if (!['zh', 'en'].includes(resolvedParams.locale)) {
-    notFound()
+  if (!["zh", "en"].includes(resolvedParams.locale)) {
+    notFound();
   }
 
   // Get user preferences
-  const userMode = (resolvedSearchParams.mode || 'simple') as 'simple' | 'advanced'
-  const sessionId = resolvedSearchParams.session
-  const activeTab = resolvedSearchParams.tab || 'chat'
+  const userMode = (resolvedSearchParams.mode || "simple") as
+    | "simple"
+    | "advanced";
+  const sessionId = resolvedSearchParams.session;
+  const activeTab = resolvedSearchParams.tab || "chat";
 
   return (
     <AgentLayout defaultMode={userMode} className="min-h-screen">
@@ -145,19 +153,16 @@ export default async function AIAgentPage({ params, searchParams }: AIAgentPageP
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              AI Agent
-            </h1>
+            <h1 className="text-3xl font-bold tracking-tight">AI Agent</h1>
             <p className="text-muted-foreground mt-1">
-              {userMode === 'simple'
-                ? '智能AI助手，让对话更简单'
-                : '高级AI代理，配备多模态处理和MCP工具集成'
-              }
+              {userMode === "simple"
+                ? "智能AI助手，让对话更简单"
+                : "高级AI代理，配备多模态处理和MCP工具集成"}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={userMode === 'simple' ? 'default' : 'secondary'}>
-              {userMode === 'simple' ? '简单模式' : '高级模式'}
+            <Badge variant={userMode === "simple" ? "default" : "secondary"}>
+              {userMode === "simple" ? "简单模式" : "高级模式"}
             </Badge>
           </div>
         </div>
@@ -237,7 +242,9 @@ export default async function AIAgentPage({ params, searchParams }: AIAgentPageP
                       toolCalls={[]}
                       executionRecords={[]}
                       userMode={userMode}
-                      detailLevel={userMode === 'simple' ? 'simple' : 'detailed'}
+                      detailLevel={
+                        userMode === "simple" ? "simple" : "detailed"
+                      }
                     />
                   </Suspense>
                 </CardContent>
@@ -266,7 +273,9 @@ export default async function AIAgentPage({ params, searchParams }: AIAgentPageP
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">示例会话</p>
-                          <p className="text-sm text-muted-foreground">2024年3月15日</p>
+                          <p className="text-sm text-muted-foreground">
+                            2024年3月15日
+                          </p>
                         </div>
                         <Badge variant="outline">简单模式</Badge>
                       </div>
@@ -283,5 +292,5 @@ export default async function AIAgentPage({ params, searchParams }: AIAgentPageP
         </Tabs>
       </div>
     </AgentLayout>
-  )
+  );
 }
