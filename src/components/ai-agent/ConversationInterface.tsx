@@ -7,6 +7,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -113,7 +114,7 @@ export default function ConversationInterface({
     addToolResult,
     setMessages,
   } = useChat({
-    transport: {
+    transport: new DefaultChatTransport({
       api: "/api/ai-agent",
       headers: {
         "Content-Type": "application/json",
@@ -123,7 +124,7 @@ export default function ConversationInterface({
         sessionId,
         userId: user?.id,
       },
-    },
+    }),
     id: sessionId,
     onFinish: ({ message, messages, isAbort, isDisconnect, isError }) => {
       if (!isAbort && !isDisconnect && !isError) {
@@ -188,8 +189,11 @@ export default function ConversationInterface({
           },
         };
 
-        // 使用 AI SDK 5.0 的 sendMessage
-        await sendMessage(messageText, messageOptions);
+        // 使用 AI SDK 5.0 的 sendMessage - 第一个参数需要是包含 text 属性的对象
+        await sendMessage({
+          text: messageText,
+          files: message.files || attachments,
+        });
 
         // 清理状态
         setInput("");

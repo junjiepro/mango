@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { openai } from "@ai-sdk/openai";
-import { streamText, CoreMessage, ToolCallPart, ToolResultPart } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
+import {
+  streamText,
+  CoreMessage,
+  ToolCallPart,
+  ToolResultPart,
+  UIMessage,
+  convertToModelMessages,
+  ToolSet,
+  tool,
+} from "ai";
 
 import { AgentEngine } from "@/lib/ai-agent/core";
 import { MCPClientService } from "@/lib/mcp/client";
@@ -12,8 +21,9 @@ import type {
   MultimodalContent,
   ToolCall,
   AgentMessage,
-  MCPToolResult,
 } from "@/types/ai-agent";
+import env from "@/lib/env";
+import z from "zod";
 
 // Initialize services
 const agentEngine = new AgentEngine();
@@ -21,12 +31,17 @@ const mcpClient = new MCPClientService();
 const multimodalProcessor = new MultimodalProcessorService();
 const pluginManager = new PluginManagerService();
 
+const openai = createOpenAI({
+  baseURL: env.OPENAI_API_BASE,
+  apiKey: env.OPENAI_API_KEY,
+});
+
 // Tool definitions for the AI model
-const availableTools = {
+const availableTools: ToolSet = {
   // MCP tool execution
   executeMCPTool: {
     description: "Execute a tool from an MCP server",
-    parameters: {
+    inputSchema: {
       type: "object",
       properties: {
         serverId: {
@@ -118,7 +133,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate authentication
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
       error: authError,
@@ -132,7 +147,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get or create agent session
-    let session: AgentSession;
+    let session: AgentSession | null = null;
     if (sessionId) {
       session = await agentEngine.getSession(sessionId);
       if (!session || session.userId !== user.id) {
@@ -152,7 +167,7 @@ export async function POST(request: NextRequest) {
         try {
           const result = await multimodalProcessor.processContent(content);
           if (result.success) {
-            processedContent.push(result.processedContent!);
+            processedContent.push(result.data!);
           }
         } catch (error) {
           console.error("Multimodal processing error:", error);
@@ -163,7 +178,7 @@ export async function POST(request: NextRequest) {
     // Configure MCP connections if provided
     if (mcpConfig) {
       try {
-        await mcpClient.configure(mcpConfig);
+        await mcpClient.connect(mcpConfig);
       } catch (error) {
         console.error("MCP configuration error:", error);
       }
@@ -181,23 +196,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert messages to CoreMessage format
-    const coreMessages: CoreMessage[] = messages.map((msg: AgentMessage) => ({
-      role: msg.role,
-      content: msg.content,
-      ...(msg.toolInvocations && { toolInvocations: msg.toolInvocations }),
-    }));
+
+    const coreMessages: CoreMessage[] = convertToModelMessages(messages);
 
     // Add session context to system message
     const systemMessage: CoreMessage = {
       role: "system",
       content: `You are an AI agent with access to various tools and plugins.
 Current session mode: ${session.mode}
-Session capabilities: ${JSON.stringify(session.capabilities)}
+Session capabilities: ${JSON.stringify(
+        session.settings.mcpConfigs.map((c) => c.capabilities)
+      )}
 Available MCP servers: ${mcpClient
-        .getConnectedServers()
-        .map((s) => s.id)
+        .getAllSessions()
+        .map((s) => s.serverId)
         .join(", ")}
-Loaded plugins: ${Array.from(pluginManager.getLoadedPlugins().keys()).join(
+Loaded plugins: ${Array.from(pluginManager.getEnabledPlugins().keys()).join(
         ", "
       )}
 
@@ -214,117 +228,229 @@ Always provide helpful responses and explain tool usage when appropriate.`,
 
     // Stream response using Vercel AI SDK
     const result = await streamText({
-      model: openai("gpt-4o"),
+      model: openai("gpt-5"),
       messages: messagesWithSystem,
-      tools: availableTools,
+      tools: {
+        // MCP tool execution
+        executeMCPTool: tool({
+          description: "Execute a tool from an MCP server",
+          inputSchema: z.object({
+            serverId: z.string().describe("The ID of the MCP server"),
+            toolName: z.string().describe("The name of the tool to execute"),
+            parameters: z.any().describe("Parameters to pass to the tool"),
+          }),
+          execute: async ({ serverId, toolName, parameters }) => {
+            const result = await mcpClient.executeTool(
+              serverId,
+              toolName,
+              parameters
+            );
+
+            // Update session with tool call
+            await agentEngine.updateSession(session.id, {
+              lastActivity: new Date().toISOString(),
+              toolCalls: [
+                ...(session.toolCalls || []),
+                {
+                  id: toolCall.toolCallId,
+                  name: toolName,
+                  parameters,
+                  timestamp: new Date().toISOString(),
+                  status: result.success ? "completed" : "failed",
+                  result: result.result,
+                  error: result.error,
+                },
+              ],
+            });
+
+            return {
+              success: result.success,
+              result: result.result,
+              error: result.error,
+            };
+          },
+        }),
+
+        // Plugin execution
+        executePlugin: tool({
+          description: "Execute a registered plugin",
+          inputSchema: z.object({
+            pluginId: z.string().describe("The ID of the plugin to execute"),
+            context: z.any().describe("Execution context for the plugin"),
+          }),
+          execute: async ({ pluginId, context }) => {
+            const result = await pluginManager.executePlugin(pluginId, {
+              sessionId: session.id,
+              userId: user.id,
+              mode: session.mode,
+              ...context,
+            });
+
+            return {
+              success: true,
+              result,
+            };
+          },
+        }),
+
+        // Multimodal content processing
+        processMultimodalContent: tool({
+          description: "Process multimodal content (images, code, files, etc.)",
+          inputSchema: z.object({
+            content: z.any().describe("The multimodal content to process"),
+            processingOptions: z
+              .any()
+              .describe("Processing configuration options"),
+          }),
+          execute: async ({ content, processingOptions }) => {
+            const result = await multimodalProcessor.processContent(
+              content
+              // processingOptions
+            );
+
+            return {
+              success: result.success,
+              result: result.data,
+              metadata: result.metadata,
+              error: result.error,
+            };
+          },
+        }),
+
+        // Session management
+        updateSession: tool({
+          description: "Update agent session properties",
+          inputSchema: z.object({
+            sessionId: z.string().describe("The session ID to update"),
+            updates: z.any().describe("Properties to update"),
+          }),
+          execute: async ({ sessionId: targetSessionId, updates }) => {
+            // Ensure user can only update their own sessions
+            if (targetSessionId !== session.id) {
+              const targetSession = await agentEngine.getSession(
+                targetSessionId
+              );
+              if (!targetSession || targetSession.userId !== user.id) {
+                throw new Error("Access denied to session");
+              }
+            }
+
+            await agentEngine.updateSession(targetSessionId, updates);
+
+            return {
+              success: true,
+              result: "Session updated successfully",
+            };
+          },
+        }),
+      },
       toolChoice: "auto",
       temperature: 0.7,
-      maxTokens: 4096,
 
       // Handle tool calls
-      async onToolCall({ toolCall }) {
-        console.log("Tool call:", toolCall);
+      // async onToolCall({ toolCall }) {
+      //   console.log("Tool call:", toolCall);
 
-        try {
-          switch (toolCall.toolName) {
-            case "executeMCPTool": {
-              const { serverId, toolName, parameters } = toolCall.args;
-              const result = await mcpClient.executeTool(
-                serverId,
-                toolName,
-                parameters
-              );
+      //   try {
+      //     switch (toolCall.toolName) {
+      //       case "executeMCPTool": {
+      //         const { serverId, toolName, parameters } = toolCall.args;
+      //         const result = await mcpClient.executeTool(
+      //           serverId,
+      //           toolName,
+      //           parameters
+      //         );
 
-              // Update session with tool call
-              await agentEngine.updateSession(session.id, {
-                lastActivity: new Date().toISOString(),
-                toolCalls: [
-                  ...(session.toolCalls || []),
-                  {
-                    id: toolCall.toolCallId,
-                    name: toolName,
-                    parameters,
-                    timestamp: new Date().toISOString(),
-                    status: result.success ? "completed" : "failed",
-                    result: result.result,
-                    error: result.error,
-                  },
-                ],
-              });
+      //         // Update session with tool call
+      //         await agentEngine.updateSession(session.id, {
+      //           lastActivity: new Date().toISOString(),
+      //           toolCalls: [
+      //             ...(session.toolCalls || []),
+      //             {
+      //               id: toolCall.toolCallId,
+      //               name: toolName,
+      //               parameters,
+      //               timestamp: new Date().toISOString(),
+      //               status: result.success ? "completed" : "failed",
+      //               result: result.result,
+      //               error: result.error,
+      //             },
+      //           ],
+      //         });
 
-              return {
-                success: result.success,
-                result: result.result,
-                error: result.error,
-              };
-            }
+      //         return {
+      //           success: result.success,
+      //           result: result.result,
+      //           error: result.error,
+      //         };
+      //       }
 
-            case "executePlugin": {
-              const { pluginId, context } = toolCall.args;
-              const result = await pluginManager.executePlugin(pluginId, {
-                sessionId: session.id,
-                userId: user.id,
-                mode: session.mode,
-                ...context,
-              });
+      //       case "executePlugin": {
+      //         const { pluginId, context } = toolCall.args;
+      //         const result = await pluginManager.executePlugin(pluginId, {
+      //           sessionId: session.id,
+      //           userId: user.id,
+      //           mode: session.mode,
+      //           ...context,
+      //         });
 
-              return {
-                success: true,
-                result,
-              };
-            }
+      //         return {
+      //           success: true,
+      //           result,
+      //         };
+      //       }
 
-            case "processMultimodalContent": {
-              const { content, processingOptions } = toolCall.args;
-              const result = await multimodalProcessor.processContent(
-                content,
-                processingOptions
-              );
+      //       case "processMultimodalContent": {
+      //         const { content, processingOptions } = toolCall.args;
+      //         const result = await multimodalProcessor.processContent(
+      //           content
+      //           // processingOptions
+      //         );
 
-              return {
-                success: result.success,
-                result: result.processedContent,
-                metadata: result.metadata,
-                error: result.error,
-              };
-            }
+      //         return {
+      //           success: result.success,
+      //           result: result.data,
+      //           metadata: result.metadata,
+      //           error: result.error,
+      //         };
+      //       }
 
-            case "updateSession": {
-              const { sessionId: targetSessionId, updates } = toolCall.args;
+      //       case "updateSession": {
+      //         const { sessionId: targetSessionId, updates } = toolCall.args;
 
-              // Ensure user can only update their own sessions
-              if (targetSessionId !== session.id) {
-                const targetSession = await agentEngine.getSession(
-                  targetSessionId
-                );
-                if (!targetSession || targetSession.userId !== user.id) {
-                  throw new Error("Access denied to session");
-                }
-              }
+      //         // Ensure user can only update their own sessions
+      //         if (targetSessionId !== session.id) {
+      //           const targetSession = await agentEngine.getSession(
+      //             targetSessionId
+      //           );
+      //           if (!targetSession || targetSession.userId !== user.id) {
+      //             throw new Error("Access denied to session");
+      //           }
+      //         }
 
-              await agentEngine.updateSession(targetSessionId, updates);
+      //         await agentEngine.updateSession(targetSessionId, updates);
 
-              return {
-                success: true,
-                result: "Session updated successfully",
-              };
-            }
+      //         return {
+      //           success: true,
+      //           result: "Session updated successfully",
+      //         };
+      //       }
 
-            default:
-              throw new Error(`Unknown tool: ${toolCall.toolName}`);
-          }
-        } catch (error) {
-          console.error(
-            `Tool execution error for ${toolCall.toolName}:`,
-            error
-          );
-          return {
-            success: false,
-            error:
-              error instanceof Error ? error.message : "Tool execution failed",
-          };
-        }
-      },
+      //       default:
+      //         throw new Error(`Unknown tool: ${toolCall.toolName}`);
+      //     }
+      //   } catch (error) {
+      //     console.error(
+      //       `Tool execution error for ${toolCall.toolName}:`,
+      //       error
+      //     );
+      //     return {
+      //       success: false,
+      //       error:
+      //         error instanceof Error ? error.message : "Tool execution failed",
+      //     };
+      //   }
+      // },
 
       // Handle completion
       async onFinish({ text, toolCalls, usage }) {
@@ -343,7 +469,7 @@ Always provide helpful responses and explain tool usage when appropriate.`,
             }),
           };
 
-          await agentEngine.addMessage(session.id, agentMessage);
+          // await agentEngine.addMessage(session.id, agentMessage);
 
           // Update session activity
           await agentEngine.updateSession(session.id, {
@@ -371,7 +497,7 @@ Always provide helpful responses and explain tool usage when appropriate.`,
     });
 
     // Return streaming response with session info
-    return new Response(result.toAIStreamResponse().body, {
+    return new Response(result.toTextStreamResponse().body, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "X-Session-ID": session.id,
@@ -420,8 +546,8 @@ export async function GET() {
         pluginManager: pluginManager ? "ready" : "unavailable",
       },
       connections: {
-        mcpServers: mcpClient.getConnectedServers().length,
-        loadedPlugins: pluginManager.getLoadedPlugins().size,
+        mcpServers: mcpClient.getAllSessions().length,
+        loadedPlugins: pluginManager.getEnabledPlugins().length,
       },
     };
 
