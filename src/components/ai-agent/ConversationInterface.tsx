@@ -7,7 +7,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, UIMessagePart } from "ai";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -114,39 +114,39 @@ export default function ConversationInterface({
     addToolResult,
     setMessages,
   } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/ai-agent",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: {
-        mode,
-        sessionId,
-        userId: user?.id,
-      },
-    }),
-    id: sessionId,
-    onFinish: ({ message, messages, isAbort, isDisconnect, isError }) => {
-      if (!isAbort && !isDisconnect && !isError) {
-        console.log("Message finished:", message);
-        // 处理会话ID更新
-        if (message.metadata?.sessionId && onSessionChange) {
-          onSessionChange(message.metadata.sessionId);
-        }
-      }
-    },
-    onError: (error) => {
-      console.error("Chat error:", error);
-    },
-    onToolCall: async ({ toolCall }) => {
-      // 处理工具调用
-      console.log("Tool call:", toolCall);
-      // 这里可以添加工具调用的具体逻辑
-    },
-    onData: (dataPart) => {
-      // 处理数据部分
-      console.log("Data part:", dataPart);
-    },
+    // transport: new DefaultChatTransport({
+    //   api: "/api/ai-agent",
+    //   headers: {
+    //     "Content-Type": "application/json",
+    //   },
+    //   body: {
+    //     mode,
+    //     sessionId,
+    //     userId: user?.id,
+    //   },
+    // }),
+    // id: sessionId,
+    // onFinish: ({ message, messages, isAbort, isDisconnect, isError }) => {
+    //   if (!isAbort && !isDisconnect && !isError) {
+    //     console.log("Message finished:", message);
+    //     // 处理会话ID更新
+    //     if (message.metadata?.sessionId && onSessionChange) {
+    //       onSessionChange(message.metadata.sessionId);
+    //     }
+    //   }
+    // },
+    // onError: (error) => {
+    //   console.error("Chat error:", error);
+    // },
+    // onToolCall: async ({ toolCall }) => {
+    //   // 处理工具调用
+    //   console.log("Tool call:", toolCall);
+    //   // 这里可以添加工具调用的具体逻辑
+    // },
+    // onData: (dataPart) => {
+    //   // 处理数据部分
+    //   console.log("Data part:", dataPart);
+    // },
   });
 
   // 计算是否正在加载
@@ -190,10 +190,17 @@ export default function ConversationInterface({
         };
 
         // 使用 AI SDK 5.0 的 sendMessage - 第一个参数需要是包含 text 属性的对象
-        await sendMessage({
-          text: messageText,
-          files: message.files || attachments,
-        });
+        await sendMessage(
+          {
+            text: messageText,
+            files: message.files || attachments,
+          },
+          {
+            body: {
+              model: "pollinations:openai",
+            },
+          }
+        );
 
         // 清理状态
         setInput("");
@@ -223,16 +230,16 @@ export default function ConversationInterface({
   }, []);
 
   // 渲染消息内容 - 使用AI SDK 5.0的消息格式
-  const renderMessageContent = useCallback((message: any) => {
+  const renderMessageContent = useCallback((message: UIMessage) => {
     // 处理 AI SDK 5.0 的 parts 结构
     if (message.parts && Array.isArray(message.parts)) {
       return (
         <div className="space-y-3">
-          {message.parts.map((part: any, index: number) => {
+          {message.parts.map((part, index) => {
             switch (part.type) {
               case "text":
                 // 检查文本中是否包含代码块
-                const content = part.text || part.content || "";
+                const content = part.text || "";
                 const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
                 const parts = [];
                 let lastIndex = 0;
@@ -308,7 +315,7 @@ export default function ConversationInterface({
                 return (
                   <div key={`tool-call-${index}`}>
                     <ChainOfThought>
-                      <ChainOfThoughtStep>
+                      <ChainOfThoughtStep label={""}>
                         <ChainOfThoughtHeader>
                           <div className="flex items-center justify-between w-full">
                             <div className="flex items-center space-x-2">
@@ -341,7 +348,7 @@ export default function ConversationInterface({
                 return (
                   <div key={`tool-result-${index}`}>
                     <ChainOfThought>
-                      <ChainOfThoughtStep>
+                      <ChainOfThoughtStep label={""}>
                         <ChainOfThoughtHeader>
                           <div className="flex items-center justify-between w-full">
                             <div className="flex items-center space-x-2">
@@ -373,7 +380,7 @@ export default function ConversationInterface({
                     key={`unknown-${index}`}
                     className="whitespace-pre-wrap leading-relaxed"
                   >
-                    {part.text || part.content || ""}
+                    {""}
                   </div>
                 );
             }
@@ -463,7 +470,7 @@ export default function ConversationInterface({
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
-      <Conversation className="flex-1">
+      <Conversation className="h-full">
         <ConversationContent className="space-y-4">
           {messages.length === 0 ? (
             <ConversationEmptyState
@@ -647,110 +654,110 @@ export default function ConversationInterface({
               </Card>
             </div>
           )}
+          {status === "submitted" && <Loader />}
         </ConversationContent>
 
         <ConversationScrollButton />
       </Conversation>
 
       {/* 输入区域 - 改进版本，更好的可访问性和用户体验 */}
-      <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <PromptInput
-          className="border-none"
-          onSubmit={handlePromptSubmit}
-          maxFiles={5}
-          maxFileSize={10 * 1024 * 1024} // 10MB
-          accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt,.md,.js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.cs,.rb,.go,.rs,.php,.html,.css,.json,.xml,.yaml,.yml"
-          multiple
-          globalDrop={mode === "advanced"}
-        >
-          <PromptInputBody>
-            {/* 附件预览区域 - 使用内置的 PromptInput 附件系统 */}
-            <PromptInputAttachments>
-              {(attachment) => (
-                <PromptInputAttachment
-                  data={attachment}
-                  className="bg-background border border-border/50"
-                />
-              )}
-            </PromptInputAttachments>
+      <PromptInput
+        className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+        onSubmit={handlePromptSubmit}
+        maxFiles={5}
+        maxFileSize={10 * 1024 * 1024} // 10MB
+        accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt,.md,.js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.cs,.rb,.go,.rs,.php,.html,.css,.json,.xml,.yaml,.yml"
+        multiple
+        globalDrop={mode === "advanced"}
+      >
+        <PromptInputBody>
+          {/* 附件预览区域 - 使用内置的 PromptInput 附件系统 */}
+          <PromptInputAttachments>
+            {(attachment) => (
+              <PromptInputAttachment
+                data={attachment}
+                className="bg-background border border-border/50"
+              />
+            )}
+          </PromptInputAttachments>
 
-            {/* 输入区域 */}
-            <div className="flex items-end space-x-3 p-4">
-              <div className="flex-1 relative">
-                <PromptInputTextarea
-                  value={input}
-                  onChange={handleInputChange}
-                  placeholder={
-                    mode === "simple"
-                      ? t("placeholder", "输入您的问题...")
-                      : t("placeholderAdvanced", "详细描述您的需求...")
-                  }
-                  className={cn(
-                    "min-h-[52px] max-h-[140px] resize-none transition-all duration-200",
-                    "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50",
-                    "placeholder:text-muted-foreground/60"
-                  )}
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                {/* 发送按钮 */}
-                <PromptInputSubmit
-                  status={isLoading ? "streaming" : undefined}
-                  className={cn(
-                    "h-11 w-11 rounded-lg transition-all duration-200",
-                    "bg-blue-500 hover:bg-blue-600 text-white",
-                    "disabled:opacity-50 disabled:cursor-not-allowed",
-                    "focus:ring-2 focus:ring-blue-500/20",
-                    "shadow-lg hover:shadow-xl"
-                  )}
-                  title={isLoading ? t("stop", "停止") : t("send", "发送")}
-                />
-              </div>
+          {/* 输入区域 */}
+          <div className="flex items-end space-x-3 p-4">
+            <div className="flex-1 relative">
+              <PromptInputTextarea
+                value={input}
+                onChange={handleInputChange}
+                placeholder={
+                  mode === "simple"
+                    ? t("placeholder", "输入您的问题...")
+                    : t("placeholderAdvanced", "详细描述您的需求...")
+                }
+                className={cn(
+                  "min-h-[52px] max-h-[140px] resize-none transition-all duration-200",
+                  "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50",
+                  "placeholder:text-muted-foreground/60"
+                )}
+              />
             </div>
 
-            {/* 工具栏 */}
-            <PromptInputToolbar className="px-4 pb-3">
-              <PromptInputTools>
-                <span className="text-xs text-muted-foreground/80">
-                  {mode === "simple"
-                    ? t("hints.simple", "按Enter发送，Shift+Enter换行")
-                    : t("hints.advanced", "支持代码、文件等复杂输入")}
-                </span>
-                {/* 文件上传 - 仅高级模式 */}
-                {mode === "advanced" && (
-                  <PromptInputButton
-                    onClick={() => {
-                      // 文件上传将由 PromptInput 的内置功能处理
-                      const fileInput = document.querySelector(
-                        'input[type="file"]'
-                      ) as HTMLInputElement;
-                      fileInput?.click();
-                    }}
-                    className={cn(
-                      "h-8 px-2 rounded border-dashed border-border/50",
-                      "hover:border-blue-500/50 hover:bg-blue-50/50 transition-all duration-200"
-                    )}
-                    title="添加文件"
-                  >
-                    <FileText className="h-3 w-3 mr-1" />
-                    <span className="text-xs">文件</span>
-                  </PromptInputButton>
+            <div className="flex items-center space-x-2">
+              {/* 发送按钮 */}
+              <PromptInputSubmit
+                status={status}
+                disabled={!input}
+                className={cn(
+                  "h-11 w-11 rounded-lg transition-all duration-200",
+                  "bg-blue-500 hover:bg-blue-600 text-white",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "focus:ring-2 focus:ring-blue-500/20",
+                  "shadow-lg hover:shadow-xl"
                 )}
-              </PromptInputTools>
-              <div className="flex items-center space-x-3 text-xs text-muted-foreground/80">
-                <span className="hidden sm:block">
-                  {t("hints.shortcuts", "Enter发送 • Shift+Enter换行")}
-                </span>
-                <span className="flex items-center space-x-1">
-                  <Sparkles className="h-3 w-3" />
-                  <span>{mode === "simple" ? "简单模式" : "高级模式"}</span>
-                </span>
-              </div>
-            </PromptInputToolbar>
-          </PromptInputBody>
-        </PromptInput>
-      </div>
+                title={isLoading ? t("stop", "停止") : t("send", "发送")}
+              />
+            </div>
+          </div>
+
+          {/* 工具栏 */}
+          <PromptInputToolbar className="px-4 pb-3">
+            <PromptInputTools>
+              <span className="text-xs text-muted-foreground/80">
+                {mode === "simple"
+                  ? t("hints.simple", "按Enter发送，Shift+Enter换行")
+                  : t("hints.advanced", "支持代码、文件等复杂输入")}
+              </span>
+              {/* 文件上传 - 仅高级模式 */}
+              {mode === "advanced" && (
+                <PromptInputButton
+                  onClick={() => {
+                    // 文件上传将由 PromptInput 的内置功能处理
+                    const fileInput = document.querySelector(
+                      'input[type="file"]'
+                    ) as HTMLInputElement;
+                    fileInput?.click();
+                  }}
+                  className={cn(
+                    "h-8 px-2 rounded border-dashed border-border/50",
+                    "hover:border-blue-500/50 hover:bg-blue-50/50 transition-all duration-200"
+                  )}
+                  title="添加文件"
+                >
+                  <FileText className="h-3 w-3 mr-1" />
+                  <span className="text-xs">文件</span>
+                </PromptInputButton>
+              )}
+            </PromptInputTools>
+            <div className="flex items-center space-x-3 text-xs text-muted-foreground/80">
+              <span className="hidden sm:block">
+                {t("hints.shortcuts", "Enter发送 • Shift+Enter换行")}
+              </span>
+              <span className="flex items-center space-x-1">
+                <Sparkles className="h-3 w-3" />
+                <span>{mode === "simple" ? "简单模式" : "高级模式"}</span>
+              </span>
+            </div>
+          </PromptInputToolbar>
+        </PromptInputBody>
+      </PromptInput>
     </div>
   );
 }

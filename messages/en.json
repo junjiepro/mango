@@ -347,7 +347,8 @@
       "interrupt": "Interrupt",
       "attachFile": "Attach File",
       "voice": "Voice Input",
-      "image": "Image Input"
+      "image": "Image Input",
+      "thinking": "AI is thinking..."
     },
     "sessionHistory": {
       "title": "Chat History",

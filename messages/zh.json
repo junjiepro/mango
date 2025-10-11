@@ -361,7 +361,8 @@
       "interrupt": "中断",
       "attachFile": "附加文件",
       "voice": "语音输入",
-      "image": "图像输入"
+      "image": "图像输入",
+      "thinking": "AI正在思考..."
     },
     "sessionHistory": {
       "title": "对话历史",

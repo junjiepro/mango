@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.32",
+    "@ai-sdk/openai-compatible": "^1.0.22",
     "@ai-sdk/react": "^2.0.52",
     "@hookform/resolvers": "^5.2.2",
     "@monaco-editor/react": "^4.7.0",
