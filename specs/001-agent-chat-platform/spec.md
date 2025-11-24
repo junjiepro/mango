@@ -128,7 +128,7 @@ Agent在与用户交互过程中学习用户偏好和反馈，在后续对话中
 **协议支持**
 - **FR-006**: 系统必须支持MCP（Model Context Protocol）协议，允许Agent调用符合该协议的工具服务
 - **FR-007**: 系统必须支持A2A（Agent-to-Agent）协议，允许Agent与其他Agent协作
-- **FR-008**: 系统必须支持ACP协议，允许Agent接入符合该协议的能力提供方
+- **FR-008**: 系统必须支持ACP（Agent Client Protocol）协议，允许Agent接入符合该协议的能力提供方
 
 **小应用功能**
 - **FR-009**: 系统必须允许Agent在对话过程中创建小应用
@@ -192,6 +192,16 @@ Agent在与用户交互过程中学习用户偏好和反馈，在后续对话中
 - **SC-011**: 界面语言切换在1秒内完成，用户无感知延迟
 - **SC-012**: 初始支持的语言（中文、英文）翻译覆盖率达到100%
 
+## Clarifications
+
+### Session 2025-11-24
+
+- Q: Web前端框架选择？ → A: Next.js (React全栈框架)
+- Q: 后端语言/运行时选择？ → A: Node.js + Deno + TypeScript
+- Q: 数据库选择？ → A: Supabase (PostgreSQL托管服务)
+- Q: 用户认证方案？ → A: Supabase Auth (邮箱密码+OAuth+魔法链接)
+- Q: 文件存储方案？ → A: Supabase Storage
+
 ## Assumptions
 
 - 用户有稳定的网络连接（移动网络或WiFi）
@@ -217,3 +227,11 @@ Agent在与用户交互过程中学习用户偏好和反馈，在后续对话中
 - 小应用的商业化分发市场
 - 企业级多租户支持
 - 更多语言支持（日语、韩语等，未来按需扩展）
+
+## Technical Constraints
+
+- **Web前端框架**: Next.js (React全栈框架，支持SSR/SSG)
+- **后端运行时**: Node.js + Deno + TypeScript (全栈统一语言生态)
+- **数据库**: Supabase (PostgreSQL托管服务，支持JSON/JSONB，全文搜索)
+- **用户认证**: Supabase Auth (邮箱密码+OAuth社交登录+魔法链接)
+- **文件存储**: Supabase Storage (统一生态，支持公开/私有bucket)
