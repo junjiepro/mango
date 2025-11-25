@@ -127,8 +127,8 @@ Agent在与用户交互过程中学习用户偏好和反馈，在后续对话中
 
 **协议支持**
 - **FR-006**: 系统必须支持MCP（Model Context Protocol）协议，允许Agent调用符合该协议的工具服务
-- **FR-007**: 系统必须支持A2A（Agent-to-Agent）协议，允许Agent与其他Agent协作
-- **FR-008**: 系统必须支持ACP（Agent Client Protocol）协议，允许Agent接入符合该协议的能力提供方
+- **FR-007**: 系统必须支持A2A（Agent-to-Agent）协议，允许Agent与其他Agent协作 *(Phase 2实现，当前版本仅完成架构预留)*
+- **FR-008**: 系统必须支持ACP（Agent Client Protocol, The Agent Client Protocol standardizes communication between code editors/IDEs, and coding agents (programs that use generative AI to autonomously modify code).）协议，允许Agent接入符合该协议的coding agents
 
 **小应用功能**
 - **FR-009**: 系统必须允许Agent在对话过程中创建小应用
@@ -223,7 +223,7 @@ Agent在与用户交互过程中学习用户偏好和反馈，在后续对话中
 **不在当前范围内**:
 - 桌面端原生应用（未来迭代）
 - 移动端原生应用（未来迭代）
-- 复杂的Agent协作网络
+- A2A协议完整实现（Phase 2，当前版本仅架构预留）
 - 小应用的商业化分发市场
 - 企业级多租户支持
 - 更多语言支持（日语、韩语等，未来按需扩展）

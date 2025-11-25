@@ -1,0 +1,456 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Mango Realtime Events Schema",
+  "description": "Supabase Realtime 事件的 JSON Schema 定义",
+  "version": "1.0.0",
+
+  "definitions": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 格式的时间戳"
+    },
+
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUID v4 格式"
+    },
+
+    "eventMetadata": {
+      "type": "object",
+      "properties": {
+        "eventId": { "$ref": "#/definitions/uuid" },
+        "timestamp": { "$ref": "#/definitions/timestamp" },
+        "userId": { "$ref": "#/definitions/uuid" }
+      },
+      "required": ["eventId", "timestamp"]
+    }
+  },
+
+  "oneOf": [
+    { "$ref": "#/events/MessageCreated" },
+    { "$ref": "#/events/MessageUpdated" },
+    { "$ref": "#/events/TaskStatusChanged" },
+    { "$ref": "#/events/TaskProgressUpdated" },
+    { "$ref": "#/events/NotificationReceived" },
+    { "$ref": "#/events/ConversationUpdated" },
+    { "$ref": "#/events/MiniAppInvoked" },
+    { "$ref": "#/events/PresenceChanged" }
+  ],
+
+  "events": {
+    "MessageCreated": {
+      "type": "object",
+      "description": "新消息创建事件",
+      "required": ["type", "data", "metadata"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "message.created"
+        },
+        "data": {
+          "type": "object",
+          "required": ["id", "conversationId", "senderType", "content", "createdAt"],
+          "properties": {
+            "id": { "$ref": "#/definitions/uuid" },
+            "conversationId": { "$ref": "#/definitions/uuid" },
+            "senderType": {
+              "type": "string",
+              "enum": ["user", "agent", "system", "miniapp"]
+            },
+            "senderId": { "$ref": "#/definitions/uuid" },
+            "content": { "type": "string" },
+            "contentType": {
+              "type": "string",
+              "default": "text/markdown"
+            },
+            "attachments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "$ref": "#/definitions/uuid" },
+                  "fileName": { "type": "string" },
+                  "fileType": { "type": "string" },
+                  "fileSize": { "type": "integer" },
+                  "url": { "type": "string", "format": "uri" }
+                }
+              }
+            },
+            "agentMetadata": {
+              "type": "object",
+              "properties": {
+                "model": { "type": "string" },
+                "tokens": { "type": "integer" },
+                "thinkingTimeMs": { "type": "integer" },
+                "toolCalls": { "type": "array" }
+              }
+            },
+            "sequenceNumber": { "type": "integer" },
+            "createdAt": { "$ref": "#/definitions/timestamp" }
+          }
+        },
+        "metadata": { "$ref": "#/definitions/eventMetadata" }
+      }
+    },
+
+    "MessageUpdated": {
+      "type": "object",
+      "description": "消息更新事件（编辑）",
+      "required": ["type", "data", "metadata"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "message.updated"
+        },
+        "data": {
+          "type": "object",
+          "required": ["id", "conversationId", "content", "editedAt"],
+          "properties": {
+            "id": { "$ref": "#/definitions/uuid" },
+            "conversationId": { "$ref": "#/definitions/uuid" },
+            "content": { "type": "string" },
+            "editedAt": { "$ref": "#/definitions/timestamp" }
+          }
+        },
+        "metadata": { "$ref": "#/definitions/eventMetadata" }
+      }
+    },
+
+    "TaskStatusChanged": {
+      "type": "object",
+      "description": "任务状态变更事件",
+      "required": ["type", "data", "metadata"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "task.status_changed"
+        },
+        "data": {
+          "type": "object",
+          "required": ["id", "conversationId", "status", "previousStatus"],
+          "properties": {
+            "id": { "$ref": "#/definitions/uuid" },
+            "conversationId": { "$ref": "#/definitions/uuid" },
+            "title": { "type": "string" },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "queued", "running", "completed", "failed", "cancelled"]
+            },
+            "previousStatus": {
+              "type": "string",
+              "enum": ["pending", "queued", "running", "completed", "failed", "cancelled"]
+            },
+            "result": { "type": "object" },
+            "errorMessage": { "type": "string" },
+            "completedAt": { "$ref": "#/definitions/timestamp" }
+          }
+        },
+        "metadata": { "$ref": "#/definitions/eventMetadata" }
+      }
+    },
+
+    "TaskProgressUpdated": {
+      "type": "object",
+      "description": "任务进度更新事件",
+      "required": ["type", "data", "metadata"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "task.progress_updated"
+        },
+        "data": {
+          "type": "object",
+          "required": ["id", "progress"],
+          "properties": {
+            "id": { "$ref": "#/definitions/uuid" },
+            "conversationId": { "$ref": "#/definitions/uuid" },
+            "progress": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "currentStep": { "type": "string" },
+            "estimatedTimeRemaining": {
+              "type": "integer",
+              "description": "预计剩余时间（毫秒）"
+            }
+          }
+        },
+        "metadata": { "$ref": "#/definitions/eventMetadata" }
+      }
+    },
+
+    "NotificationReceived": {
+      "type": "object",
+      "description": "收到新通知事件",
+      "required": ["type", "data", "metadata"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "notification.received"
+        },
+        "data": {
+          "type": "object",
+          "required": ["id", "title", "body", "category", "priority", "createdAt"],
+          "properties": {
+            "id": { "$ref": "#/definitions/uuid" },
+            "sourceType": {
+              "type": "string",
+              "enum": ["system", "agent", "miniapp", "user"]
+            },
+            "sourceId": { "$ref": "#/definitions/uuid" },
+            "title": { "type": "string" },
+            "body": { "type": "string" },
+            "actionUrl": { "type": "string", "format": "uri" },
+            "category": {
+              "type": "string",
+              "enum": ["reminder", "alert", "info", "success", "error"]
+            },
+            "priority": {
+              "type": "string",
+              "enum": ["low", "normal", "high", "urgent"]
+            },
+            "metadata": { "type": "object" },
+            "createdAt": { "$ref": "#/definitions/timestamp" },
+            "expiresAt": { "$ref": "#/definitions/timestamp" }
+          }
+        },
+        "metadata": { "$ref": "#/definitions/eventMetadata" }
+      }
+    },
+
+    "ConversationUpdated": {
+      "type": "object",
+      "description": "对话更新事件",
+      "required": ["type", "data", "metadata"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "conversation.updated"
+        },
+        "data": {
+          "type": "object",
+          "required": ["id"],
+          "properties": {
+            "id": { "$ref": "#/definitions/uuid" },
+            "title": { "type": "string" },
+            "status": {
+              "type": "string",
+              "enum": ["active", "archived", "deleted"]
+            },
+            "stats": {
+              "type": "object",
+              "properties": {
+                "messageCount": { "type": "integer" },
+                "taskCount": { "type": "integer" },
+                "totalTokens": { "type": "integer" }
+              }
+            },
+            "updatedAt": { "$ref": "#/definitions/timestamp" }
+          }
+        },
+        "metadata": { "$ref": "#/definitions/eventMetadata" }
+      }
+    },
+
+    "MiniAppInvoked": {
+      "type": "object",
+      "description": "小应用调用事件（小应用主动发送消息）",
+      "required": ["type", "data", "metadata"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "miniapp.invoked"
+        },
+        "data": {
+          "type": "object",
+          "required": ["miniAppId", "installationId", "action"],
+          "properties": {
+            "miniAppId": { "$ref": "#/definitions/uuid" },
+            "installationId": { "$ref": "#/definitions/uuid" },
+            "action": {
+              "type": "string",
+              "description": "小应用触发的动作"
+            },
+            "payload": {
+              "type": "object",
+              "description": "动作携带的数据"
+            },
+            "conversationId": {
+              "$ref": "#/definitions/uuid",
+              "description": "如果是发送消息，指定目标对话ID"
+            }
+          }
+        },
+        "metadata": { "$ref": "#/definitions/eventMetadata" }
+      }
+    },
+
+    "PresenceChanged": {
+      "type": "object",
+      "description": "用户在线状态变更事件",
+      "required": ["type", "data", "metadata"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "presence.changed"
+        },
+        "data": {
+          "type": "object",
+          "required": ["userId", "status"],
+          "properties": {
+            "userId": { "$ref": "#/definitions/uuid" },
+            "status": {
+              "type": "string",
+              "enum": ["online", "away", "offline"]
+            },
+            "lastActiveAt": { "$ref": "#/definitions/timestamp" },
+            "deviceInfo": {
+              "type": "object",
+              "properties": {
+                "platform": { "type": "string" },
+                "browser": { "type": "string" }
+              }
+            }
+          }
+        },
+        "metadata": { "$ref": "#/definitions/eventMetadata" }
+      }
+    }
+  },
+
+  "channels": {
+    "description": "Supabase Realtime 频道命名约定",
+    "patterns": {
+      "user_channel": {
+        "pattern": "realtime:user:{userId}",
+        "description": "用户私有频道，接收所有用户相关事件",
+        "events": [
+          "notification.received",
+          "conversation.updated",
+          "presence.changed"
+        ]
+      },
+      "conversation_channel": {
+        "pattern": "realtime:conversation:{conversationId}",
+        "description": "对话频道，接收特定对话的所有事件",
+        "events": [
+          "message.created",
+          "message.updated",
+          "task.status_changed",
+          "task.progress_updated"
+        ]
+      },
+      "task_channel": {
+        "pattern": "realtime:task:{taskId}",
+        "description": "任务频道，接收特定任务的进度更新",
+        "events": [
+          "task.progress_updated",
+          "task.status_changed"
+        ]
+      },
+      "miniapp_channel": {
+        "pattern": "realtime:miniapp:{installationId}",
+        "description": "小应用频道，接收小应用主动触发的事件",
+        "events": [
+          "miniapp.invoked"
+        ]
+      }
+    }
+  },
+
+  "subscriptionExamples": {
+    "description": "Supabase Realtime 订阅示例",
+    "examples": [
+      {
+        "name": "订阅用户频道",
+        "code": "supabase.channel('user:${userId}').on('broadcast', { event: 'notification.received' }, handler).subscribe()"
+      },
+      {
+        "name": "订阅对话消息",
+        "code": "supabase.channel('realtime:public:messages:conversation_id=eq.${conversationId}').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, handler).subscribe()"
+      },
+      {
+        "name": "订阅任务进度",
+        "code": "supabase.channel('task:${taskId}').on('broadcast', { event: 'task.progress_updated' }, handler).subscribe()"
+      }
+    ]
+  },
+
+  "rateLimits": {
+    "description": "事件发送频率限制",
+    "limits": {
+      "task.progress_updated": {
+        "maxPerSecond": 2,
+        "description": "任务进度更新最多每0.5秒一次，避免过度推送"
+      },
+      "message.created": {
+        "maxPerSecond": 10,
+        "description": "消息创建最多每秒10条（Agent流式输出除外）"
+      }
+    }
+  },
+
+  "errorEvents": {
+    "description": "错误事件定义",
+    "ErrorEvent": {
+      "type": "object",
+      "required": ["type", "error", "metadata"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "error"
+        },
+        "error": {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "UNAUTHORIZED",
+                "PERMISSION_DENIED",
+                "RATE_LIMIT_EXCEEDED",
+                "INTERNAL_ERROR",
+                "CHANNEL_NOT_FOUND"
+              ]
+            },
+            "message": { "type": "string" },
+            "details": { "type": "object" }
+          }
+        },
+        "metadata": { "$ref": "#/definitions/eventMetadata" }
+      }
+    }
+  },
+
+  "bestPractices": {
+    "description": "实时事件最佳实践",
+    "recommendations": [
+      "使用防抖（debounce）处理高频事件（如进度更新）",
+      "订阅时使用精确的过滤条件，避免接收无关事件",
+      "断线重连后查询缺失的消息（使用 created_at > last_event_time）",
+      "使用乐观更新提升用户体验，失败时回滚",
+      "合理使用频道分片，避免单频道订阅用户过多",
+      "监控订阅连接数，实施自动重连策略",
+      "敏感事件使用RLS策略确保用户只能接收授权事件"
+    ]
+  },
+
+  "security": {
+    "description": "安全考虑",
+    "rls": {
+      "description": "Row Level Security 确保事件隔离",
+      "policies": [
+        "用户只能订阅自己的 user 频道",
+        "用户只能订阅参与的 conversation 频道",
+        "小应用事件只推送给安装者"
+      ]
+    },
+    "authentication": {
+      "description": "所有 Realtime 订阅必须携带有效的 JWT Token"
+    }
+  }
+}
