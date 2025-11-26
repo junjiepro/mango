@@ -31,14 +31,14 @@ Based on plan.md monorepo structure:
 
 - [X] T001 Initialize monorepo with pnpm workspaces in root `pnpm-workspace.yaml`
 - [X] T002 [P] Create Next.js 14+ app in `apps/web/` using App Router
-- [ ] T003 [P] Create CLI app scaffolding in `apps/cli/` with TypeScript
-- [ ] T004 [P] Configure TypeScript 5.x strict mode in root `tsconfig.json` and workspace-level configs
-- [ ] T005 [P] Setup ESLint + Prettier in `.eslintrc.js` and `.prettierrc`
-- [ ] T006 [P] Configure TailwindCSS in `apps/web/tailwind.config.ts`
-- [ ] T007 [P] Create shared types package in `packages/shared/types/`
-- [ ] T008 [P] Setup Vitest configuration in `apps/web/vitest.config.ts`
-- [ ] T009 [P] Setup Playwright configuration in `apps/web/playwright.config.ts`
-- [ ] T010 [P] Create GitHub Actions CI workflow in `.github/workflows/ci.yml` (lint, test with 80% coverage gate, build)
+- [X] T003 [P] Create CLI app scaffolding in `apps/cli/` with TypeScript
+- [X] T004 [P] Configure TypeScript 5.x strict mode in root `tsconfig.json` and workspace-level configs
+- [X] T005 [P] Setup ESLint + Prettier in `.eslintrc.js` and `.prettierrc`
+- [X] T006 [P] Configure TailwindCSS in `apps/web/tailwind.config.ts`
+- [X] T007 [P] Create shared types package in `packages/shared/types/`
+- [X] T008 [P] Setup Vitest configuration in `apps/web/vitest.config.ts`
+- [X] T009 [P] Setup Playwright configuration in `apps/web/playwright.config.ts`
+- [X] T010 [P] Create GitHub Actions CI workflow in `.github/workflows/ci.yml` (lint, test with 80% coverage gate, build)
 
 ---
 
