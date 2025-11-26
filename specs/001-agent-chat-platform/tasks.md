@@ -29,8 +29,8 @@ Based on plan.md monorepo structure:
 
 **Purpose**: Project initialization and monorepo structure
 
-- [ ] T001 Initialize monorepo with pnpm workspaces in root `pnpm-workspace.yaml`
-- [ ] T002 [P] Create Next.js 14+ app in `apps/web/` using App Router
+- [X] T001 Initialize monorepo with pnpm workspaces in root `pnpm-workspace.yaml`
+- [X] T002 [P] Create Next.js 14+ app in `apps/web/` using App Router
 - [ ] T003 [P] Create CLI app scaffolding in `apps/cli/` with TypeScript
 - [ ] T004 [P] Configure TypeScript 5.x strict mode in root `tsconfig.json` and workspace-level configs
 - [ ] T005 [P] Setup ESLint + Prettier in `.eslintrc.js` and `.prettierrc`
