@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# Generated files
+next-env.d.ts
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Supabase
+.supabase/
+
+# Turbo
+.turbo/
+
+# Public assets
+public/
+
+# Misc
+*.min.js
+*.bundle.js

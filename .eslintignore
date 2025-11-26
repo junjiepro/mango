@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# Generated files
+next-env.d.ts
+*.d.ts
+
+# Config files
+next.config.js
+postcss.config.js
+tailwind.config.js
+vitest.config.ts
+playwright.config.ts
+
+# Supabase
+.supabase/
+supabase/functions/**/*.js
+
+# Turbo
+.turbo/
+
+# Public assets
+public/
+
+# Misc
+*.min.js
+*.bundle.js
