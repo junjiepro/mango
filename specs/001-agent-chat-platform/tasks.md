@@ -50,43 +50,43 @@ Based on plan.md monorepo structure:
 
 ### Database & Supabase Setup
 
-- [ ] T011 Initialize Supabase project locally using `supabase init` in root
-- [ ] T012 Create initial database migration for `user_profiles` table in `supabase/migrations/20250124000001_user_profiles.sql`
-- [ ] T013 [P] Create `conversations` table migration in `supabase/migrations/20250124000002_conversations.sql`
-- [ ] T014 [P] Create `messages` table migration in `supabase/migrations/20250124000003_messages.sql`
-- [ ] T015 [P] Create `attachments` table migration in `supabase/migrations/20250124000004_attachments.sql`
-- [ ] T016 [P] Create `tasks` table migration in `supabase/migrations/20250124000005_tasks.sql`
-- [ ] T017 [P] Create `tools` table migration in `supabase/migrations/20250124000006_tools.sql`
-- [ ] T018 [P] Create `mini_apps` and `mini_app_installations` table migration in `supabase/migrations/20250124000007_mini_apps.sql`
-- [ ] T019 [P] Create `mini_app_data` table migration in `supabase/migrations/20250124000008_mini_app_data.sql`
-- [ ] T020 [P] Create `feedback_records` and `learning_records` tables migration in `supabase/migrations/20250124000009_feedback_learning.sql`
-- [ ] T021 [P] Create `notifications` table migration in `supabase/migrations/20250124000010_notifications.sql`
-- [ ] T022 [P] Create `audit_logs` table migration in `supabase/migrations/20250124000011_audit_logs.sql`
-- [ ] T023 Create RLS policies migration for all tables in `supabase/migrations/20250124000012_rls_policies.sql`
-- [ ] T024 Create database indexes migration in `supabase/migrations/20250124000013_indexes.sql`
-- [ ] T025 Create triggers and functions migration in `supabase/migrations/20250124000014_triggers_functions.sql`
-- [ ] T026 Apply all migrations to local Supabase instance using `supabase db push`
+- [X] T011 Initialize Supabase project locally using `supabase init` in root
+- [X] T012 Create initial database migration for `user_profiles` table in `supabase/migrations/20250124000001_user_profiles.sql`
+- [X] T013 [P] Create `conversations` table migration in `supabase/migrations/20250124000002_conversations.sql`
+- [X] T014 [P] Create `messages` table migration in `supabase/migrations/20250124000003_messages.sql`
+- [X] T015 [P] Create `attachments` table migration in `supabase/migrations/20250124000004_attachments.sql`
+- [X] T016 [P] Create `tasks` table migration in `supabase/migrations/20250124000005_tasks.sql`
+- [X] T017 [P] Create `tools` table migration in `supabase/migrations/20250124000006_tools.sql`
+- [X] T018 [P] Create `mini_apps` and `mini_app_installations` table migration in `supabase/migrations/20250124000007_mini_apps.sql`
+- [X] T019 [P] Create `mini_app_data` table migration in `supabase/migrations/20250124000008_mini_app_data.sql`
+- [X] T020 [P] Create `feedback_records` and `learning_records` tables migration in `supabase/migrations/20250124000009_feedback_learning.sql`
+- [X] T021 [P] Create `notifications` table migration in `supabase/migrations/20250124000010_notifications.sql`
+- [X] T022 [P] Create `audit_logs` table migration in `supabase/migrations/20250124000011_audit_logs.sql`
+- [X] T023 Create RLS policies migration for all tables in `supabase/migrations/20250124000012_rls_policies.sql`
+- [X] T024 Create database indexes migration in `supabase/migrations/20250124000013_indexes.sql`
+- [X] T025 Create triggers and functions migration in `supabase/migrations/20250124000014_triggers_functions.sql`
+- [X] T026 Apply all migrations to local Supabase instance using `supabase db push`
 
 ### Authentication & Core Services
 
-- [ ] T027 [P] Setup Supabase Auth configuration in `apps/web/src/lib/supabase/auth-config.ts`
-- [ ] T028 [P] Create Supabase client factory in `apps/web/src/lib/supabase/client.ts` (browser client)
-- [ ] T029 [P] Create Supabase server client in `apps/web/src/lib/supabase/server.ts` (server-side)
-- [ ] T030 [P] Create authentication middleware in `apps/web/src/middleware.ts` for protected routes
-- [ ] T031 [P] Create shared TypeScript types from Supabase schema in `packages/shared/types/database.types.ts`
-- [ ] T032 [P] Create error handling utility in `packages/shared/utils/errors.ts`
-- [ ] T033 [P] Create logging utility in `packages/shared/utils/logger.ts`
+- [X] T027 [P] Setup Supabase Auth configuration in `apps/web/src/lib/supabase/auth-config.ts`
+- [X] T028 [P] Create Supabase client factory in `apps/web/src/lib/supabase/client.ts` (browser client)
+- [X] T029 [P] Create Supabase server client in `apps/web/src/lib/supabase/server.ts` (server-side)
+- [X] T030 [P] Create authentication middleware in `apps/web/src/middleware.ts` for protected routes
+- [X] T031 [P] Create shared TypeScript types from Supabase schema in `packages/shared/types/database.types.ts`
+- [X] T032 [P] Create error handling utility in `packages/shared/utils/errors.ts`
+- [X] T033 [P] Create logging utility in `packages/shared/utils/logger.ts`
 
 ### UI Foundation
 
-- [ ] T034 [P] Create base design system tokens (colors, spacing, typography) in `apps/web/src/styles/tokens.css`
-- [ ] T035 [P] Create reusable UI components: Button in `apps/web/src/components/ui/Button.tsx`
-- [ ] T036 [P] Create reusable UI components: Input in `apps/web/src/components/ui/Input.tsx`
-- [ ] T037 [P] Create reusable UI components: Modal in `apps/web/src/components/ui/Modal.tsx`
-- [ ] T038 [P] Create reusable UI components: Toast notification in `apps/web/src/components/ui/Toast.tsx`
-- [ ] T039 [P] Create loading states: Skeleton in `apps/web/src/components/ui/Skeleton.tsx`
-- [ ] T040 [P] Create error boundary component in `apps/web/src/components/ErrorBoundary.tsx`
-- [ ] T041 [P] Create layout component in `apps/web/src/components/layouts/MainLayout.tsx`
+- [X] T034 [P] Create base design system tokens (colors, spacing, typography) in `apps/web/src/styles/tokens.css`
+- [X] T035 [P] Create reusable UI components: Button in `apps/web/src/components/ui/Button.tsx`
+- [X] T036 [P] Create reusable UI components: Input in `apps/web/src/components/ui/Input.tsx`
+- [X] T037 [P] Create reusable UI components: Modal in `apps/web/src/components/ui/Modal.tsx`
+- [X] T038 [P] Create reusable UI components: Toast notification in `apps/web/src/components/ui/Toast.tsx`
+- [X] T039 [P] Create loading states: Skeleton in `apps/web/src/components/ui/Skeleton.tsx`
+- [X] T040 [P] Create error boundary component in `apps/web/src/components/ErrorBoundary.tsx`
+- [X] T041 [P] Create layout component in `apps/web/src/components/layouts/MainLayout.tsx`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
