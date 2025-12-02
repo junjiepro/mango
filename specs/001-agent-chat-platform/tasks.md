@@ -100,29 +100,29 @@ Based on plan.md monorepo structure:
 
 ### Core Conversation Implementation
 
-- [ ] T042 [P] [US1] Create Conversation service in `apps/web/src/services/ConversationService.ts`
-- [ ] T043 [P] [US1] Create Message service in `apps/web/src/services/MessageService.ts`
-- [ ] T044 [P] [US1] Create Task service in `apps/web/src/services/TaskService.ts`
-- [ ] T045 [P] [US1] Create Realtime subscription hook in `apps/web/src/hooks/useRealtimeSubscription.ts`
-- [ ] T046 [P] [US1] Create Conversation context provider in `apps/web/src/contexts/ConversationContext.tsx`
+- [X] T042 [P] [US1] Create Conversation service in `apps/web/src/services/ConversationService.ts`
+- [X] T043 [P] [US1] Create Message service in `apps/web/src/services/MessageService.ts`
+- [X] T044 [P] [US1] Create Task service in `apps/web/src/services/TaskService.ts`
+- [X] T045 [P] [US1] Create Realtime subscription hook in `apps/web/src/hooks/useRealtimeSubscription.ts`
+- [X] T046 [P] [US1] Create Conversation context provider in `apps/web/src/contexts/ConversationContext.tsx`
 
 ### UI Components for Conversation
 
-- [ ] T047 [P] [US1] Create ConversationList component in `apps/web/src/components/conversation/ConversationList.tsx`
-- [ ] T048 [P] [US1] Create MessageList component in `apps/web/src/components/conversation/MessageList.tsx`
-- [ ] T049 [P] [US1] Create MessageInput component with multimodal support in `apps/web/src/components/conversation/MessageInput.tsx`
-- [ ] T050 [P] [US1] Create MessageItem component in `apps/web/src/components/conversation/MessageItem.tsx`
-- [ ] T051 [P] [US1] Create AttachmentUpload component in `apps/web/src/components/conversation/AttachmentUpload.tsx`
-- [ ] T052 [P] [US1] Create AttachmentPreview component in `apps/web/src/components/conversation/AttachmentPreview.tsx`
-- [ ] T053 [P] [US1] Create TaskProgressIndicator component in `apps/web/src/components/task/TaskProgressIndicator.tsx`
+- [X] T047 [P] [US1] Create ConversationList component in `apps/web/src/components/conversation/ConversationList.tsx`
+- [X] T048 [P] [US1] Create MessageList component in `apps/web/src/components/conversation/MessageList.tsx`
+- [X] T049 [P] [US1] Create MessageInput component with multimodal support in `apps/web/src/components/conversation/MessageInput.tsx`
+- [X] T050 [P] [US1] Create MessageItem component in `apps/web/src/components/conversation/MessageItem.tsx`
+- [X] T051 [P] [US1] Create AttachmentUpload component in `apps/web/src/components/conversation/AttachmentUpload.tsx`
+- [X] T052 [P] [US1] Create AttachmentPreview component in `apps/web/src/components/conversation/AttachmentPreview.tsx`
+- [X] T053 [P] [US1] Create TaskProgressIndicator component in `apps/web/src/components/task/TaskProgressIndicator.tsx`
 
 ### Pages and Routes
 
-- [ ] T054 [US1] Create conversations list page in `apps/web/src/app/conversations/page.tsx`
-- [ ] T055 [US1] Create conversation detail page in `apps/web/src/app/conversations/[id]/page.tsx`
-- [ ] T056 [US1] Create API route for creating conversation in `apps/web/src/app/api/conversations/route.ts`
-- [ ] T057 [US1] Create API route for sending message in `apps/web/src/app/api/conversations/[id]/messages/route.ts`
-- [ ] T058 [US1] Create API route for uploading attachment in `apps/web/src/app/api/attachments/route.ts`
+- [X] T054 [US1] Create conversations list page in `apps/web/src/app/conversations/page.tsx`
+- [X] T055 [US1] Create conversation detail page in `apps/web/src/app/conversations/[id]/page.tsx`
+- [X] T056 [US1] Create API route for creating conversation in `apps/web/src/app/api/conversations/route.ts`
+- [X] T057 [US1] Create API route for sending message in `apps/web/src/app/api/conversations/[id]/messages/route.ts`
+- [X] T058 [US1] Create API route for uploading attachment in `apps/web/src/app/api/attachments/route.ts`
 
 ### MCP Protocol Integration
 
@@ -148,11 +148,11 @@ Based on plan.md monorepo structure:
 
 ### Authentication & User Management
 
-- [ ] T072 [P] [US1] Create signup page in `apps/web/src/app/auth/signup/page.tsx`
-- [ ] T073 [P] [US1] Create login page in `apps/web/src/app/auth/login/page.tsx`
-- [ ] T074 [P] [US1] Create logout functionality in `apps/web/src/app/auth/logout/route.ts`
-- [ ] T075 [US1] Create user profile service in `apps/web/src/services/UserService.ts`
-- [ ] T076 [US1] Create user profile page in `apps/web/src/app/profile/page.tsx`
+- [X] T072 [P] [US1] Create signup page in `apps/web/src/app/auth/signup/page.tsx`
+- [X] T073 [P] [US1] Create login page in `apps/web/src/app/auth/login/page.tsx`
+- [X] T074 [P] [US1] Create logout functionality in `apps/web/src/app/auth/logout/route.ts`
+- [X] T075 [US1] Create user profile service in `apps/web/src/services/UserService.ts`
+- [X] T076 [US1] Create user profile page in `apps/web/src/app/profile/page.tsx`
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - users can create conversations, send multimodal messages, and see background task execution
 
