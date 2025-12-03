@@ -11,7 +11,7 @@ import { ConversationProvider, useConversation } from '@/contexts/ConversationCo
 import { MessageList } from '@/components/conversation/MessageList'
 import { MessageInput } from '@/components/conversation/MessageInput'
 import { TaskProgressIndicator } from '@/components/task/TaskProgressIndicator'
-import { MainLayout } from '@/components/layouts/MainLayout'
+import { AppHeader } from '@/components/layouts/AppHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -62,9 +62,9 @@ function ConversationDetailContent() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* 对话标题栏 */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+      {/* 对话信息栏 */}
+      <div className="border-b bg-muted/40">
+        <div className="container mx-auto flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -166,9 +166,12 @@ export default function ConversationDetailPage({
 
   return (
     <ConversationProvider conversationId={id}>
-      <MainLayout className="h-screen">
-        <ConversationDetailContent />
-      </MainLayout>
+      <div className="flex h-screen flex-col">
+        <AppHeader />
+        <div className="flex-1 overflow-hidden">
+          <ConversationDetailContent />
+        </div>
+      </div>
     </ConversationProvider>
   )
 }

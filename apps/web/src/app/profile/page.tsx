@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { userService } from '@/services/UserService'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { MainLayout } from '@/components/layouts/MainLayout'
+import { AppHeader } from '@/components/layouts/AppHeader'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
 import { logger } from '@mango/shared/utils'
@@ -120,110 +120,112 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <MainLayout>
-        <div className="mx-auto max-w-2xl space-y-6">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-64 w-full" />
-        </div>
-      </MainLayout>
+      <div className="flex min-h-screen flex-col">
+        <AppHeader />
+        <main className="flex-1">
+          <div className="container mx-auto p-4 md:p-6 lg:p-8">
+            <div className="mx-auto max-w-2xl space-y-6">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-64 w-full" />
+            </div>
+          </div>
+        </main>
+      </div>
     )
   }
 
   return (
-    <MainLayout
-      header={
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <h1 className="text-xl font-bold">用户配置</h1>
-          <Button variant="ghost" onClick={() => router.push('/conversations')}>
-            返回对话
-          </Button>
-        </div>
-      }
-    >
-      <div className="mx-auto max-w-2xl space-y-6">
-        {/* 统计信息 */}
-        {stats && (
-          <div className="grid grid-cols-3 gap-4">
-            <div className="rounded-lg border bg-card p-4 text-center">
-              <div className="text-2xl font-bold">{stats.conversationCount}</div>
-              <div className="text-sm text-muted-foreground">对话</div>
+    <div className="flex min-h-screen flex-col">
+      <AppHeader />
+
+      <main className="flex-1">
+        <div className="container mx-auto p-4 md:p-6 lg:p-8">
+          <div className="mx-auto max-w-2xl space-y-6">
+            {/* 统计信息 */}
+            {stats && (
+              <div className="grid grid-cols-3 gap-4">
+                <div className="rounded-lg border bg-card p-4 text-center">
+                  <div className="text-2xl font-bold">{stats.conversationCount}</div>
+                  <div className="text-sm text-muted-foreground">对话</div>
+                </div>
+                <div className="rounded-lg border bg-card p-4 text-center">
+                  <div className="text-2xl font-bold">{stats.messageCount}</div>
+                  <div className="text-sm text-muted-foreground">消息</div>
+                </div>
+                <div className="rounded-lg border bg-card p-4 text-center">
+                  <div className="text-2xl font-bold">{stats.taskCount}</div>
+                  <div className="text-sm text-muted-foreground">任务</div>
+                </div>
+              </div>
+            )}
+
+            {/* 配置表单 */}
+            <div className="rounded-lg border bg-card p-6">
+              <h2 className="mb-4 text-lg font-semibold">个人信息</h2>
+
+              <form onSubmit={handleSave} className="space-y-4">
+                <div className="space-y-2">
+                  <label htmlFor="displayName" className="text-sm font-medium">
+                    显示名称
+                  </label>
+                  <Input
+                    id="displayName"
+                    type="text"
+                    placeholder="您的名字"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    disabled={isSaving}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="bio" className="text-sm font-medium">
+                    个人简介
+                  </label>
+                  <textarea
+                    id="bio"
+                    placeholder="介绍一下自己..."
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    disabled={isSaving}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    rows={4}
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={isSaving}>
+                    {isSaving ? '保存中...' : '保存更改'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={loadProfile}
+                    disabled={isSaving}
+                  >
+                    取消
+                  </Button>
+                </div>
+              </form>
             </div>
-            <div className="rounded-lg border bg-card p-4 text-center">
-              <div className="text-2xl font-bold">{stats.messageCount}</div>
-              <div className="text-sm text-muted-foreground">消息</div>
-            </div>
-            <div className="rounded-lg border bg-card p-4 text-center">
-              <div className="text-2xl font-bold">{stats.taskCount}</div>
-              <div className="text-sm text-muted-foreground">任务</div>
+
+            {/* 账号操作 */}
+            <div className="rounded-lg border bg-card p-6">
+              <h2 className="mb-4 text-lg font-semibold">账号操作</h2>
+
+              <div className="space-y-3">
+                <Button
+                  variant="outline"
+                  onClick={handleLogout}
+                  className="w-full"
+                >
+                  登出
+                </Button>
+              </div>
             </div>
           </div>
-        )}
-
-        {/* 配置表单 */}
-        <div className="rounded-lg border bg-card p-6">
-          <h2 className="mb-4 text-lg font-semibold">个人信息</h2>
-
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="displayName" className="text-sm font-medium">
-                显示名称
-              </label>
-              <Input
-                id="displayName"
-                type="text"
-                placeholder="您的名字"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                disabled={isSaving}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="bio" className="text-sm font-medium">
-                个人简介
-              </label>
-              <textarea
-                id="bio"
-                placeholder="介绍一下自己..."
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                disabled={isSaving}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                rows={4}
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? '保存中...' : '保存更改'}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={loadProfile}
-                disabled={isSaving}
-              >
-                取消
-              </Button>
-            </div>
-          </form>
         </div>
-
-        {/* 账号操作 */}
-        <div className="rounded-lg border bg-card p-6">
-          <h2 className="mb-4 text-lg font-semibold">账号操作</h2>
-
-          <div className="space-y-3">
-            <Button
-              variant="outline"
-              onClick={handleLogout}
-              className="w-full"
-            >
-              登出
-            </Button>
-          </div>
-        </div>
-      </div>
-    </MainLayout>
+      </main>
+    </div>
   )
 }
