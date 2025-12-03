@@ -6,106 +6,97 @@
 
 @layer base {
   :root {
-
-    --background: 0 0% 100%;
-
-    --foreground: 20 14.3% 4.1%;
-
+    /* Primary Colors - HSL Format */
+    --mango-dark: 40 3% 8%;           /* #141413 */
+    --mango-light: 48 31% 97%;        /* #faf9f5 */
+    --mango-mid-gray: 48 4% 68%;      /* #b0aea5 */
+    --mango-light-gray: 48 13% 89%;   /* #e8e6dc */
+    
+    /* Accent Colors - HSL Format */
+    --mango-orange: 15 63% 60%;       /* #d97757 */
+    --mango-blue: 210 45% 60%;        /* #6a9bcc */
+    --mango-green: 85 21% 45%;        /* #788c5d */
+    
+    /* Extended Color Palette - HSL Format */
+    --mango-orange-dark: 15 53% 50%;  /* Darker variant */
+    --mango-orange-light: 15 73% 70%; /* Lighter variant */
+    --mango-blue-dark: 210 55% 50%;   /* Darker variant */
+    --mango-blue-light: 210 55% 70%;  /* Lighter variant */
+    --mango-green-dark: 85 31% 35%;   /* Darker variant */
+    --mango-green-light: 85 31% 55%;  /* Lighter variant */
+    
+    /* Neutral Scale - HSL Format */
+    --mango-gray-50: 48 33% 99%;      /* Near white */
+    --mango-gray-100: 48 25% 96%;     /* Very light gray */
+    --mango-gray-200: 48 13% 89%;     /* Light gray */
+    --mango-gray-300: 48 8% 82%;      /* Medium light gray */
+    --mango-gray-400: 48 4% 68%;      /* Medium gray */
+    --mango-gray-500: 48 3% 55%;      /* Gray */
+    --mango-gray-600: 48 3% 42%;      /* Medium dark gray */
+    --mango-gray-700: 48 4% 32%;      /* Dark gray */
+    --mango-gray-800: 48 6% 22%;      /* Very dark gray */
+    --mango-gray-900: 40 3% 8%;       /* Near black */
+    
+    /* Semantic Colors - HSL Format with CSS Functions */
+    --background: var(--mango-light);
+    --foreground: var(--mango-dark);
     --card: 0 0% 100%;
-
-    --card-foreground: 20 14.3% 4.1%;
-
+    --card-foreground: var(--mango-dark);
     --popover: 0 0% 100%;
-
-    --popover-foreground: 20 14.3% 4.1%;
-
-    --primary: 24 9.8% 10%;
-
-    --primary-foreground: 60 9.1% 97.8%;
-
-    --secondary: 60 4.8% 95.9%;
-
-    --secondary-foreground: 24 9.8% 10%;
-
-    --muted: 60 4.8% 95.9%;
-
-    --muted-foreground: 25 5.3% 44.7%;
-
-    --accent: 60 4.8% 95.9%;
-
-    --accent-foreground: 24 9.8% 10%;
-
-    --destructive: 0 84.2% 60.2%;
-
-    --destructive-foreground: 60 9.1% 97.8%;
-
-    --border: 20 5.9% 90%;
-
-    --input: 20 5.9% 90%;
-
-    --ring: 20 14.3% 4.1%;
-
-    --chart-1: 12 76% 61%;
-
-    --chart-2: 173 58% 39%;
-
-    --chart-3: 197 37% 24%;
-
-    --chart-4: 43 74% 66%;
-
-    --chart-5: 27 87% 67%;
-
-    --radius: 0.5rem
+    --popover-foreground: var(--mango-dark);
+    --primary: var(--mango-orange);
+    --primary-foreground: 0 0% 100%;
+    --secondary: var(--mango-light-gray);
+    --secondary-foreground: var(--mango-dark);
+    --muted: var(--mango-gray-100);
+    --muted-foreground: var(--mango-gray-600);
+    --accent: var(--mango-gray-100);
+    --accent-foreground: var(--mango-gray-600);
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: var(--mango-gray-200);
+    --input: var(--mango-gray-200);
+    --ring: var(--mango-orange);
+    
+    /* Typography */
+    --font-sans: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-serif: "Lora", Georgia, "Times New Roman", Times, serif;
+    --font-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+    
+    /* Spacing Scale - Based on Anthropic's 8px grid */
+    --spacing-unit: 0.5rem;
+    
+    /* Border Radius */
+    --radius: 0.5rem;
+    --radius-sm: 0.25rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    --radius-3xl: 1.5rem;
   }
+
+  /* Dark Mode Variables - HSL Format */
   .dark {
-
-    --background: 20 14.3% 4.1%;
-
-    --foreground: 60 9.1% 97.8%;
-
-    --card: 20 14.3% 4.1%;
-
-    --card-foreground: 60 9.1% 97.8%;
-
-    --popover: 20 14.3% 4.1%;
-
-    --popover-foreground: 60 9.1% 97.8%;
-
-    --primary: 60 9.1% 97.8%;
-
-    --primary-foreground: 24 9.8% 10%;
-
-    --secondary: 12 6.5% 15.1%;
-
-    --secondary-foreground: 60 9.1% 97.8%;
-
-    --muted: 12 6.5% 15.1%;
-
-    --muted-foreground: 24 5.4% 63.9%;
-
-    --accent: 12 6.5% 15.1%;
-
-    --accent-foreground: 60 9.1% 97.8%;
-
-    --destructive: 0 62.8% 30.6%;
-
-    --destructive-foreground: 60 9.1% 97.8%;
-
-    --border: 12 6.5% 15.1%;
-
-    --input: 12 6.5% 15.1%;
-
-    --ring: 24 5.7% 82.9%;
-
-    --chart-1: 220 70% 50%;
-
-    --chart-2: 160 60% 45%;
-
-    --chart-3: 30 80% 55%;
-
-    --chart-4: 280 65% 60%;
-
-    --chart-5: 340 75% 55%
+    --background: var(--mango-dark);
+    --foreground: var(--mango-light);
+    --card: var(--mango-gray-800);
+    --card-foreground: var(--mango-light);
+    --popover: var(--mango-gray-800);
+    --popover-foreground: var(--mango-light);
+    --primary: var(--mango-orange);
+    --primary-foreground: 0 0% 100%;
+    --secondary: var(--mango-gray-700);
+    --secondary-foreground: var(--mango-light);
+    --muted: var(--mango-gray-800);
+    --muted-foreground: var(--mango-gray-300);
+    --accent: var(--mango-gray-800);
+    --accent-foreground: var(--mango-gray-300);
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: var(--mango-gray-700);
+    --input: var(--mango-gray-700);
+    --ring: var(--mango-orange);
   }
 }
 
