@@ -29,7 +29,10 @@ export function createClient() {
     auth: authConfig,
     cookies: {
       get(name: string) {
-        // 浏览器环境直接从 document.cookie 读取
+        // 仅在浏览器环境读取 cookie
+        if (typeof document === 'undefined') {
+          return undefined
+        }
         const value = document.cookie
           .split('; ')
           .find(row => row.startsWith(`${name}=`))
@@ -37,7 +40,10 @@ export function createClient() {
         return value ? decodeURIComponent(value) : undefined
       },
       set(name: string, value: string, options: any) {
-        // 浏览器环境直接设置 cookie
+        // 仅在浏览器环境设置 cookie
+        if (typeof document === 'undefined') {
+          return
+        }
         let cookie = `${name}=${encodeURIComponent(value)}`
 
         if (options?.maxAge) {
@@ -59,7 +65,10 @@ export function createClient() {
         document.cookie = cookie
       },
       remove(name: string, options: any) {
-        // 浏览器环境删除 cookie
+        // 仅在浏览器环境删除 cookie
+        if (typeof document === 'undefined') {
+          return
+        }
         let cookie = `${name}=; max-age=0`
 
         if (options?.path) {
