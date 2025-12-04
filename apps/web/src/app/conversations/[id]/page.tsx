@@ -160,9 +160,9 @@ function ConversationDetailContent() {
 export default function ConversationDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }) {
-  const { id } = use(params)
+  const { id } = params
 
   return (
     <ConversationProvider conversationId={id}>
