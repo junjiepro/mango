@@ -8,9 +8,12 @@
 import React, { useState, useRef, KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { logger } from '@mango/shared/utils'
+import { uploadFiles, type UploadResult } from '@/lib/storage/upload'
+import { AttachmentUpload } from './AttachmentUpload'
+import { AttachmentPreviewList, type AttachmentData } from './AttachmentPreview'
 
 interface MessageInputProps {
-  onSendMessage: (content: string, attachments?: any[]) => Promise<void>
+  onSendMessage: (content: string, attachments?: UploadResult[]) => Promise<void>
   disabled?: boolean
   placeholder?: string
   className?: string
@@ -29,8 +32,10 @@ export function MessageInput({
   const [content, setContent] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
   const [isSending, setIsSending] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<number>(0)
+  const [uploadingFileName, setUploadingFileName] = useState<string>('')
+  const [uploadError, setUploadError] = useState<string>('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 自动调整文本框高度
   const adjustTextareaHeight = () => {
@@ -54,9 +59,9 @@ export function MessageInput({
     }
   }
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
+  const handleFilesSelected = (files: File[]) => {
     setAttachments((prev) => [...prev, ...files])
+    setUploadError('')
     logger.debug('Files selected', { count: files.length })
   }
 
@@ -69,61 +74,85 @@ export function MessageInput({
     if (isSending || disabled) return
 
     setIsSending(true)
+    setUploadError('')
+    setUploadProgress(0)
 
     try {
-      // TODO: 上传附件到 Supabase Storage
-      const attachmentData = attachments.map((file) => ({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-      }))
+      // 上传附件到 Supabase Storage
+      let uploadResults: UploadResult[] = []
 
-      await onSendMessage(content.trim(), attachmentData)
+      if (attachments.length > 0) {
+        logger.info('Uploading attachments', { count: attachments.length })
+
+        uploadResults = await uploadFiles(attachments, {
+          bucket: 'attachments',
+          pathPrefix: 'messages',
+          uniqueFileName: true,
+          onProgress: (progress, fileName) => {
+            setUploadProgress(progress)
+            setUploadingFileName(fileName)
+          },
+        })
+
+        if (uploadResults.length === 0) {
+          throw new Error('所有文件上传失败')
+        }
+
+        if (uploadResults.length < attachments.length) {
+          logger.warn('Some files failed to upload', {
+            total: attachments.length,
+            successful: uploadResults.length,
+          })
+          setUploadError(
+            `部分文件上传失败 (${uploadResults.length}/${attachments.length})`
+          )
+        }
+
+        logger.info('Attachments uploaded successfully', {
+          count: uploadResults.length,
+        })
+      }
+
+      // 发送消息
+      await onSendMessage(content.trim(), uploadResults)
 
       // 清空输入
       setContent('')
       setAttachments([])
+      setUploadProgress(0)
+      setUploadingFileName('')
+      setUploadError('')
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'
       }
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '发送失败'
       logger.error('Failed to send message', err as Error)
+      setUploadError(errorMessage)
     } finally {
       setIsSending(false)
     }
   }
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
+  // 将 File[] 转换为 AttachmentData[]
+  const attachmentDataList: AttachmentData[] = attachments.map((file, index) => ({
+    fileName: file.name,
+    fileType: file.type,
+    fileSize: file.size,
+    file,
+  }))
 
   return (
     <div className={`rounded-lg border bg-background ${className}`}>
       {/* 附件预览 */}
       {attachments.length > 0 && (
-        <div className="border-b p-2">
-          <div className="flex flex-wrap gap-2">
-            {attachments.map((file, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-2 rounded-md border bg-muted px-3 py-2 text-sm"
-              >
-                <span className="truncate max-w-[200px]">{file.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {formatFileSize(file.size)}
-                </span>
-                <button
-                  onClick={() => handleRemoveAttachment(index)}
-                  className="text-muted-foreground hover:text-foreground"
-                  type="button"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
+        <div className="border-b p-3">
+          <AttachmentPreviewList
+            attachments={attachmentDataList}
+            onRemove={handleRemoveAttachment}
+            removable={!isSending}
+            mode="compact"
+          />
         </div>
       )}
 
@@ -142,25 +171,15 @@ export function MessageInput({
         />
 
         <div className="flex items-center gap-2">
-          {/* 附件按钮 */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={handleFileSelect}
-            className="hidden"
-            accept="image/*,.pdf,.doc,.docx,.txt"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
+          {/* 附件上传按钮 */}
+          <AttachmentUpload
+            onFilesSelected={handleFilesSelected}
             disabled={disabled || isSending}
-            className="h-8 w-8 p-0"
-          >
-            📎
-          </Button>
+            multiple={true}
+            accept="image/*,.pdf,.doc,.docx,.txt"
+            maxSize={10 * 1024 * 1024}
+            mode="button"
+          />
 
           {/* 发送按钮 */}
           <Button
@@ -175,9 +194,43 @@ export function MessageInput({
         </div>
       </div>
 
-      {/* 提示文本 */}
-      <div className="border-t px-3 py-2 text-xs text-muted-foreground">
-        按 Ctrl+Enter 发送消息
+      {/* 上传进度和提示文本 */}
+      <div className="border-t px-3 py-2">
+        {/* 上传进度 */}
+        {isSending && uploadProgress > 0 && uploadProgress < 100 && (
+          <div className="mb-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+              <span>正在上传: {uploadingFileName}</span>
+              <span>{Math.round(uploadProgress)}%</span>
+            </div>
+            <div className="h-1 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* 错误提示 */}
+        {uploadError && (
+          <div className="mb-2 text-xs text-destructive flex items-center gap-1">
+            <span>⚠️</span>
+            <span>{uploadError}</span>
+            <button
+              onClick={() => setUploadError('')}
+              className="ml-auto hover:text-destructive/80"
+              type="button"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* 提示文本 */}
+        <div className="text-xs text-muted-foreground">
+          按 Ctrl+Enter 发送消息 • 支持图片、PDF、Word、文本文件(最大 10MB)
+        </div>
       </div>
     </div>
   )

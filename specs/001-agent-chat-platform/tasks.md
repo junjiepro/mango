@@ -112,8 +112,8 @@ Based on plan.md monorepo structure:
 - [X] T048 [P] [US1] Create MessageList component in `apps/web/src/components/conversation/MessageList.tsx`
 - [X] T049 [P] [US1] Create MessageInput component with multimodal support in `apps/web/src/components/conversation/MessageInput.tsx`
 - [X] T050 [P] [US1] Create MessageItem component in `apps/web/src/components/conversation/MessageItem.tsx`
-- [X] T051 [P] [US1] Create AttachmentUpload component in `apps/web/src/components/conversation/AttachmentUpload.tsx`
-- [X] T052 [P] [US1] Create AttachmentPreview component in `apps/web/src/components/conversation/AttachmentPreview.tsx`
+- [X] T051 [P] [US1] Create AttachmentUpload component in `apps/web/src/components/conversation/AttachmentUpload.tsx` ✅ 已完成
+- [X] T052 [P] [US1] Create AttachmentPreview component in `apps/web/src/components/conversation/AttachmentPreview.tsx` ✅ 已完成
 - [X] T053 [P] [US1] Create TaskProgressIndicator component in `apps/web/src/components/task/TaskProgressIndicator.tsx`
 
 ### Pages and Routes
@@ -153,6 +153,8 @@ Based on plan.md monorepo structure:
 - [X] T074 [P] [US1] Create logout functionality in `apps/web/src/app/auth/logout/route.ts`
 - [X] T075 [US1] Create user profile service in `apps/web/src/services/UserService.ts`
 - [X] T076 [US1] Create user profile page in `apps/web/src/app/profile/page.tsx`
+- [X] T076a [P] [US1] Create password reset request page in `apps/web/src/app/auth/reset-password/page.tsx`
+- [X] T076b [P] [US1] Create password update page in `apps/web/src/app/auth/update-password/page.tsx`
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - users can create conversations, send multimodal messages, and see background task execution
 
