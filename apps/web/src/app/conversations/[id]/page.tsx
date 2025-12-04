@@ -3,17 +3,17 @@
  * T055: Create conversation detail page
  */
 
-'use client'
+'use client';
 
-import React, { use } from 'react'
-import { useRouter } from 'next/navigation'
-import { ConversationProvider, useConversation } from '@/contexts/ConversationContext'
-import { MessageList } from '@/components/conversation/MessageList'
-import { MessageInput } from '@/components/conversation/MessageInput'
-import { TaskProgressIndicator } from '@/components/task/TaskProgressIndicator'
-import { AppHeader } from '@/components/layouts/AppHeader'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import React, { use } from 'react';
+import { useRouter } from 'next/navigation';
+import { ConversationProvider, useConversation } from '@/contexts/ConversationContext';
+import { MessageList } from '@/components/conversation/MessageList';
+import { MessageInput } from '@/components/conversation/MessageInput';
+import { TaskProgressIndicator } from '@/components/task/TaskProgressIndicator';
+import { AppHeader } from '@/components/layouts/AppHeader';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /**
  * 对话详情内容组件
@@ -29,9 +29,9 @@ function ConversationDetailContent() {
     tasks,
     isRealtimeConnected,
     error,
-  } = useConversation()
+  } = useConversation();
 
-  const router = useRouter()
+  const router = useRouter();
 
   if (error) {
     return (
@@ -39,16 +39,12 @@ function ConversationDetailContent() {
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
           <p className="text-destructive">加载对话失败</p>
           <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
-          <Button
-            variant="outline"
-            onClick={() => router.push('/conversations')}
-            className="mt-4"
-          >
+          <Button variant="outline" onClick={() => router.push('/conversations')} className="mt-4">
             返回对话列表
           </Button>
         </div>
       </div>
-    )
+    );
   }
 
   if (!currentConversation) {
@@ -57,7 +53,7 @@ function ConversationDetailContent() {
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-96 w-full" />
       </div>
-    )
+    );
   }
 
   return (
@@ -66,19 +62,13 @@ function ConversationDetailContent() {
       <div className="border-b bg-muted/40">
         <div className="container mx-auto flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/conversations')}
-            >
+            <Button variant="ghost" size="sm" onClick={() => router.push('/conversations')}>
               ← 返回
             </Button>
             <div>
               <h1 className="font-semibold">{currentConversation.title}</h1>
               {currentConversation.description && (
-                <p className="text-xs text-muted-foreground">
-                  {currentConversation.description}
-                </p>
+                <p className="text-xs text-muted-foreground">{currentConversation.description}</p>
               )}
             </div>
           </div>
@@ -112,7 +102,7 @@ function ConversationDetailContent() {
           />
 
           {/* 消息输入框 */}
-          <div className="border-t bg-background p-4">
+          <div className="bg-background p-4">
             <div className="container mx-auto max-w-4xl">
               <MessageInput
                 onSendMessage={sendMessage}
@@ -151,18 +141,14 @@ function ConversationDetailContent() {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 /**
  * 对话详情页面
  */
-export default function ConversationDetailPage({
-  params,
-}: {
-  params: { id: string }
-}) {
-  const { id } = params
+export default function ConversationDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
 
   return (
     <ConversationProvider conversationId={id}>
@@ -173,5 +159,5 @@ export default function ConversationDetailPage({
         </div>
       </div>
     </ConversationProvider>
-  )
+  );
 }
