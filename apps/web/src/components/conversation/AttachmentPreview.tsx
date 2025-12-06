@@ -60,31 +60,36 @@ export function AttachmentPreview({
   // 判断是否为图片
   const isImage = attachment.fileType.startsWith('image/')
 
+  // 创建和管理 Object URL
+  React.useEffect(() => {
+    // 如果已有 URL 或不是图片，不需要创建 Object URL
+    if (attachment.url || !attachment.file || !isImage) {
+      return
+    }
+
+    // 为本地文件创建 Object URL
+    const url = URL.createObjectURL(attachment.file)
+    setPreviewUrl(url)
+    logger.debug('Created blob URL for preview', { fileName: attachment.fileName, url })
+
+    // 清理函数：组件卸载时释放 Object URL
+    return () => {
+      URL.revokeObjectURL(url)
+      logger.debug('Revoked blob URL', { fileName: attachment.fileName, url })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachment.fileName, isImage])
+
   // 获取预览 URL
   const getPreviewUrl = (): string | null => {
     if (attachment.url) {
       return attachment.url
     }
-    if (attachment.file && isImage) {
-      // 为本地文件创建 Object URL
-      if (!previewUrl) {
-        const url = URL.createObjectURL(attachment.file)
-        setPreviewUrl(url)
-        return url
-      }
+    if (previewUrl) {
       return previewUrl
     }
     return null
   }
-
-  // 清理 Object URL
-  React.useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl)
-      }
-    }
-  }, [previewUrl])
 
   /**
    * 格式化文件大小
