@@ -6,7 +6,7 @@
 
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import type { Database } from '@/types/database.types'
 import {
   Message,
@@ -19,6 +19,8 @@ import {
 } from '@/components/ai-elements/message'
 import { CopyIcon, RefreshCcwIcon, AlertCircleIcon, ClockIcon } from 'lucide-react'
 import type { FileUIPart } from 'ai'
+import { smartRefreshAttachmentUrls, type AttachmentWithPath } from '@/lib/storage/attachment-utils'
+import { logger } from '@mango/shared/utils'
 
 type MessageType = Database['public']['Tables']['messages']['Row']
 
@@ -50,6 +52,63 @@ export function MessageItem({
   // 确定消息角色
   const messageRole = isUser ? 'user' : 'assistant'
 
+  // 状态：刷新后的附件
+  const [refreshedAttachments, setRefreshedAttachments] = useState<any[]>([])
+  // 使用 ref 跟踪是否已刷新，避免重复执行
+  const hasRefreshedRef = useRef(false)
+  const lastMessageIdRef = useRef<string>('')
+
+  // 在组件挂载时刷新附件 URL（如果需要）
+  useEffect(() => {
+    // 如果消息 ID 变化，重置刷新状态
+    if (lastMessageIdRef.current !== message.id) {
+      hasRefreshedRef.current = false
+      lastMessageIdRef.current = message.id
+    }
+
+    // 避免重复刷新
+    if (hasRefreshedRef.current) {
+      return
+    }
+
+    const refreshUrls = async () => {
+      if (!message.attachments || !Array.isArray(message.attachments) || message.attachments.length === 0) {
+        hasRefreshedRef.current = true
+        return
+      }
+
+      // 将 JSON 类型转换为普通对象数组
+      const attachmentsArray = message.attachments as any[]
+
+      // 检查附件是否有 path 字段（需要刷新的标志）
+      const hasPath = attachmentsArray.some((att: any) => att && typeof att === 'object' && att.path)
+      if (!hasPath) {
+        setRefreshedAttachments(attachmentsArray)
+        hasRefreshedRef.current = true
+        return
+      }
+
+      try {
+        const refreshed = await smartRefreshAttachmentUrls(
+          attachmentsArray as AttachmentWithPath[],
+          'attachments',
+          86400, // 24小时
+          3600   // 提前1小时刷新
+        )
+        setRefreshedAttachments(refreshed)
+        hasRefreshedRef.current = true
+        logger.debug('Attachment URLs refreshed', { messageId: message.id, count: refreshed.length })
+      } catch (error) {
+        logger.error('Failed to refresh attachment URLs', error as Error)
+        // 失败时使用原始附件
+        setRefreshedAttachments(attachmentsArray)
+        hasRefreshedRef.current = true
+      }
+    }
+
+    refreshUrls()
+  }, [message.id, message.attachments])
+
   const getSenderName = () => {
     if (isUser) return '你'
     if (isAgent) return 'Agent'
@@ -76,16 +135,25 @@ export function MessageItem({
 
   // 转换附件格式为 ai-elements 所需的格式
   const convertAttachments = (): FileUIPart[] => {
-    if (!message.attachments || !Array.isArray(message.attachments)) {
+    const attachmentsToUse = refreshedAttachments.length > 0 ? refreshedAttachments : message.attachments
+
+    if (!attachmentsToUse || !Array.isArray(attachmentsToUse)) {
       return []
     }
 
-    return message.attachments.map((attachment: any) => ({
-      type: 'file' as const,
-      url: attachment.url || '',
-      filename: attachment.name || 'attachment',
-      mediaType: attachment.type || 'application/octet-stream',
-    }))
+    return attachmentsToUse.map((attachment: any) => {
+      // 确保 URL 存在且有效
+      const url = attachment.url || attachment.publicUrl || ''
+      const filename = attachment.name || attachment.fileName || 'attachment'
+      const mediaType = attachment.type || attachment.fileType || attachment.mediaType || 'application/octet-stream'
+
+      return {
+        type: 'file' as const,
+        url,
+        filename,
+        mediaType,
+      }
+    })
   }
 
   const attachments = convertAttachments()

@@ -5,6 +5,7 @@
 
 import { getClient } from '@/lib/supabase/client'
 import { logger } from '@mango/shared/utils'
+import { urlCache } from './url-cache'
 
 /**
  * 文件上传结果
@@ -150,14 +151,25 @@ export async function uploadFile(
       throw new Error(`上传失败: ${error.message}`)
     }
 
-    // 获取公开访问 URL
-    const { data: urlData } = supabase.storage
+    // 为私有 bucket 生成签名 URL (24小时有效期)
+    const expiresIn = 86400 // 24小时 = 86400秒
+    const { data: urlData, error: urlError } = await supabase.storage
       .from(config.bucket)
-      .getPublicUrl(data.path)
+      .createSignedUrl(data.path, expiresIn)
+
+    if (urlError) {
+      logger.error('Failed to create signed URL', urlError)
+      throw new Error(`生成访问链接失败: ${urlError.message}`)
+    }
+
+    const signedUrl = urlData.signedUrl
+
+    // 缓存签名 URL
+    urlCache.set(data.path, signedUrl, config.bucket, expiresIn)
 
     logger.info('File uploaded successfully', {
       path: data.path,
-      publicUrl: urlData.publicUrl
+      signedUrl
     })
 
     // 调用进度回调(100%)
@@ -167,7 +179,7 @@ export async function uploadFile(
 
     return {
       path: data.path,
-      publicUrl: urlData.publicUrl,
+      publicUrl: signedUrl,
       fileName: file.name,
       fileType: file.type,
       fileSize: file.size,
@@ -267,7 +279,46 @@ export async function deleteFile(
 }
 
 /**
- * 获取文件的公开 URL
+ * 获取文件的签名 URL (用于私有 bucket)
+ * @param path 文件路径
+ * @param bucket Storage bucket 名称
+ * @param expiresIn 过期时间(秒)，默认 24 小时
+ * @returns 签名访问 URL
+ */
+export async function getSignedUrl(
+  path: string,
+  bucket: string = DEFAULT_OPTIONS.bucket,
+  expiresIn: number = 86400
+): Promise<string> {
+  // 先检查缓存
+  const cachedUrl = urlCache.get(path, bucket, 3600)
+  if (cachedUrl) {
+    logger.debug('Using cached signed URL', { path, bucket })
+    return cachedUrl
+  }
+
+  // 缓存未命中，生成新的签名 URL
+  const supabase = getClient()
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(path, expiresIn)
+
+  if (error) {
+    logger.error('Failed to create signed URL', error)
+    throw new Error(`生成访问链接失败: ${error.message}`)
+  }
+
+  const signedUrl = data.signedUrl
+
+  // 缓存新生成的 URL
+  urlCache.set(path, signedUrl, bucket, expiresIn)
+
+  return signedUrl
+}
+
+/**
+ * 获取文件的公开 URL (已废弃，请使用 getSignedUrl)
+ * @deprecated 使用 getSignedUrl 代替
  * @param path 文件路径
  * @param bucket Storage bucket 名称
  * @returns 公开访问 URL

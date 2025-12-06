@@ -10,10 +10,21 @@ import { Button } from '@/components/ui/button'
 import { logger } from '@mango/shared/utils'
 import { uploadFiles, type UploadResult } from '@/lib/storage/upload'
 import { AttachmentUpload } from './AttachmentUpload'
-import { AttachmentPreviewList, type AttachmentData } from './AttachmentPreview'
+import { AttachmentPreviewList, type AttachmentData as AttachmentPreviewData } from './AttachmentPreview'
+
+/**
+ * 附件数据格式 (用于保存到数据库)
+ */
+export interface MessageAttachmentData {
+  url: string
+  name: string
+  type: string
+  size: number
+  path: string
+}
 
 interface MessageInputProps {
-  onSendMessage: (content: string, attachments?: UploadResult[]) => Promise<void>
+  onSendMessage: (content: string, attachments?: MessageAttachmentData[]) => Promise<void>
   disabled?: boolean
   placeholder?: string
   className?: string
@@ -113,8 +124,17 @@ export function MessageInput({
         })
       }
 
+      // 转换附件格式为数据库所需格式
+      const attachmentsData = uploadResults.map((result) => ({
+        url: result.publicUrl,
+        name: result.fileName,
+        type: result.fileType,
+        size: result.fileSize,
+        path: result.path,
+      }))
+
       // 发送消息
-      await onSendMessage(content.trim(), uploadResults)
+      await onSendMessage(content.trim(), attachmentsData)
 
       // 清空输入
       setContent('')
@@ -134,8 +154,8 @@ export function MessageInput({
     }
   }
 
-  // 将 File[] 转换为 AttachmentData[]
-  const attachmentDataList: AttachmentData[] = attachments.map((file, index) => ({
+  // 将 File[] 转换为 AttachmentPreviewData[]
+  const attachmentDataList: AttachmentPreviewData[] = attachments.map((file) => ({
     fileName: file.name,
     fileType: file.type,
     fileSize: file.size,
