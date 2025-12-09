@@ -126,25 +126,25 @@ Based on plan.md monorepo structure:
 
 ### MCP Protocol Integration
 
-- [ ] T059 [P] [US1] Create MCP protocol adapter base in `packages/protocols/mcp/adapter.ts`
-- [ ] T060 [P] [US1] Create MCP client implementation in `packages/protocols/mcp/client.ts`
-- [ ] T061 [P] [US1] Create MCP tool registry in `packages/protocols/mcp/registry.ts`
-- [ ] T062 [US1] Create MCP tool invocation service in `apps/web/src/services/MCPService.ts`
-- [ ] T063 [US1] Create API route for MCP tool invocation in `apps/web/src/app/api/tools/invoke/route.ts`
+- [X] T059 [P] [US1] Create MCP protocol adapter base in `packages/protocols/mcp/adapter.ts` ✅ 使用官方 @modelcontextprotocol/sdk 实现
+- [X] T060 [P] [US1] Create MCP client implementation in `packages/protocols/mcp/client.ts` ✅ 使用官方 SDK 的 StreamableHTTPClientTransport
+- [X] T061 [P] [US1] Create MCP tool registry in `packages/protocols/mcp/registry.ts` ✅ 与官方 SDK 类型兼容
+- [X] T062 [US1] Create MCP tool invocation service in `apps/web/src/services/MCPService.ts` ✅ 已完成
+- [X] T063 [US1] Create API route for MCP tool invocation in `apps/web/src/app/api/tools/invoke/route.ts` ✅ 已完成
 
 ### Background Task Execution
 
-- [ ] T064 [US1] Create Supabase Edge Function for background tasks in `supabase/functions/process-task/index.ts`
-- [ ] T065 [US1] Implement task queue mechanism with PostgreSQL in Edge Function
-- [ ] T066 [US1] Create task status update via Realtime broadcasts
-- [ ] T067 [US1] Add task reconnection logic in `apps/web/src/hooks/useTaskMonitor.ts`
+- [X] T064 [US1] Create Supabase Edge Function for background tasks in `supabase/functions/process-task/index.ts` ✅ 已完成
+- [X] T065 [US1] Implement task queue mechanism with PostgreSQL in Edge Function ✅ 已完成
+- [X] T066 [US1] Create task status update via Realtime broadcasts ✅ 已完成
+- [X] T067 [US1] Add task reconnection logic in `apps/web/src/hooks/useTaskMonitor.ts` ✅ 已完成
 
 ### Realtime Sync & Offline Support
 
-- [ ] T068 [US1] Implement message realtime subscription in ConversationContext
-- [ ] T069 [US1] Implement task progress realtime subscription in ConversationContext
-- [ ] T070 [US1] Add offline message queue in `apps/web/src/lib/offline-queue.ts`
-- [ ] T071 [US1] Add reconnection and sync logic in `apps/web/src/hooks/useOfflineSync.ts`
+- [X] T068 [US1] Implement message realtime subscription in ConversationContext ✅ 已完成
+- [X] T069 [US1] Implement task progress realtime subscription in ConversationContext ✅ 已完成
+- [X] T070 [US1] Add offline message queue in `apps/web/src/lib/offline-queue.ts` ✅ 已完成
+- [X] T071 [US1] Add reconnection and sync logic in `apps/web/src/hooks/useOfflineSync.ts` ✅ 已完成
 
 ### Authentication & User Management
 
