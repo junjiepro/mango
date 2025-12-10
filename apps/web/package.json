@@ -12,6 +12,7 @@
     "clean": "rm -rf .next out dist"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.54",
     "@mango/protocols": "workspace:*",
     "@mango/shared": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.15",

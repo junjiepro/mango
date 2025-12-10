@@ -19,6 +19,7 @@ export class MessageService {
 
   /**
    * 发送消息
+   * 通过 API 路由发送，以触发 Agent 响应
    */
   async sendMessage(data: {
     conversationId: string
@@ -33,45 +34,30 @@ export class MessageService {
       throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
     }
 
-    // 获取下一个序列号
-    const { data: lastMessage } = await this.supabase
-      .from('messages')
-      .select('sequence_number')
-      .eq('conversation_id', data.conversationId)
-      .order('sequence_number', { ascending: false })
-      .limit(1)
-      .single()
+    // 通过 API 路由发送消息，以触发 Agent 响应
+    const response = await fetch(`/api/conversations/${data.conversationId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        content: data.content,
+        contentType: data.contentType,
+        attachments: data.attachments,
+        replyToMessageId: data.replyToMessageId,
+      }),
+    })
 
-    const sequenceNumber = (lastMessage?.sequence_number || 0) + 1
-
-    const messageData: MessageInsert = {
-      conversation_id: data.conversationId,
-      sender_type: 'user',
-      sender_id: user.id,
-      content: data.content,
-      content_type: data.contentType || 'text/markdown',
-      attachments: data.attachments || [],
-      reply_to_message_id: data.replyToMessageId,
-      sequence_number: sequenceNumber,
-      status: 'sent',
-    }
-
-    const { data: message, error } = await this.supabase
-      .from('messages')
-      .insert(messageData)
-      .select()
-      .single()
-
-    if (error) {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
       throw new AppError(
-        `Failed to send message: ${error.message}`,
-        ErrorType.DATABASE_ERROR,
-        500,
-        true,
-        { originalError: error }
+        `Failed to send message: ${errorData.error || response.statusText}`,
+        ErrorType.NETWORK_ERROR,
+        response.status
       )
     }
 
+    const message = await response.json()
     return message
   }
 
