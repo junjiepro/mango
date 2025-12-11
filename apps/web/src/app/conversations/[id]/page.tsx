@@ -94,6 +94,7 @@ function ConversationDetailContent() {
         {/* 消息列表 */}
         <div className="flex flex-1 flex-col">
           <MessageList
+            conversationId={currentConversation.id}
             messages={messages}
             isLoading={isLoadingMessages}
             hasMore={hasMoreMessages}
