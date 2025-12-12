@@ -7,7 +7,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js';
 import { createOpenAICompatible } from 'https://esm.sh/@ai-sdk/openai-compatible';
 import { gateway } from 'https://esm.sh/@ai-sdk/gateway';
-import { streamText, createProviderRegistry, tool } from 'https://esm.sh/ai';
+import { streamText, createProviderRegistry, tool, stepCountIs } from 'https://esm.sh/ai';
+import { experimental_createMCPClient as createMCPClient } from 'https://esm.sh/@ai-sdk/mcp';
 import { z } from 'https://esm.sh/zod@3.23.8';
 
 const corsHeaders = {
@@ -169,8 +170,137 @@ Deno.serve(async (req) => {
 });
 
 /**
+ * Initialize MCP client and load tools using Vercel AI SDK
+ */
+async function initializeMCPTools(
+  supabase: any,
+  channel: any,
+  messageId: string
+): Promise<Record<string, any>> {
+  const mcpServerUrl = Deno.env.get('MCP_SERVER_URL');
+  const mcpApiKey = Deno.env.get('MCP_SERVER_API_KEY') || '';
+
+  // 如果没有配置 MCP 服务器，返回空工具集
+  if (!mcpServerUrl) {
+    console.log('MCP_SERVER_URL not configured, skipping MCP tools initialization');
+    return {};
+  }
+
+  try {
+    console.log(`Connecting to MCP server: ${mcpServerUrl}`);
+
+    // 创建 MCP 客户端
+    const mcpClient = await createMCPClient({
+      transport: {
+        type: 'http',
+        url: mcpServerUrl,
+        headers: mcpApiKey ? { Authorization: `Bearer ${mcpApiKey}` } : undefined,
+      },
+    });
+
+    // 获取所有可用工具
+    const mcpTools = await mcpClient.listTools();
+    console.log(
+      `Loaded ${mcpTools.length} MCP tools:`,
+      mcpTools.map((t: any) => t.name)
+    );
+
+    // 转换 MCP 工具为 Vercel AI SDK 工具格式
+    const tools: Record<string, any> = {};
+
+    for (const mcpTool of mcpTools) {
+      const toolName = mcpTool.name;
+
+      tools[toolName] = tool({
+        description: mcpTool.description || `MCP tool: ${toolName}`,
+        parameters: mcpTool.inputSchema || z.object({}),
+        execute: async (args: any) => {
+          try {
+            console.log(`Executing MCP tool: ${toolName}`, args);
+
+            // 发送工具调用开始事件
+            await channel.send({
+              type: 'broadcast',
+              event: 'tool_call_start',
+              payload: {
+                messageId,
+                tool: toolName,
+                args,
+              },
+            });
+
+            // 调用 MCP 工具
+            const result = await mcpClient.callTool(toolName, args);
+
+            // 提取结果文本
+            let resultText = '';
+            if (result.content && Array.isArray(result.content)) {
+              resultText = result.content
+                .filter((c: any) => c.type === 'text')
+                .map((c: any) => c.text)
+                .join('\n');
+            } else if (typeof result === 'string') {
+              resultText = result;
+            } else {
+              resultText = JSON.stringify(result);
+            }
+
+            console.log(`MCP tool ${toolName} result:`, resultText.substring(0, 200));
+
+            // 发送工具调用成功事件
+            await channel.send({
+              type: 'broadcast',
+              event: 'tool_call_result',
+              payload: {
+                messageId,
+                tool: toolName,
+                status: 'success',
+                result: resultText,
+              },
+            });
+
+            return resultText;
+          } catch (error) {
+            console.error(`MCP tool ${toolName} execution error:`, error);
+
+            // 发送工具调用失败事件
+            await channel.send({
+              type: 'broadcast',
+              event: 'tool_call_result',
+              payload: {
+                messageId,
+                tool: toolName,
+                status: 'error',
+                error: error instanceof Error ? error.message : '未知错误',
+              },
+            });
+
+            return `❌ 工具执行失败: ${error instanceof Error ? error.message : '未知错误'}`;
+          }
+        },
+      });
+    }
+
+    return tools;
+  } catch (error) {
+    console.error('Failed to initialize MCP tools:', error);
+    return {};
+  }
+}
+
+interface AttachmentWithPath {
+  url: string;
+  path: string;
+  name?: string;
+  type?: string;
+  size?: number;
+  [key: string]: any;
+}
+
+/**
  * Stream agent response using Vercel AI SDK and Supabase Realtime
  * Supports multimodal input (text, images, files) and output
+ * Supports MCP tools integration
  */
 async function streamAgentResponse(
   supabase: any,
@@ -249,140 +379,144 @@ async function streamAgentResponse(
     });
 
     // 流式处理内容块（支持文本和多模态内容）
-    const generatedFiles: any[] = [];
+    const generatedFiles: AttachmentWithPath[] = [];
+
+    // 初始化 MCP 工具
+    console.log('Initializing MCP tools...');
+    const mcpTools = await initializeMCPTools(supabase, channel, messageId);
+    console.log(`Loaded ${Object.keys(mcpTools).length} MCP tools`);
+
+    // 合并内置工具和 MCP 工具
+    const allTools = {
+      ...mcpTools,
+      image_generate: tool({
+        description: '根据提示词生成图片。支持多种模型和尺寸。',
+        inputSchema: z.object({
+          prompt: z.string().describe('图片生成提示词，描述要生成的图片内容'),
+          width: z.number().describe('图片宽度，默认 1024'),
+          height: z.number().describe('图片高度，默认 1024'),
+          model: z
+            .string()
+            .describe('图片生成模型：flux (高质量), turbo (快速), gptimage (GPT风格)'),
+        }),
+        execute: async ({ prompt, width, height, model }) => {
+          // 设置默认值
+          const finalWidth = width || 1024;
+          const finalHeight = height || 1024;
+          const finalModel = model || 'flux';
+
+          try {
+            console.log('开始生成图片:', {
+              prompt,
+              width: finalWidth,
+              height: finalHeight,
+              model: finalModel,
+            });
+
+            // 发送工具调用开始事件
+            await channel.send({
+              type: 'broadcast',
+              event: 'tool_call_start',
+              payload: {
+                messageId,
+                tool: 'image_generate',
+                args: { prompt, width: finalWidth, height: finalHeight, model: finalModel },
+              },
+            });
+
+            // 构建图片生成 URL
+            const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${finalWidth}&height=${finalHeight}&model=${finalModel}&nologo=true`;
+
+            // 获取图片数据
+            const response = await fetch(imageUrl);
+            if (!response.ok) {
+              throw new Error(`图片生成失败: ${response.statusText}`);
+            }
+
+            // 获取图片二进制数据
+            const imageBuffer = await response.arrayBuffer();
+            const imageBytes = new Uint8Array(imageBuffer);
+
+            // 生成唯一文件名
+            const timestamp = Date.now();
+            const randomStr = Math.random().toString(36).substring(7);
+            const filename = `generated-${timestamp}-${randomStr}.png`;
+            const filePath = `generated-images/${conversationId}/${filename}`;
+
+            console.log('上传图片到 Supabase Storage:', filePath);
+
+            // 上传到 Supabase Storage
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('attachments')
+              .upload(filePath, imageBytes, {
+                contentType: 'image/png',
+                cacheControl: '3600',
+                upsert: false,
+              });
+
+            if (uploadError) {
+              console.error('图片上传失败:', uploadError);
+              throw new Error(`图片上传失败: ${uploadError.message}`);
+            }
+
+            // 添加到生成文件列表
+            const generatedFile: AttachmentWithPath = {
+              type: 'image/png',
+              url: '',
+              path: filePath,
+              name: filename,
+              size: imageBytes.length,
+            };
+            generatedFiles.push(generatedFile);
+
+            // 通过 Realtime Channel 发送图片生成成功事件
+            await channel.send({
+              type: 'broadcast',
+              event: 'tool_call_result',
+              payload: {
+                messageId,
+                tool: 'image_generate',
+                status: 'success',
+                result: {
+                  prompt,
+                  width: finalWidth,
+                  height: finalHeight,
+                  model: finalModel,
+                  name: filename,
+                  path: filePath,
+                },
+              },
+            });
+
+            return `✅ 图片已生成：${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}\n`;
+          } catch (error) {
+            console.error('图片生成工具执行失败:', error);
+
+            // 发送错误事件
+            await channel.send({
+              type: 'broadcast',
+              event: 'tool_call_result',
+              payload: {
+                messageId,
+                tool: 'image_generate',
+                status: 'error',
+                error: error instanceof Error ? error.message : '未知错误',
+              },
+            });
+
+            return `❌ 图片生成失败: ${error instanceof Error ? error.message : '未知错误'}`;
+          }
+        },
+      }),
+    };
 
     // 使用 Vercel AI SDK 流式生成回复
     const result = streamText({
-      model: registry.languageModel('openai:gpt-5'),
+      model: registry.languageModel('pollinations:gemini'),
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      toolChoice: 'required',
-      tools: {
-        image_generate: tool({
-          description: '根据提示词生成图片。支持多种模型和尺寸。',
-          inputSchema: z.object({
-            prompt: z.string().describe('图片生成提示词，描述要生成的图片内容'),
-            width: z.number().describe('图片宽度，默认 1024'),
-            height: z.number().describe('图片高度，默认 1024'),
-            model: z
-              .string()
-              .describe('图片生成模型：flux (高质量), turbo (快速), gptimage (GPT风格)'),
-          }),
-          execute: async ({ prompt, width, height, model }) => {
-            // 设置默认值
-            const finalWidth = width || 1024;
-            const finalHeight = height || 1024;
-            const finalModel = model || 'flux';
-
-            try {
-              console.log('开始生成图片:', {
-                prompt,
-                width: finalWidth,
-                height: finalHeight,
-                model: finalModel,
-              });
-
-              // 发送工具调用开始事件
-              await channel.send({
-                type: 'broadcast',
-                event: 'tool_call_start',
-                payload: {
-                  messageId,
-                  tool: 'image_generate',
-                  args: { prompt, width: finalWidth, height: finalHeight, model: finalModel },
-                },
-              });
-
-              // 构建图片生成 URL
-              const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${finalWidth}&height=${finalHeight}&model=${finalModel}&nologo=true`;
-
-              // 获取图片数据
-              const response = await fetch(imageUrl);
-              if (!response.ok) {
-                throw new Error(`图片生成失败: ${response.statusText}`);
-              }
-
-              // 获取图片二进制数据
-              const imageBuffer = await response.arrayBuffer();
-              const imageBytes = new Uint8Array(imageBuffer);
-
-              // 生成唯一文件名
-              const timestamp = Date.now();
-              const randomStr = Math.random().toString(36).substring(7);
-              const filename = `generated-${timestamp}-${randomStr}.png`;
-              const filePath = `generated-images/${conversationId}/${filename}`;
-
-              console.log('上传图片到 Supabase Storage:', filePath);
-
-              // 上传到 Supabase Storage
-              const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('attachments')
-                .upload(filePath, imageBytes, {
-                  contentType: 'image/png',
-                  cacheControl: '3600',
-                  upsert: false,
-                });
-
-              if (uploadError) {
-                console.error('图片上传失败:', uploadError);
-                throw new Error(`图片上传失败: ${uploadError.message}`);
-              }
-
-              // 获取公开访问 URL
-              const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
-
-              const publicUrl = urlData.publicUrl;
-
-              console.log('图片生成成功:', publicUrl);
-
-              // 添加到生成文件列表
-              const generatedFile = {
-                type: 'image/png',
-                url: publicUrl,
-                filename,
-                size: imageBytes.length,
-              };
-              generatedFiles.push(generatedFile);
-
-              // 通过 Realtime Channel 发送图片生成成功事件
-              await channel.send({
-                type: 'broadcast',
-                event: 'tool_call_result',
-                payload: {
-                  messageId,
-                  tool: 'image_generate',
-                  status: 'success',
-                  result: {
-                    url: publicUrl,
-                    prompt,
-                    width: finalWidth,
-                    height: finalHeight,
-                    model: finalModel,
-                    filename,
-                  },
-                },
-              });
-
-              return `✅ 图片已生成：${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}\n图片URL: ${publicUrl}`;
-            } catch (error) {
-              console.error('图片生成工具执行失败:', error);
-
-              // 发送错误事件
-              await channel.send({
-                type: 'broadcast',
-                event: 'tool_call_result',
-                payload: {
-                  messageId,
-                  tool: 'image_generate',
-                  status: 'error',
-                  error: error instanceof Error ? error.message : '未知错误',
-                },
-              });
-
-              return `❌ 图片生成失败: ${error instanceof Error ? error.message : '未知错误'}`;
-            }
-          },
-        }),
-      },
+      toolChoice: 'auto',
+      tools: allTools,
+      stopWhen: stepCountIs(5),
     });
 
     // 处理文本流
@@ -417,7 +551,8 @@ async function streamAgentResponse(
                 type: part.type,
                 url: part.url || part.image,
                 mediaType: part.mimeType || part.mediaType || 'image/png',
-                filename: part.filename || `generated-${Date.now()}.png`,
+                name: part.filename || `generated-${Date.now()}.png`,
+                path: part.filename || `generated-${Date.now()}.png`,
               });
 
               // 发送文件生成事件

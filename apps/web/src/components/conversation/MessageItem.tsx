@@ -229,7 +229,11 @@ export function MessageItem({
   const getToolStatusDisplay = (status: ToolCall['status']) => {
     switch (status) {
       case 'running':
-        return { icon: <ClockIcon className="size-3 animate-spin" />, text: '执行中', color: 'text-blue-500' };
+        return {
+          icon: <ClockIcon className="size-3 animate-spin" />,
+          text: '执行中',
+          color: 'text-blue-500',
+        };
       case 'success':
         return { icon: '✓', text: '成功', color: 'text-green-500' };
       case 'error':
@@ -281,10 +285,14 @@ export function MessageItem({
                   key={index}
                   className={cn(
                     'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm',
-                    toolCall.status === 'running' && 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950',
-                    toolCall.status === 'success' && 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950',
-                    toolCall.status === 'error' && 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950',
-                    toolCall.status === 'pending' && 'border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950'
+                    toolCall.status === 'running' &&
+                      'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950',
+                    toolCall.status === 'success' &&
+                      'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950',
+                    toolCall.status === 'error' &&
+                      'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950',
+                    toolCall.status === 'pending' &&
+                      'border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950'
                   )}
                 >
                   <span className={cn('flex items-center', statusDisplay.color)}>
@@ -294,13 +302,12 @@ export function MessageItem({
                   <span className={statusDisplay.color}>{statusDisplay.text}</span>
                   {toolCall.args?.prompt && (
                     <span className="text-xs text-muted-foreground">
-                      "{toolCall.args.prompt.substring(0, 30)}{toolCall.args.prompt.length > 30 ? '...' : ''}"
+                      "{toolCall.args.prompt.substring(0, 30)}
+                      {toolCall.args.prompt.length > 30 ? '...' : ''}"
                     </span>
                   )}
                   {toolCall.error && (
-                    <span className="text-xs text-red-600 dark:text-red-400">
-                      {toolCall.error}
-                    </span>
+                    <span className="text-xs text-red-600 dark:text-red-400">{toolCall.error}</span>
                   )}
                 </div>
               );
@@ -310,7 +317,7 @@ export function MessageItem({
 
         {/* 附件展示 - 在消息内容之前（包含数据库附件和流式附件） */}
         {allAttachments.length > 0 && (
-          <MessageAttachments className="mb-2">
+          <MessageAttachments className={cn('mb-2', messageRole !== 'user' && 'ml-0')}>
             {allAttachments.map((attachment, index) => (
               <MessageAttachment key={index} data={attachment} />
             ))}
