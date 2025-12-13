@@ -297,6 +297,51 @@ interface AttachmentWithPath {
   [key: string]: any;
 }
 
+async function toFileContext(
+  supabase: any,
+  attachment: AttachmentWithPath,
+  bucket: string = 'attachments',
+  expiresIn: number = 86400
+) {
+  let result;
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(attachment.path, expiresIn);
+
+  if (error || !data) {
+    throw new Error('Failed to get attachment URL', { cause: error || 'Empty data' });
+  }
+
+  // 更新 URL - Supabase 返回的是 { signedUrl: string }
+  const newUrl = data.signedUrl || data;
+  const finalUrl = typeof newUrl === 'string' ? newUrl : attachment.url;
+
+  if (attachment.type?.startsWith('image/')) {
+    // 图片附件
+    result = {
+      type: 'image',
+      image: finalUrl,
+    };
+  } else {
+    // 其他文件类型（如果模型支持）
+    const response = await fetch(finalUrl);
+    if (!response.ok) {
+      throw new Error(`获取文件失败: ${response.statusText}`);
+    }
+
+    // 获取文件二进制数据
+    const fileBuffer = await response.arrayBuffer();
+    const fileBytes = new Uint8Array(fileBuffer);
+    result = {
+      type: 'file',
+      data: fileBytes,
+      mimeType: attachment.type || 'application/octet-stream',
+    };
+  }
+
+  return result;
+}
+
 /**
  * Stream agent response using Vercel AI SDK and Supabase Realtime
  * Supports multimodal input (text, images, files) and output
@@ -314,43 +359,46 @@ async function streamAgentResponse(
 
   try {
     // 构建消息历史，支持多模态内容
-    const messages = conversationHistory
-      .filter((msg: any) => msg.sender_type === 'user' || msg.sender_type === 'agent')
-      .map((msg: any) => {
-        const role = msg.sender_type === 'user' ? 'user' : 'assistant';
+    const attachmentPathMap: Record<string, AttachmentWithPath> = {};
+    const attachmentNameMap: Record<string, AttachmentWithPath> = {};
+    const messages = await Promise.all(
+      conversationHistory
+        .filter((msg: any) => msg.sender_type === 'user' || msg.sender_type === 'agent')
+        .map(async (msg: any, index: number, arr: any[]) => {
+          const role = msg.sender_type === 'user' ? 'user' : 'assistant';
+          const isLastMessage = index === arr.length - 1;
 
-        // 检查是否有附件（多模态内容）
-        const hasAttachments =
-          msg.attachments && Array.isArray(msg.attachments) && msg.attachments.length > 0;
+          // 检查是否有附件（多模态内容）
+          const hasAttachments =
+            msg.attachments && Array.isArray(msg.attachments) && msg.attachments.length > 0;
 
-        if (hasAttachments) {
-          // 构建多模态内容数组
-          const content: any[] = [{ type: 'text', text: msg.content }];
+          if (hasAttachments) {
+            // 构建多模态内容数组
+            const content: any[] = [{ type: 'text', text: msg.content }];
 
-          // 添加附件（图片、文件等）
-          for (const attachment of msg.attachments) {
-            if (attachment.type?.startsWith('image/')) {
-              // 图片附件
-              content.push({
-                type: 'image',
-                image: attachment.url || attachment.publicUrl,
-              });
-            } else if (attachment.url || attachment.publicUrl) {
-              // 其他文件类型（如果模型支持）
-              content.push({
-                type: 'file',
-                data: attachment.url || attachment.publicUrl,
-                mimeType: attachment.type || 'application/octet-stream',
-              });
+            // 添加附件（图片、文件等）
+            if (isLastMessage) {
+              for (const attachment of msg.attachments) {
+                content.push(await toFileContext(supabase, attachment));
+              }
+            } else {
+              for (const attachment of msg.attachments) {
+                attachmentPathMap[attachment.path] = attachment;
+                attachmentNameMap[attachment.name] = attachment;
+                content.push({
+                  type: 'text',
+                  text: `<file name="${attachment.name}" path="${attachment.path}" type="${attachment.type || 'application/octet-stream'}" />`,
+                });
+              }
             }
-          }
 
-          return { role, content };
-        } else {
-          // 纯文本消息
-          return { role, content: msg.content };
-        }
-      });
+            return { role, content };
+          } else {
+            // 纯文本消息
+            return { role, content: msg.content };
+          }
+        })
+    );
 
     // 系统提示词
     const systemPrompt = `你是 Mango AI 助手，一个智能、友好、专业的 AI 助手。
@@ -361,6 +409,7 @@ async function streamAgentResponse(
 - 使用工具和 MCP 协议扩展能力
 - 理解上下文，进行多轮对话
 - 生成图片：可以根据用户描述生成各种风格的图片
+- 读取标记文件内容：可以读取对话中的标记文件（<file />）的内容
 
 请用简洁、清晰、友好的方式回复用户。`;
 
@@ -389,7 +438,7 @@ async function streamAgentResponse(
     // 合并内置工具和 MCP 工具
     const allTools = {
       ...mcpTools,
-      image_generate: tool({
+      generating_image: tool({
         description: '根据提示词生成图片。支持多种模型和尺寸。',
         inputSchema: z.object({
           prompt: z.string().describe('图片生成提示词，描述要生成的图片内容'),
@@ -419,7 +468,7 @@ async function streamAgentResponse(
               event: 'tool_call_start',
               payload: {
                 messageId,
-                tool: 'image_generate',
+                tool: 'generating_image',
                 args: { prompt, width: finalWidth, height: finalHeight, model: finalModel },
               },
             });
@@ -475,7 +524,7 @@ async function streamAgentResponse(
               event: 'tool_call_result',
               payload: {
                 messageId,
-                tool: 'image_generate',
+                tool: 'generating_image',
                 status: 'success',
                 result: {
                   prompt,
@@ -498,7 +547,82 @@ async function streamAgentResponse(
               event: 'tool_call_result',
               payload: {
                 messageId,
-                tool: 'image_generate',
+                tool: 'generating_image',
+                status: 'error',
+                error: error instanceof Error ? error.message : '未知错误',
+              },
+            });
+
+            return `❌ 图片生成失败: ${error instanceof Error ? error.message : '未知错误'}`;
+          }
+        },
+      }),
+      reading_taged_file: tool({
+        description: '读取对话中的标记文件（<file />）的内容',
+        inputSchema: z.object({
+          path: z.string().describe('目标标记文件中的path/name, <file path="path" name="name" />'),
+        }),
+        execute: async ({ path }) => {
+          // 设置默认值
+          const attachment = attachmentPathMap[path] || attachmentNameMap[path];
+
+          if (!attachment) {
+            // 发送错误事件
+            await channel.send({
+              type: 'broadcast',
+              event: 'tool_call_result',
+              payload: {
+                messageId,
+                tool: 'reading_taged_file',
+                status: 'error',
+                error: '找不到该标记文件',
+              },
+            });
+
+            return `❌ 找不到该标记文件`;
+          }
+
+          try {
+            console.log('开始读取标记文件:', {
+              path,
+            });
+
+            // 发送工具调用开始事件
+            await channel.send({
+              type: 'broadcast',
+              event: 'tool_call_start',
+              payload: {
+                messageId,
+                tool: 'reading_taged_file',
+                args: { path },
+              },
+            });
+
+            const result = await toFileContext(supabase, attachment);
+
+            // 通过 Realtime Channel 发送图片生成成功事件
+            await channel.send({
+              type: 'broadcast',
+              event: 'tool_call_result',
+              payload: {
+                messageId,
+                tool: 'reading_taged_file',
+                status: 'success',
+                result,
+              },
+            });
+
+            return result;
+          } catch (error) {
+            console.error('读取标记文件工具执行失败:', error);
+
+            // 发送错误事件
+            await channel.send({
+              type: 'broadcast',
+              event: 'tool_call_result',
+              payload: {
+                messageId,
+                tool: 'reading_taged_file',
                 status: 'error',
                 error: error instanceof Error ? error.message : '未知错误',
               },

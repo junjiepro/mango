@@ -220,7 +220,8 @@ export function MessageItem({
   // 获取工具调用的显示名称
   const getToolDisplayName = (toolName: string) => {
     const toolNames: Record<string, string> = {
-      image_generate: '图片生成',
+      generating_image: '图片生成',
+      reading_taged_file: '读取标记文件',
     };
     return toolNames[toolName] || toolName;
   };
