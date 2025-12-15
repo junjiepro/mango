@@ -3,13 +3,11 @@
  * T027: Setup Supabase Auth configuration
  */
 
-import { type AuthConfig } from '@supabase/supabase-js'
-
 /**
  * Supabase Auth 配置
  * 定义认证行为、会话管理和安全策略
  */
-export const authConfig: AuthConfig = {
+export const authConfig = {
   // 自动刷新 token
   autoRefreshToken: true,
 
@@ -20,7 +18,7 @@ export const authConfig: AuthConfig = {
   detectSessionInUrl: true,
 
   // 流程类型 (PKCE for better security)
-  flowType: 'pkce',
+  flowType: 'pkce' as const,
 }
 
 /**

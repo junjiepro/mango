@@ -72,12 +72,48 @@ pnpm build
 ### 测试
 
 ```bash
-# 运行所有测试
-pnpm test
+# 运行所有单元测试和集成测试
+cd apps/web
+pnpm vitest run
+
+# 运行测试并生成覆盖率报告
+pnpm vitest run --coverage
+
+# 监视模式(开发时使用)
+pnpm vitest
 
 # 运行 E2E 测试
 pnpm test:e2e
+
+# 查看测试覆盖率报告
+open coverage/index.html  # macOS
+start coverage/index.html # Windows
 ```
+
+#### 测试结构
+
+```
+apps/web/tests/
+├── helpers/           # 测试辅助工具
+│   ├── supabase-mock.ts    # Supabase Mock 框架
+│   └── test-data.ts        # 测试数据工厂
+├── unit/             # 单元测试
+│   └── services/     # 服务层测试
+├── integration/      # 集成测试
+│   └── api/         # API 路由测试
+└── e2e/             # E2E 测试
+```
+
+#### 测试覆盖
+
+- ✅ **User Story 1** - 93+ 个测试用例
+  - 单元测试: ConversationService, MessageService, TaskService
+  - 集成测试: API 路由
+  - E2E 测试: 完整对话流程
+
+详细测试文档:
+- [测试实现报告](./docs/user-story-1-test-implementation.md)
+- [测试最终报告](./docs/user-story-1-test-final-report.md)
 
 ### 代码检查
 

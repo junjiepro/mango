@@ -25,7 +25,7 @@ export interface TaskQueueResult {
  * Create a new task and add it to the queue
  */
 export async function createTask(options: CreateTaskOptions): Promise<TaskQueueResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Create task record
   const { data: task, error: taskError } = await supabase
@@ -107,7 +107,7 @@ async function triggerTaskProcessing(taskId: string, userId: string): Promise<vo
  * Get task status
  */
 export async function getTaskStatus(taskId: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data: task, error } = await supabase
     .from('tasks')
@@ -126,7 +126,7 @@ export async function getTaskStatus(taskId: string) {
  * Cancel a task
  */
 export async function cancelTask(taskId: string, userId: string): Promise<void> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { error } = await supabase
     .from('tasks')
@@ -152,7 +152,7 @@ export async function getUserTasks(
     offset?: number;
   }
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   let query = supabase
     .from('tasks')
@@ -192,7 +192,7 @@ export async function getUserTasks(
  * Retry a failed task
  */
 export async function retryTask(taskId: string, userId: string): Promise<TaskQueueResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Get original task
   const { data: task, error: fetchError } = await supabase
@@ -257,7 +257,7 @@ export async function cleanupOldTasks(
   userId: string,
   olderThanDays: number = 30
 ): Promise<number> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
