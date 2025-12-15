@@ -168,12 +168,12 @@ Based on plan.md monorepo structure:
 
 ### MiniApp Runtime Foundation
 
-- [ ] T077 [P] [US2] Create MiniApp sandbox core in `packages/miniapp-runtime/core/sandbox.ts`
-- [ ] T078 [P] [US2] Create MiniApp API interface definitions in `packages/miniapp-runtime/apis/types.ts`
-- [ ] T079 [P] [US2] Create MiniApp permission system in `packages/miniapp-runtime/core/permissions.ts`
-- [ ] T080 [P] [US2] Create MiniApp secure message bridge in `packages/miniapp-runtime/core/message-bridge.ts`
-- [ ] T081 [P] [US2] Create MiniApp storage API in `packages/miniapp-runtime/apis/storage.ts`
-- [ ] T082 [P] [US2] Create MiniApp notification API in `packages/miniapp-runtime/apis/notification.ts`
+- [X] T077 [P] [US2] Create MiniApp sandbox core in `packages/miniapp-runtime/core/sandbox.ts`
+- [X] T078 [P] [US2] Create MiniApp API interface definitions in `packages/miniapp-runtime/apis/types.ts`
+- [X] T079 [P] [US2] Create MiniApp permission system in `packages/miniapp-runtime/core/permissions.ts`
+- [X] T080 [P] [US2] Create MiniApp secure message bridge in `packages/miniapp-runtime/core/message-bridge.ts`
+- [X] T081 [P] [US2] Create MiniApp storage API in `packages/miniapp-runtime/apis/storage.ts`
+- [X] T082 [P] [US2] Create MiniApp notification API in `packages/miniapp-runtime/apis/notification.ts`
 
 ### MiniApp Services
 
