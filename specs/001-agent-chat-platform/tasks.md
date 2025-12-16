@@ -177,39 +177,39 @@ Based on plan.md monorepo structure:
 
 ### MiniApp Services
 
-- [ ] T083 [P] [US2] Create MiniApp service in `apps/web/src/services/MiniAppService.ts`
-- [ ] T084 [P] [US2] Create MiniApp installation service in `apps/web/src/services/MiniAppInstallationService.ts`
-- [ ] T085 [US2] Create API route for creating MiniApp in `apps/web/src/app/api/miniapps/route.ts`
-- [ ] T086 [US2] Create API route for installing MiniApp in `apps/web/src/app/api/miniapps/[id]/install/route.ts`
-- [ ] T087 [US2] Create API route for MiniApp data CRUD in `apps/web/src/app/api/miniapp-data/route.ts`
+- [X] T083 [P] [US2] Create MiniApp service in `apps/web/src/services/MiniAppService.ts`
+- [X] T084 [P] [US2] Create MiniApp installation service in `apps/web/src/services/MiniAppInstallationService.ts`
+- [X] T085 [US2] Create API route for creating MiniApp in `apps/web/src/app/api/miniapps/route.ts`
+- [X] T086 [US2] Create API route for installing MiniApp in `apps/web/src/app/api/miniapps/[id]/install/route.ts`
+- [X] T087 [US2] Create API route for MiniApp data CRUD in `apps/web/src/app/api/miniapp-data/route.ts`
 
 ### MiniApp UI Components
 
-- [ ] T088 [P] [US2] Create MiniAppContainer component in `apps/web/src/components/miniapp/MiniAppContainer.tsx`
-- [ ] T089 [P] [US2] Create MiniAppCard component in `apps/web/src/components/miniapp/MiniAppCard.tsx`
-- [ ] T090 [P] [US2] Create MiniAppPermissionDialog component in `apps/web/src/components/miniapp/PermissionDialog.tsx`
-- [ ] T091 [P] [US2] Create MiniAppList component in `apps/web/src/components/miniapp/MiniAppList.tsx`
-- [ ] T092 [US2] Create MiniApp gallery page in `apps/web/src/app/miniapps/page.tsx`
-- [ ] T093 [US2] Create MiniApp detail page in `apps/web/src/app/miniapps/[id]/page.tsx`
+- [X] T088 [P] [US2] Create MiniAppContainer component in `apps/web/src/components/miniapp/MiniAppContainer.tsx`
+- [X] T089 [P] [US2] Create MiniAppCard component in `apps/web/src/components/miniapp/MiniAppCard.tsx`
+- [X] T090 [P] [US2] Create MiniAppPermissionDialog component in `apps/web/src/components/miniapp/PermissionDialog.tsx`
+- [X] T091 [P] [US2] Create MiniAppList component in `apps/web/src/components/miniapp/MiniAppList.tsx`
+- [X] T092 [US2] Create MiniApp gallery page in `apps/web/src/app/miniapps/page.tsx`
+- [X] T093 [US2] Create MiniApp detail page in `apps/web/src/app/miniapps/[id]/page.tsx`
 
 ### Active Triggering & Notifications
 
-- [ ] T094 [US2] Create Supabase Edge Function for scheduled MiniApp triggers in `supabase/functions/miniapp-scheduler/index.ts`
-- [ ] T095 [US2] Implement Service Worker for MiniApp notifications in `apps/web/public/service-worker.js`
-- [ ] T096 [US2] Create notification subscription logic in `apps/web/src/hooks/useNotifications.ts`
+- [X] T094 [US2] Create Supabase Edge Function for scheduled MiniApp triggers in `supabase/functions/miniapp-scheduler/index.ts`
+- [X] T095 [US2] Implement Service Worker for MiniApp notifications in `apps/web/public/service-worker.js`
+- [X] T096 [US2] Create notification subscription logic in `apps/web/src/hooks/useNotifications.ts`
 - [ ] T097 [US2] Add MiniApp trigger configuration UI in MiniApp settings
 
 ### MiniApp Sharing
 
-- [ ] T098 [P] [US2] Create MiniApp sharing service in `apps/web/src/services/SharingService.ts`
-- [ ] T099 [P] [US2] Create share link generation in API route `apps/web/src/app/api/miniapps/[id]/share/route.ts`
-- [ ] T100 [US2] Create MiniApp import from share link in `apps/web/src/app/miniapps/import/[shareToken]/page.tsx`
-- [ ] T101 [US2] Add sharing UI button and dialog in MiniAppCard component
+- [X] T098 [P] [US2] Create MiniApp sharing service in `apps/web/src/services/SharingService.ts`
+- [X] T099 [P] [US2] Create share link generation in API route `apps/web/src/app/api/miniapps/[id]/share/route.ts`
+- [X] T100 [US2] Create MiniApp import from share link in `apps/web/src/app/miniapps/import/[shareToken]/page.tsx`
+- [X] T101 [US2] Add sharing UI button and dialog in MiniAppCard component
 
 ### Integration with Conversations
 
-- [ ] T102 [US2] Integrate MiniApp invocation in MessageInput component
-- [ ] T103 [US2] Add MiniApp message rendering in MessageItem component
+- [X] T102 [US2] Integrate MiniApp invocation in MessageInput component
+- [X] T103 [US2] Add MiniApp message rendering in MessageItem component
 - [ ] T104 [US2] Create MiniApp trigger handler in ConversationContext
 
 **Checkpoint**: User Story 2 complete - MiniApps can be created, used passively/actively, and shared

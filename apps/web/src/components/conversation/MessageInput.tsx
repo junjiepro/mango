@@ -11,6 +11,11 @@ import { logger } from '@mango/shared/utils'
 import { uploadFiles, type UploadResult } from '@/lib/storage/upload'
 import { AttachmentUpload } from './AttachmentUpload'
 import { AttachmentPreviewList, type AttachmentData as AttachmentPreviewData } from './AttachmentPreview'
+import { MiniAppSelector } from './MiniAppSelector'
+import type { Database } from '@/types/database.types'
+
+type MiniApp = Database['public']['Tables']['mini_apps']['Row']
+type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row']
 
 /**
  * 附件数据格式 (用于保存到数据库)
@@ -24,7 +29,7 @@ export interface MessageAttachmentData {
 }
 
 interface MessageInputProps {
-  onSendMessage: (content: string, attachments?: MessageAttachmentData[]) => Promise<void>
+  onSendMessage: (content: string, attachments?: MessageAttachmentData[], miniAppData?: { miniAppId: string; installationId: string }) => Promise<void>
   disabled?: boolean
   placeholder?: string
   className?: string
@@ -42,6 +47,7 @@ export function MessageInput({
 }: MessageInputProps) {
   const [content, setContent] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
+  const [selectedMiniApp, setSelectedMiniApp] = useState<{ miniApp: MiniApp; installation: MiniAppInstallation } | null>(null)
   const [isSending, setIsSending] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<number>(0)
   const [uploadingFileName, setUploadingFileName] = useState<string>('')
@@ -78,6 +84,18 @@ export function MessageInput({
 
   const handleRemoveAttachment = (index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleMiniAppSelect = (miniApp: MiniApp, installation: MiniAppInstallation) => {
+    setSelectedMiniApp({ miniApp, installation })
+    // 自动填充调用小应用的提示
+    const prompt = `@${miniApp.display_name} `
+    setContent((prev) => prev + prompt)
+    textareaRef.current?.focus()
+  }
+
+  const handleRemoveMiniApp = () => {
+    setSelectedMiniApp(null)
   }
 
   const handleSend = async () => {
@@ -133,12 +151,21 @@ export function MessageInput({
         path: result.path,
       }))
 
+      // 准备小应用数据
+      const miniAppData = selectedMiniApp
+        ? {
+            miniAppId: selectedMiniApp.miniApp.id,
+            installationId: selectedMiniApp.installation.id,
+          }
+        : undefined
+
       // 发送消息
-      await onSendMessage(content.trim(), attachmentsData)
+      await onSendMessage(content.trim(), attachmentsData, miniAppData)
 
       // 清空输入
       setContent('')
       setAttachments([])
+      setSelectedMiniApp(null)
       setUploadProgress(0)
       setUploadingFileName('')
       setUploadError('')
@@ -164,6 +191,41 @@ export function MessageInput({
 
   return (
     <div className={`rounded-lg border bg-background ${className}`}>
+      {/* 小应用选择提示 */}
+      {selectedMiniApp && (
+        <div className="border-b p-3 bg-primary/5">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1">
+              {selectedMiniApp.miniApp.icon_url ? (
+                <img
+                  src={selectedMiniApp.miniApp.icon_url}
+                  alt={selectedMiniApp.miniApp.display_name}
+                  className="h-6 w-6 rounded object-cover"
+                />
+              ) : (
+                <div className="flex h-6 w-6 items-center justify-center rounded bg-primary/10 text-primary">
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                </div>
+              )}
+              <span className="text-sm font-medium">
+                将调用: {selectedMiniApp.miniApp.display_name}
+              </span>
+            </div>
+            <button
+              onClick={handleRemoveMiniApp}
+              className="text-muted-foreground hover:text-foreground"
+              type="button"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 附件预览 */}
       {attachments.length > 0 && (
         <div className="border-b p-3">
@@ -191,6 +253,12 @@ export function MessageInput({
         />
 
         <div className="flex items-center gap-2">
+          {/* 小应用选择器 */}
+          <MiniAppSelector
+            onSelect={handleMiniAppSelect}
+            disabled={disabled || isSending}
+          />
+
           {/* 附件上传按钮 */}
           <AttachmentUpload
             onFilesSelected={handleFilesSelected}

@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import type { Database } from '@/types/database.types';
 import {
   Message,
@@ -28,17 +28,19 @@ import { cn } from '@/lib/utils';
 
 type MessageType = Database['public']['Tables']['messages']['Row'];
 
-interface StreamingFile {
-  type: string;
-  url: string;
-  mediaType: string;
-  filename: string;
-}
-
 interface ToolCall {
   tool: string;
   status: 'pending' | 'running' | 'success' | 'error';
   args?: any;
+  result?: any;
+  error?: string;
+}
+
+interface MiniAppInvocation {
+  miniAppId: string;
+  miniAppName: string;
+  miniAppIcon?: string;
+  installationId: string;
   result?: any;
   error?: string;
 }
@@ -53,8 +55,10 @@ interface MessageItemProps {
   // 流式消息支持
   streamingContent?: string;
   isStreaming?: boolean;
-  streamingFiles?: StreamingFile[];
+  streamingFiles?: AttachmentWithPath[];
   toolCalls?: ToolCall[];
+  // 小应用调用支持
+  miniAppInvocation?: MiniAppInvocation;
 }
 
 /**
@@ -72,10 +76,12 @@ export function MessageItem({
   isStreaming = false,
   streamingFiles = [],
   toolCalls = [],
+  miniAppInvocation,
 }: MessageItemProps) {
   const isUser = message.sender_type === 'user';
   const isAgent = message.sender_type === 'agent';
   const isSystem = message.sender_type === 'system';
+  const isMiniApp = message.sender_type === 'miniapp';
 
   // 确定消息角色
   const messageRole = isUser ? 'user' : 'assistant';
@@ -85,13 +91,31 @@ export function MessageItem({
   // 使用 ref 跟踪是否已刷新，避免重复执行
   const hasRefreshedRef = useRef(false);
   const lastMessageIdRef = useRef<string>('');
+  const lastAttachmentsRef = useRef<string>('');
+
+  const attachmentsTodo = useMemo(
+    () =>
+      [
+        ...(!message.attachments ||
+        !Array.isArray(message.attachments) ||
+        message.attachments.length === 0
+          ? []
+          : message.attachments),
+        ...streamingFiles,
+      ] as AttachmentWithPath[],
+    [message.attachments, streamingFiles]
+  );
 
   // 在组件挂载时刷新附件 URL（如果需要）
   useEffect(() => {
     // 如果消息 ID 变化，重置刷新状态
-    if (lastMessageIdRef.current !== message.id) {
+    if (
+      lastMessageIdRef.current !== message.id ||
+      lastAttachmentsRef.current !== JSON.stringify(attachmentsTodo)
+    ) {
       hasRefreshedRef.current = false;
       lastMessageIdRef.current = message.id;
+      lastAttachmentsRef.current = JSON.stringify(attachmentsTodo);
     }
 
     // 避免重复刷新
@@ -100,17 +124,13 @@ export function MessageItem({
     }
 
     const refreshUrls = async () => {
-      if (
-        !message.attachments ||
-        !Array.isArray(message.attachments) ||
-        message.attachments.length === 0
-      ) {
+      if (!attachmentsTodo || !Array.isArray(attachmentsTodo) || attachmentsTodo.length === 0) {
         hasRefreshedRef.current = true;
         return;
       }
 
       // 将 JSON 类型转换为普通对象数组
-      const attachmentsArray = message.attachments as any[];
+      const attachmentsArray = attachmentsTodo;
 
       // 检查附件是否有 path 字段（需要刷新的标志）
       const hasPath = attachmentsArray.some(
@@ -144,12 +164,13 @@ export function MessageItem({
     };
 
     refreshUrls();
-  }, [message.id, message.attachments]);
+  }, [message.id, attachmentsTodo]);
 
   const getSenderName = () => {
     if (isUser) return '你';
     if (isAgent) return 'Agent';
     if (isSystem) return '系统';
+    if (isMiniApp && miniAppInvocation) return miniAppInvocation.miniAppName;
     return '未知';
   };
 
@@ -174,7 +195,7 @@ export function MessageItem({
   };
 
   // 转换附件格式为 ai-elements 所需的格式
-  const convertAttachments = (): FileUIPart[] => {
+  const attachments: FileUIPart[] = useMemo(() => {
     const attachmentsToUse =
       refreshedAttachments.length > 0 ? refreshedAttachments : message.attachments;
 
@@ -199,23 +220,10 @@ export function MessageItem({
         mediaType,
       };
     });
-  };
-
-  const attachments = convertAttachments();
+  }, [refreshedAttachments, message.attachments]);
 
   // 确定要显示的内容：优先使用流式内容，否则使用消息内容
   const displayContent = streamingContent || message.content;
-
-  // 转换流式文件为 FileUIPart 格式
-  const streamingAttachments: FileUIPart[] = streamingFiles.map((file) => ({
-    type: 'file' as const,
-    url: file.url,
-    filename: file.filename,
-    mediaType: file.mediaType,
-  }));
-
-  // 合并数据库附件和流式附件
-  const allAttachments = [...attachments, ...streamingAttachments];
 
   // 获取工具调用的显示名称
   const getToolDisplayName = (toolName: string) => {
@@ -303,8 +311,8 @@ export function MessageItem({
                   <span className={statusDisplay.color}>{statusDisplay.text}</span>
                   {toolCall.args?.prompt && (
                     <span className="text-xs text-muted-foreground">
-                      "{toolCall.args.prompt.substring(0, 30)}
-                      {toolCall.args.prompt.length > 30 ? '...' : ''}"
+                      &quot;{toolCall.args.prompt.substring(0, 30)}
+                      {toolCall.args.prompt.length > 30 ? '...' : ''}&quot;
                     </span>
                   )}
                   {toolCall.error && (
@@ -316,10 +324,81 @@ export function MessageItem({
           </div>
         )}
 
+        {/* 小应用调用状态显示 */}
+        {miniAppInvocation && (
+          <div className="mb-3">
+            <div
+              className={cn(
+                'flex items-start gap-3 rounded-lg border p-3',
+                miniAppInvocation.error
+                  ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950'
+                  : 'border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950'
+              )}
+            >
+              {/* 小应用图标 */}
+              {miniAppInvocation.miniAppIcon ? (
+                <img
+                  src={miniAppInvocation.miniAppIcon}
+                  alt={miniAppInvocation.miniAppName}
+                  className="h-8 w-8 rounded object-cover"
+                />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded bg-purple-100 dark:bg-purple-900">
+                  <svg
+                    className="h-4 w-4 text-purple-600 dark:text-purple-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
+                  </svg>
+                </div>
+              )}
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-medium text-sm text-purple-900 dark:text-purple-100">
+                    {miniAppInvocation.miniAppName}
+                  </span>
+                  {miniAppInvocation.error ? (
+                    <span className="text-xs text-red-600 dark:text-red-400">执行失败</span>
+                  ) : (
+                    <span className="text-xs text-purple-600 dark:text-purple-400">已调用</span>
+                  )}
+                </div>
+
+                {/* 错误信息 */}
+                {miniAppInvocation.error && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                    {miniAppInvocation.error}
+                  </p>
+                )}
+
+                {/* 结果预览 */}
+                {miniAppInvocation.result && !miniAppInvocation.error && (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    <details className="cursor-pointer">
+                      <summary className="hover:text-foreground">查看结果</summary>
+                      <pre className="mt-2 p-2 bg-background rounded text-xs overflow-x-auto">
+                        {JSON.stringify(miniAppInvocation.result, null, 2)}
+                      </pre>
+                    </details>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 附件展示 - 在消息内容之前（包含数据库附件和流式附件） */}
-        {allAttachments.length > 0 && (
+        {attachments.length > 0 && (
           <MessageAttachments className={cn('mb-2', messageRole !== 'user' && 'ml-0')}>
-            {allAttachments.map((attachment, index) => (
+            {attachments.map((attachment, index) => (
               <MessageAttachment key={index} data={attachment} />
             ))}
           </MessageAttachments>
