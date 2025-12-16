@@ -539,7 +539,254 @@ const channel = supabase
 
 ---
 
-## 11. 获取帮助
+## 11. CLI 工具快速开始 (User Story 3)
+
+### 11.1 安装 Mango CLI
+
+```bash
+# 方式 1: 使用 npx（推荐）
+npx @mango/cli start
+
+# 方式 2: 全局安装
+npm install -g @mango/cli
+mango start
+
+# 方式 3: 下载独立可执行文件
+# 访问 GitHub Releases 下载适合您系统的版本
+```
+
+### 11.2 前置要求
+
+```bash
+# 安装 Cloudflare Tunnel
+# macOS
+brew install cloudflare/cloudflare/cloudflared
+
+# Windows
+choco install cloudflared
+
+# Linux
+wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared-linux-amd64.deb
+
+# 验证安装
+cloudflared --version
+```
+
+### 11.3 启动设备服务
+
+```bash
+# 基本启动
+mango start
+
+# 指定端口
+mango start --port 8080
+
+# 不自动打开浏览器
+mango start --ignore-open-bind-url
+
+# 使用环境变量
+export MANGO_APP_URL=https://app.mango.ai
+export SUPABASE_URL=https://your-project.supabase.co
+export SUPABASE_ANON_KEY=your-anon-key
+mango start
+```
+
+**首次运行输出示例**：
+
+```
+🥭 Mango Device Service
+
+✓ Configuration loaded
+✓ Device secret: abc123def456ghi789...
+✓ Server running on port 3000
+✓ Tunnel URL: https://random-id.trycloudflare.com
+
+✓ Device service is ready!
+
+Bind URL:
+  https://app.mango.ai/devices/bind?secret=abc123...
+
+Press Ctrl+C to stop the service
+```
+
+### 11.4 绑定设备
+
+1. CLI 启动后会自动打开浏览器
+2. 登录您的 Mango 账户
+3. 输入 `device_secret`（从控制台复制）
+4. 设置设备名称（如"工作电脑"）
+5. 点击"绑定设备"
+
+### 11.5 配置 MCP 服务
+
+**方式 1: Web 界面**
+
+1. 访问 https://app.mango.ai/devices
+2. 选择设备 → "配置 MCP 服务"
+3. 添加服务配置
+
+**方式 2: CLI 命令**
+
+```bash
+# 添加 MCP 服务
+mango config --add filesystem \
+  --command npx \
+  --args "-y @modelcontextprotocol/server-filesystem /Users/username/Documents"
+
+# 列出所有服务
+mango config --list
+
+# 删除服务
+mango config --remove filesystem
+```
+
+**方式 3: 编辑配置文件**
+
+编辑 `~/.mango/config.json`：
+
+```json
+{
+  "mcp_services": [
+    {
+      "name": "filesystem",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/username/Documents"],
+      "env": {
+        "LOG_LEVEL": "info"
+      },
+      "status": "active"
+    }
+  ]
+}
+```
+
+### 11.6 测试 MCP 服务
+
+在 Mango Web 对话中：
+
+```
+请帮我读取本地文件 /Users/username/Documents/report.txt 的内容
+```
+
+Agent 会自动调用您配置的 `filesystem` MCP 服务。
+
+### 11.7 常见 MCP 服务示例
+
+**文件系统访问**：
+```json
+{
+  "name": "filesystem",
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/username/Documents"]
+}
+```
+
+**GitHub 集成**：
+```json
+{
+  "name": "github",
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-github"],
+  "env": {
+    "GITHUB_TOKEN": "ghp_xxxxxxxxxxxx"
+  }
+}
+```
+
+**数据库访问**：
+```json
+{
+  "name": "postgres",
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-postgres"],
+  "env": {
+    "DATABASE_URL": "postgresql://user:pass@localhost:5432/mydb"
+  }
+}
+```
+
+### 11.8 CLI 故障排查
+
+**问题 1: Tunnel 创建失败**
+
+```bash
+# 检查 cloudflared 安装
+cloudflared --version
+
+# 手动测试 tunnel
+cloudflared tunnel --url http://localhost:3000
+```
+
+**问题 2: 设备绑定失败**
+
+```bash
+# 查看 device_secret
+cat ~/.mango/device_secret  # macOS/Linux
+type %USERPROFILE%\.mango\device_secret  # Windows
+```
+
+**问题 3: MCP 服务无法启动**
+
+```bash
+# 查看设备服务日志
+mango logs
+
+# 手动测试 MCP 服务
+npx -y @modelcontextprotocol/server-filesystem /Users/username/Documents
+```
+
+**问题 4: 端口被占用**
+
+```bash
+# 使用不同端口
+mango start --port 8080
+
+# 或终止占用进程
+lsof -ti:3000 | xargs kill -9  # macOS/Linux
+```
+
+### 11.9 CLI 命令参考
+
+```bash
+# 启动设备服务
+mango start [options]
+  --port <port>              指定端口（默认: 3000）
+  --ignore-open-bind-url     不自动打开绑定页面
+  --app-url <url>            Mango Web URL
+  --supabase-url <url>       Supabase URL
+  --supabase-anon-key <key>  Supabase anon key
+
+# 配置管理
+mango config --list                    列出所有 MCP 服务
+mango config --add <name> [options]    添加 MCP 服务
+mango config --remove <name>           删除 MCP 服务
+
+# 状态查询
+mango status                           查看设备服务状态
+
+# 帮助
+mango --help                           显示帮助信息
+```
+
+### 11.10 安全最佳实践
+
+- ❌ 不要将 device_secret 提交到版本控制
+- ❌ 不要在公共场合分享 device_secret
+- ✅ 限制文件系统访问到特定目录
+- ✅ 使用环境变量存储敏感信息（如 GitHub token）
+- ✅ 定期审查设备绑定和 MCP 服务配置
+
+### 11.11 更多资源
+
+- 📚 [MCP 协议文档](https://spec.modelcontextprotocol.io/)
+- 🛠️ [开发自定义 MCP 服务](https://github.com/modelcontextprotocol/servers)
+- 📖 [完整 CLI 文档](https://docs.mango.ai/cli)
+- 🐛 [报告问题](https://github.com/mango-ai/cli/issues)
+
+---
+
+## 12. 获取帮助
 
 ### 遇到问题？
 

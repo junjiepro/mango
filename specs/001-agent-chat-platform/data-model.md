@@ -874,6 +874,214 @@ CREATE INDEX idx_links_feedback ON learning_record_feedback_links(feedback_recor
 
 ---
 
+## 2.13 设备 (devices) - User Story 3
+
+**描述**：运行 CLI 工具的本地设备
+
+**表结构**：
+
+```sql
+CREATE TABLE devices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  device_id TEXT UNIQUE NOT NULL,
+  device_name TEXT,
+  platform TEXT NOT NULL CHECK (platform IN ('windows', 'macos', 'linux')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  last_seen_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_devices_device_id ON devices(device_id);
+CREATE INDEX idx_devices_last_seen ON devices(last_seen_at);
+```
+
+**字段说明**：
+- `device_id`: 设备唯一标识（基于硬件信息生成）
+- `device_name`: 用户自定义设备名称
+- `platform`: 操作系统平台
+- `last_seen_at`: 设备最后活跃时间
+
+**RLS策略**：
+
+```sql
+ALTER TABLE devices ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their bound devices"
+  ON devices FOR SELECT
+  USING (
+    id IN (
+      SELECT device_id FROM device_bindings WHERE user_id = auth.uid()
+    )
+  );
+```
+
+---
+
+## 2.14 设备绑定 (device_bindings) - User Story 3
+
+**描述**：设备与用户之间的绑定关系，支持多对多关系
+
+**表结构**：
+
+```sql
+CREATE TABLE device_bindings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  device_id UUID REFERENCES devices(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  binding_name TEXT,
+  tunnel_url TEXT NOT NULL,
+  binding_token TEXT UNIQUE NOT NULL,
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'expired')),
+  config JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ,
+  UNIQUE(device_id, user_id, binding_name)
+);
+
+CREATE INDEX idx_device_bindings_user ON device_bindings(user_id);
+CREATE INDEX idx_device_bindings_device ON device_bindings(device_id);
+CREATE INDEX idx_device_bindings_token ON device_bindings(binding_token);
+CREATE INDEX idx_device_bindings_status ON device_bindings(status);
+```
+
+**字段说明**：
+- `binding_name`: 用户自定义绑定名称（如"工作电脑"、"家用Mac"）
+- `tunnel_url`: Cloudflare Tunnel 公网 URL
+- `binding_token`: 用于 API 认证的 token（256位随机字符串）
+- `status`: 绑定状态（active/inactive/expired）
+- `config`: 绑定级别的配置数据
+
+**状态转换**：
+
+```
+┌─────────┐
+│ (创建)  │
+└────┬────┘
+     │
+     ▼
+┌─────────┐  用户停用   ┌──────────┐
+│ active  │────────────>│ inactive │
+└────┬────┘             └─────┬────┘
+     │                        │
+     │ 用户启用               │
+     │<───────────────────────┘
+     │
+     │ 过期时间到达
+     ▼
+┌──────────┐
+│ expired  │
+└──────────┘
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE device_bindings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own bindings"
+  ON device_bindings FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own bindings"
+  ON device_bindings FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own bindings"
+  ON device_bindings FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own bindings"
+  ON device_bindings FOR DELETE
+  USING (auth.uid() = user_id);
+```
+
+---
+
+## 2.15 MCP服务配置 (mcp_services) - User Story 3
+
+**描述**：配置在设备绑定下的本地 MCP 服务
+
+**表结构**：
+
+```sql
+CREATE TABLE mcp_services (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  binding_id UUID REFERENCES device_bindings(id) ON DELETE CASCADE,
+  service_name TEXT NOT NULL,
+  command TEXT NOT NULL,
+  args JSONB DEFAULT '[]',
+  env JSONB DEFAULT '{}',
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(binding_id, service_name)
+);
+
+CREATE INDEX idx_mcp_services_binding ON mcp_services(binding_id);
+CREATE INDEX idx_mcp_services_status ON mcp_services(status);
+```
+
+**字段说明**：
+- `service_name`: MCP 服务名称（唯一标识）
+- `command`: 启动命令（如 "npx"、"python"）
+- `args`: 命令参数数组
+- `env`: 环境变量键值对
+- `status`: 服务状态（active/inactive）
+
+**配置示例**：
+
+```json
+{
+  "service_name": "filesystem",
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/username/Documents"],
+  "env": {
+    "LOG_LEVEL": "info"
+  },
+  "status": "active"
+}
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE mcp_services ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own MCP services"
+  ON mcp_services FOR SELECT
+  USING (
+    binding_id IN (
+      SELECT id FROM device_bindings WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can create their own MCP services"
+  ON mcp_services FOR INSERT
+  WITH CHECK (
+    binding_id IN (
+      SELECT id FROM device_bindings WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can update their own MCP services"
+  ON mcp_services FOR UPDATE
+  USING (
+    binding_id IN (
+      SELECT id FROM device_bindings WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can delete their own MCP services"
+  ON mcp_services FOR DELETE
+  USING (
+    binding_id IN (
+      SELECT id FROM device_bindings WHERE user_id = auth.uid()
+    )
+  );
+```
+
+---
+
 ## 3. 辅助表
 
 ### 3.1 通知 (notifications)
