@@ -11,11 +11,19 @@ import { messageService } from '@/services/MessageService';
 import { taskService } from '@/services/TaskService';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { logger } from '@mango/shared/utils';
+import { createClient } from '@/lib/supabase/client';
 import type { Database } from '@/types/database.types';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
 type Task = Database['public']['Tables']['tasks']['Row'];
+
+interface TriggerConfig {
+  type: 'schedule' | 'event' | 'manual';
+  enabled: boolean;
+  eventType?: string;
+  message?: string;
+}
 
 /**
  * Conversation Context 类型
@@ -71,6 +79,128 @@ export function ConversationProvider({ children, conversationId }: ConversationP
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  // MiniApp 触发器处理器
+  const triggerMiniAppsByEvent = useCallback(
+    async (eventType: string, eventData?: Record<string, any>) => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) return;
+
+        // 获取用户所有已安装的 MiniApp
+        const { data: installations, error: installError } = await supabase
+          .from('mini_app_installations')
+          .select(`
+            id,
+            mini_app_id,
+            mini_apps (
+              id,
+              name,
+              display_name
+            )
+          `)
+          .eq('user_id', user.id)
+          .eq('status', 'active');
+
+        if (installError || !installations) {
+          logger.error('Failed to fetch mini app installations', installError);
+          return;
+        }
+
+        // 遍历所有安装,检查是否有匹配的事件触发器
+        for (const installation of installations) {
+          try {
+            // 获取触发器配置
+            const { data: triggerData } = await supabase
+              .from('mini_app_data')
+              .select('value')
+              .eq('installation_id', installation.id)
+              .eq('key', '_trigger_config')
+              .single();
+
+            if (!triggerData?.value) continue;
+
+            const triggerConfig = triggerData.value as TriggerConfig;
+
+            // 检查是否匹配事件类型
+            if (
+              triggerConfig.enabled &&
+              triggerConfig.type === 'event' &&
+              triggerConfig.eventType === eventType
+            ) {
+              // 触发 MiniApp
+              await executeMiniAppTrigger(
+                installation.id,
+                installation.mini_app_id,
+                triggerConfig,
+                eventData
+              );
+
+              logger.info('MiniApp triggered by event', {
+                miniAppId: installation.mini_app_id,
+                eventType,
+                installationId: installation.id,
+              });
+            }
+          } catch (err) {
+            logger.error('Failed to check trigger for installation', err as Error);
+          }
+        }
+      } catch (err) {
+        logger.error('Failed to trigger mini apps by event', err as Error);
+      }
+    },
+    []
+  );
+
+  // 执行 MiniApp 触发器
+  const executeMiniAppTrigger = async (
+    installationId: string,
+    miniAppId: string,
+    triggerConfig: TriggerConfig,
+    eventData?: Record<string, any>
+  ) => {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      // 创建通知
+      await supabase.from('notifications').insert({
+        user_id: user.id,
+        source_type: 'miniapp',
+        source_id: miniAppId,
+        title: triggerConfig.message || 'MiniApp Triggered',
+        body: `Event: ${triggerConfig.eventType || 'unknown'}`,
+        category: 'miniapp_trigger',
+        priority: 'normal',
+        status: 'unread',
+        metadata: {
+          installation_id: installationId,
+          trigger_type: triggerConfig.type,
+          event_data: eventData,
+        },
+      });
+
+      // 记录触发时间
+      await supabase.from('mini_app_data').upsert({
+        installation_id: installationId,
+        key: `_trigger_last_run_${triggerConfig.eventType || 'default'}`,
+        value: new Date().toISOString(),
+        value_type: 'string',
+        metadata: {
+          trigger_type: triggerConfig.type,
+          event_type: triggerConfig.eventType,
+          event_data: eventData,
+        },
+      });
+    } catch (err) {
+      logger.error('Failed to execute mini app trigger', err as Error);
+    }
+  };
+
   // 实时订阅 - 消息
   const { isConnected: isMessagesConnected } = useRealtimeSubscription<Message>(
     `conversation:${conversationId}:messages`,
@@ -86,6 +216,13 @@ export function ConversationProvider({ children, conversationId }: ConversationP
             return prev;
           }
           return [...prev, payload.new].sort((a, b) => a.sequence_number - b.sequence_number);
+        });
+
+        // 触发 MiniApp 事件触发器 (收到新消息)
+        triggerMiniAppsByEvent('message.received', {
+          messageId: payload.new.id,
+          conversationId: payload.new.conversation_id,
+          role: payload.new.role,
         });
       },
       onUpdate: (payload) => {
@@ -119,6 +256,15 @@ export function ConversationProvider({ children, conversationId }: ConversationP
       onUpdate: (payload) => {
         logger.debug('Task updated', { taskId: payload.new.id });
         setTasks((prev) => prev.map((t) => (t.id === payload.new.id ? payload.new : t)));
+
+        // 检查任务是否完成,触发 MiniApp 事件触发器
+        if (payload.new.status === 'completed' && payload.old.status !== 'completed') {
+          triggerMiniAppsByEvent('task.completed', {
+            taskId: payload.new.id,
+            conversationId: payload.new.conversation_id,
+            taskType: payload.new.task_type,
+          });
+        }
       },
     },
     !!conversationId
@@ -210,6 +356,13 @@ export function ConversationProvider({ children, conversationId }: ConversationP
         // 乐观更新 (实时订阅会处理最终状态)
         setMessages((prev) => [...prev, message]);
 
+        // 触发 MiniApp 事件触发器
+        await triggerMiniAppsByEvent('message.sent', {
+          messageId: message.id,
+          conversationId,
+          hasAttachments: !!attachments && attachments.length > 0,
+        });
+
         return message;
       } catch (err) {
         logger.error('Failed to send message', err as Error);
@@ -217,7 +370,7 @@ export function ConversationProvider({ children, conversationId }: ConversationP
         throw err;
       }
     },
-    [conversationId]
+    [conversationId, triggerMiniAppsByEvent]
   );
 
   // 加载更多消息
@@ -261,6 +414,12 @@ export function ConversationProvider({ children, conversationId }: ConversationP
         // 乐观更新
         setTasks((prev) => [task, ...prev]);
 
+        // 触发 MiniApp 事件触发器
+        await triggerMiniAppsByEvent('task.created', {
+          taskId: task.id,
+          conversationId,
+        });
+
         return task;
       } catch (err) {
         logger.error('Failed to create task', err as Error);
@@ -268,7 +427,7 @@ export function ConversationProvider({ children, conversationId }: ConversationP
         throw err;
       }
     },
-    [conversationId]
+    [conversationId, triggerMiniAppsByEvent]
   );
 
   // Context 值

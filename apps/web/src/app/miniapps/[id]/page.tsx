@@ -8,12 +8,25 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { MiniAppContainer } from '@/components/miniapp/MiniAppContainer'
+import { TriggerConfigDialog } from '@/components/miniapp/TriggerConfigDialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Bell, Settings } from 'lucide-react'
 import type { Database } from '@/types/database.types'
 
 type MiniApp = Database['public']['Tables']['mini_apps']['Row']
 type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row']
+
+interface TriggerConfig {
+  id?: string
+  type: 'schedule' | 'event' | 'manual'
+  enabled: boolean
+  interval?: number
+  cron?: string
+  eventType?: string
+  message?: string
+  metadata?: Record<string, any>
+}
 
 export default function MiniAppDetailPage() {
   const params = useParams()
@@ -24,10 +37,13 @@ export default function MiniAppDetailPage() {
   const [installation, setInstallation] = useState<MiniAppInstallation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [triggerConfig, setTriggerConfig] = useState<TriggerConfig | null>(null)
+  const [showTriggerDialog, setShowTriggerDialog] = useState(false)
 
   useEffect(() => {
     loadMiniApp()
     loadInstallation()
+    loadTriggerConfig()
   }, [miniAppId])
 
   const loadMiniApp = async () => {
@@ -58,6 +74,39 @@ export default function MiniAppDetailPage() {
       }
     } catch (error) {
       console.error('Failed to load installation:', error)
+    }
+  }
+
+  const loadTriggerConfig = async () => {
+    try {
+      const response = await fetch(`/api/miniapps/${miniAppId}/trigger`)
+      const result = await response.json()
+
+      if (result.success && result.data) {
+        setTriggerConfig(result.data)
+      }
+    } catch (error) {
+      console.error('Failed to load trigger config:', error)
+    }
+  }
+
+  const saveTriggerConfig = async (config: TriggerConfig) => {
+    try {
+      const response = await fetch(`/api/miniapps/${miniAppId}/trigger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      })
+      const result = await response.json()
+
+      if (result.success) {
+        setTriggerConfig(config)
+      } else {
+        throw new Error(result.error || 'Failed to save trigger config')
+      }
+    } catch (error) {
+      console.error('Failed to save trigger config:', error)
+      throw error
     }
   }
 
@@ -238,10 +287,63 @@ export default function MiniAppDetailPage() {
           <h1 className="text-3xl font-bold">{miniApp.display_name}</h1>
           <p className="text-muted-foreground mt-1">{miniApp.description}</p>
         </div>
-        <Button variant="outline" onClick={() => router.push('/miniapps')}>
-          Back
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* 触发器配置按钮 */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowTriggerDialog(true)}
+            className="gap-2"
+          >
+            <Bell className="h-4 w-4" />
+            {triggerConfig?.enabled ? '触发器已启用' : '配置触发器'}
+          </Button>
+          <Button variant="outline" onClick={() => router.push('/miniapps')}>
+            Back
+          </Button>
+        </div>
       </div>
+
+      {/* 触发器状态提示 */}
+      {triggerConfig?.enabled && (
+        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950">
+          <div className="flex items-start gap-3">
+            <Bell className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-medium text-blue-900 dark:text-blue-100">
+                触发器已启用
+              </h3>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                {triggerConfig.type === 'schedule' && (
+                  <>
+                    {triggerConfig.interval
+                      ? `每 ${triggerConfig.interval} 分钟触发一次`
+                      : triggerConfig.cron
+                      ? `按 Cron 表达式触发: ${triggerConfig.cron}`
+                      : '定时触发'}
+                  </>
+                )}
+                {triggerConfig.type === 'event' && (
+                  <>事件触发: {triggerConfig.eventType || '未设置'}</>
+                )}
+                {triggerConfig.type === 'manual' && <>手动触发</>}
+              </p>
+              {triggerConfig.message && (
+                <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                  消息: {triggerConfig.message}
+                </p>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowTriggerDialog(true)}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* 小应用容器 */}
       <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
@@ -253,6 +355,17 @@ export default function MiniAppDetailPage() {
           onError={handleError}
         />
       </div>
+
+      {/* 触发器配置对话框 */}
+      {installation && (
+        <TriggerConfigDialog
+          open={showTriggerDialog}
+          onOpenChange={setShowTriggerDialog}
+          installation={installation}
+          existingTrigger={triggerConfig || undefined}
+          onSave={saveTriggerConfig}
+        />
+      )}
     </div>
   )
 }

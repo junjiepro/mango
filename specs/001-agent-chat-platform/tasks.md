@@ -197,7 +197,7 @@ Based on plan.md monorepo structure:
 - [X] T094 [US2] Create Supabase Edge Function for scheduled MiniApp triggers in `supabase/functions/miniapp-scheduler/index.ts`
 - [X] T095 [US2] Implement Service Worker for MiniApp notifications in `apps/web/public/service-worker.js`
 - [X] T096 [US2] Create notification subscription logic in `apps/web/src/hooks/useNotifications.ts`
-- [ ] T097 [US2] Add MiniApp trigger configuration UI in MiniApp settings
+- [X] T097 [US2] Add MiniApp trigger configuration UI in MiniApp settings
 
 ### MiniApp Sharing
 
@@ -210,7 +210,7 @@ Based on plan.md monorepo structure:
 
 - [X] T102 [US2] Integrate MiniApp invocation in MessageInput component
 - [X] T103 [US2] Add MiniApp message rendering in MessageItem component
-- [ ] T104 [US2] Create MiniApp trigger handler in ConversationContext
+- [X] T104 [US2] Create MiniApp trigger handler in ConversationContext
 
 **Checkpoint**: User Story 2 complete - MiniApps can be created, used passively/actively, and shared
 
