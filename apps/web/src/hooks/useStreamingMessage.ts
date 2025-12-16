@@ -7,21 +7,15 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { logger } from '@mango/shared/utils';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { AttachmentWithPath } from '@/lib/storage/attachment-utils';
 
 interface StreamingMessage {
   messageId: string;
   content: string;
   isStreaming: boolean;
   isComplete: boolean;
-  files?: StreamingFile[];
+  files?: AttachmentWithPath[];
   toolCalls?: ToolCall[];
-}
-
-interface StreamingFile {
-  type: string;
-  url: string;
-  mediaType: string;
-  filename: string;
 }
 
 interface ToolCall {
@@ -41,7 +35,7 @@ interface MessageChunkPayload {
 
 interface MessageFilePayload {
   messageId: string;
-  file: StreamingFile;
+  file: AttachmentWithPath;
 }
 
 interface MessageCompletePayload {
@@ -49,7 +43,7 @@ interface MessageCompletePayload {
   fullContent: string;
   tokenCount: number;
   processingTime: number;
-  files?: StreamingFile[];
+  files?: AttachmentWithPath[];
 }
 
 interface ToolCallStartPayload {
@@ -79,7 +73,7 @@ export function useStreamingMessage(conversationId: string | null) {
 
   // 更新流式消息内容
   const updateStreamingMessage = useCallback(
-    (messageId: string, content: string, isComplete: boolean, files?: StreamingFile[]) => {
+    (messageId: string, content: string, isComplete: boolean, files?: AttachmentWithPath[]) => {
       setStreamingMessages((prev) => {
         const newMap = new Map(prev);
         const existing = newMap.get(messageId);
@@ -97,7 +91,7 @@ export function useStreamingMessage(conversationId: string | null) {
   );
 
   // 添加文件到流式消息
-  const addFileToStreamingMessage = useCallback((messageId: string, file: StreamingFile) => {
+  const addFileToStreamingMessage = useCallback((messageId: string, file: AttachmentWithPath) => {
     setStreamingMessages((prev) => {
       const newMap = new Map(prev);
       const existing = newMap.get(messageId);
@@ -219,12 +213,13 @@ export function useStreamingMessage(conversationId: string | null) {
       });
 
       // 如果是图片生成成功，自动添加到文件列表
-      if (data.status === 'success' && data.tool === 'generating_image' && data.result?.url) {
+      if (data.status === 'success' && data.tool === 'generating_image' && data.result?.name) {
         addFileToStreamingMessage(data.messageId, {
-          type: 'image/png',
+          type: data.result.type,
           url: data.result.url,
-          mediaType: 'image/png',
-          filename: data.result.filename || 'generated-image.png',
+          mediaType: data.result.type,
+          name: data.result.name || 'generated-image.png',
+          path: data.result.path,
         });
       }
     });

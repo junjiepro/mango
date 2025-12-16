@@ -533,6 +533,7 @@ async function streamAgentResponse(
                   model: finalModel,
                   name: filename,
                   path: filePath,
+                  type: 'image/png',
                 },
               },
             });
