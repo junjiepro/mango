@@ -211,59 +211,87 @@ Based on plan.md monorepo structure:
 - [X] T102 [US2] Integrate MiniApp invocation in MessageInput component
 - [X] T103 [US2] Add MiniApp message rendering in MessageItem component
 - [X] T104 [US2] Create MiniApp trigger handler in ConversationContext
+- [X] T104a [US2] Add miniAppData handling in messages API route `apps/web/src/app/api/conversations/[id]/messages/route.ts`
+- [X] T104b [US2] Implement invoke_miniapp tool in Agent Edge Function `supabase/functions/process-agent-message/index.ts`
+- [X] T104c [US2] Add MiniApp context awareness to Agent system prompt for automatic invocation
 
-**Checkpoint**: User Story 2 complete - MiniApps can be created, used passively/actively, and shared
+**Checkpoint**: User Story 2 complete - MiniApps can be created, used passively/actively, and shared, and Agent can invoke MiniApps
 
 ---
 
 ## Phase 5: User Story 3 - 通过CLI工具接入本地MCP/ACP服务 (Priority: P3)
 
-**Goal**: 技术用户通过CLI配置本地MCP/ACP服务,Agent可调用这些服务
+**Goal**: 技术用户通过CLI启动设备服务,通过Cloudflare Tunnel暴露到公网,完成设备绑定,配置本地MCP/ACP服务,Agent可调用这些服务
 
-**Independent Test**: 安装CLI,配置本地MCP服务,在对话中让Agent调用该服务
+**Independent Test**: 安装CLI,启动设备服务,完成设备绑定,配置本地MCP服务,在对话中让Agent调用该服务
+
+### Database Schema for Devices
+
+- [ ] T105 [US3] Create `devices` table migration in `supabase/migrations/20250124000015_devices.sql` (id, device_secret_hash, created_at, last_seen_at, metadata)
+- [ ] T106 [US3] Create `device_bindings` table migration in `supabase/migrations/20250124000016_device_bindings.sql` (id, device_id, user_id, tunnel_url, status, settings, created_at)
+- [ ] T107 [US3] Add RLS policies for devices and device_bindings tables
+- [ ] T108 [US3] Add indexes for device lookups and binding queries
 
 ### CLI Core Infrastructure
 
-- [ ] T105 [P] [US3] Create CLI command parser in `apps/cli/src/lib/commander.ts`
-- [ ] T106 [P] [US3] Create CLI config manager in `apps/cli/src/lib/config.ts`
-- [ ] T107 [P] [US3] Create authentication flow for CLI in `apps/cli/src/commands/auth.ts`
-- [ ] T107a [P] [US3] Implement secure token storage in `apps/cli/src/lib/token-manager.ts` (OS keychain or encrypted file)
-- [ ] T107b [P] [US3] Create API key generation endpoint in `apps/web/src/app/api/cli/api-keys/route.ts`
-- [ ] T107c [US3] Implement API key validation middleware in `apps/web/src/app/api/cli/auth/middleware.ts`
-- [ ] T107d [US3] Add token refresh mechanism in `apps/cli/src/lib/auth-refresh.ts`
-- [ ] T108 [P] [US3] Create CLI output formatter in `apps/cli/src/lib/formatter.ts`
+- [ ] T109 [P] [US3] Create CLI entry point and command parser in `apps/cli/src/index.ts` using commander.js
+- [ ] T110 [P] [US3] Create device secret generator and manager in `apps/cli/src/lib/device-secret.ts`
+- [ ] T111 [P] [US3] Create CLI config manager in `apps/cli/src/lib/config.ts` (支持命令行参数: ignore_open_bind_url, app_url, supabase_url, supabase_anon_key, device_secret)
+- [ ] T112 [P] [US3] Create CLI output formatter and logger in `apps/cli/src/lib/formatter.ts`
 
-### MCP/ACP Service Management
+### Device Service HTTP Server
 
-- [ ] T109 [P] [US3] Create service registry command in `apps/cli/src/commands/service/register.ts`
-- [ ] T110 [P] [US3] Create service list command in `apps/cli/src/commands/service/list.ts`
-- [ ] T111 [P] [US3] Create service unregister command in `apps/cli/src/commands/service/unregister.ts`
-- [ ] T112 [P] [US3] Create service status command in `apps/cli/src/commands/service/status.ts`
-- [ ] T113 [US3] Create API route for CLI service registration in `apps/web/src/app/api/cli/services/route.ts`
+- [ ] T113 [P] [US3] Create HTTP server foundation in `apps/cli/src/server/index.ts` (Express/Fastify)
+- [ ] T114 [P] [US3] Implement /health endpoint in `apps/cli/src/server/routes/health.ts`
+- [ ] T115 [P] [US3] Implement /bind endpoint in `apps/cli/src/server/routes/bind.ts` (验证 device_secret, 调用远程 API 建立绑定)
+- [ ] T116 [P] [US3] Implement /setting endpoint in `apps/cli/src/server/routes/setting.ts` (GET/POST 配置管理)
+- [ ] T117 [US3] Implement /mcp endpoint in `apps/cli/src/server/routes/mcp.ts` (streamable HTTP MCP 服务代理)
+- [ ] T118 [US3] Implement /acp endpoint in `apps/cli/src/server/routes/acp.ts` (ACP 协议服务代理)
 
-### Local Service Connectivity
+### Cloudflare Tunnel Integration
 
-- [ ] T114 [P] [US3] Create local service connector in `apps/cli/src/lib/connectors/local-connector.ts`
-- [ ] T115 [P] [US3] Create MCP stdio transport in `packages/protocols/mcp/transports/stdio.ts`
-- [ ] T116 [P] [US3] Create ACP protocol adapter in `packages/protocols/acp/adapter.ts`
-- [ ] T117 [US3] Create service health check in `apps/cli/src/lib/health-check.ts`
-- [ ] T118 [US3] Create service proxy in backend API route `apps/web/src/app/api/services/proxy/route.ts`
+- [ ] T119 [P] [US3] Create Cloudflare Tunnel manager in `apps/cli/src/lib/tunnel-manager.ts` (使用 cloudflared 或 SDK)
+- [ ] T120 [US3] Implement tunnel creation and lifecycle management in CLI startup flow
+- [ ] T121 [US3] Add tunnel URL reporting to device service and remote database
+
+### MCP/ACP Service Configuration
+
+- [ ] T122 [P] [US3] Create MCP service config schema in `apps/cli/src/types/mcp-config.ts`
+- [ ] T123 [P] [US3] Create ACP service config schema in `apps/cli/src/types/acp-config.ts`
+- [ ] T124 [P] [US3] Implement local MCP service connector in `apps/cli/src/lib/connectors/mcp-connector.ts` (支持 stdio transport)
+- [ ] T125 [P] [US3] Implement local ACP service connector in `apps/cli/src/lib/connectors/acp-connector.ts`
+- [ ] T126 [US3] Create service health check and status monitoring in `apps/cli/src/lib/health-check.ts`
+
+### Device Binding Flow (Web)
+
+- [ ] T127 [P] [US3] Create device binding API route in `apps/web/src/app/api/devices/bind/route.ts` (验证 device_secret, 创建绑定记录)
+- [ ] T128 [P] [US3] Create device binding page in `apps/web/src/app/devices/bind/page.tsx` (输入 device_secret 的 UI)
+- [ ] T129 [P] [US3] Create device list API route in `apps/web/src/app/api/devices/route.ts` (GET 用户的设备绑定列表)
+- [ ] T130 [US3] Create device management page in `apps/web/src/app/settings/devices/page.tsx` (显示绑定的设备, 在线状态, 解绑操作)
+
+### CLI Startup Flow
+
+- [ ] T131 [US3] Implement CLI startup command in `apps/cli/src/commands/start.ts` (生成 device_secret, 启动 HTTP 服务, 创建 tunnel, 打开绑定页面)
+- [ ] T132 [US3] Add browser auto-open logic for binding page (支持 --ignore-open-bind-url 参数)
+- [ ] T133 [US3] Add graceful shutdown handling for device service
+
+### Agent Integration with Device Services
+
+- [ ] T134 [US3] Create device service client in `apps/web/src/services/DeviceService.ts` (通过 tunnel URL 调用设备服务)
+- [ ] T135 [US3] Update Tool Registry to discover tools from user's bound devices
+- [ ] T136 [US3] Implement device service proxy in Agent Edge Function `supabase/functions/process-agent-message/index.ts` (调用设备的 /mcp 端点)
+- [ ] T137 [US3] Add device availability check before tool invocation
+- [ ] T138 [US3] Implement error handling for device offline/unreachable scenarios
 
 ### CLI User Experience
 
-- [ ] T119 [P] [US3] Create CLI help and documentation commands in `apps/cli/src/commands/help.ts`
-- [ ] T120 [P] [US3] Create CLI version command in `apps/cli/src/commands/version.ts`
-- [ ] T121 [P] [US3] Create CLI init wizard in `apps/cli/src/commands/init.ts`
-- [ ] T122 [US3] Package CLI as executable using pkg/ncc in `apps/cli/package.json`
-- [ ] T123 [US3] Create CLI installation and security documentation in `apps/cli/README.md` (包含API key管理和安全最佳实践)
+- [ ] T139 [P] [US3] Create CLI help command in `apps/cli/src/commands/help.ts`
+- [ ] T140 [P] [US3] Create CLI version command in `apps/cli/src/commands/version.ts`
+- [ ] T141 [P] [US3] Create CLI status command in `apps/cli/src/commands/status.ts` (显示设备服务状态, 绑定状态, 配置的服务)
+- [ ] T142 [US3] Package CLI as executable using pkg or ncc in `apps/cli/package.json`
+- [ ] T143 [US3] Create CLI installation guide and security documentation in `apps/cli/README.md` (包含 device_secret 管理和安全最佳实践)
 
-### Backend Integration
-
-- [ ] T124 [US3] Update Tool Registry to include user-registered local services
-- [ ] T125 [US3] Add service availability check in MCPService before invocation
-- [ ] T126 [US3] Create user service management UI in `apps/web/src/app/settings/services/page.tsx`
-
-**Checkpoint**: User Story 3 complete - CLI tool enables local MCP/ACP service integration
+**Checkpoint**: User Story 3 complete - CLI tool启动设备服务, 通过Cloudflare Tunnel暴露, 完成设备绑定, 配置本地MCP/ACP服务, Agent可调用这些服务
 
 ---
 
@@ -564,7 +592,7 @@ With multiple developers:
 
 ---
 
-**Total Tasks**: 217
+**Total Tasks**: 230
 
 **Task Distribution by Story**:
 
@@ -572,17 +600,17 @@ With multiple developers:
 - Foundational: 31 tasks
 - User Story 1 (P1): 35 tasks
 - User Story 2 (P2): 28 tasks
-- User Story 3 (P3): 26 tasks (原22 + 4认证任务)
+- User Story 3 (P3): 39 tasks (重新设计: 设备服务架构 + Cloudflare Tunnel + 设备绑定流程)
 - User Story 4 (P4): 20 tasks
 - User Story 5 (P5): 10 tasks
 - User Story 6 (P6): 17 tasks
-- Polish: 40 tasks (原37 + 3覆盖率验证任务)
+- Polish: 40 tasks
 
-**Parallel Opportunities**: ~125 tasks marked [P] can run concurrently within their phase
+**Parallel Opportunities**: ~140 tasks marked [P] can run concurrently within their phase
 
 **Suggested MVP Scope**: Phases 1-3 (Setup + Foundational + User Story 1) = 76 tasks (unchanged)
 
 ---
 
-**Generated**: 2025-11-25
+**Generated**: 2025-12-17
 **Based on**: spec.md, plan.md, research.md, data-model.md, contracts/
