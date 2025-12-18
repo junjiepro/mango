@@ -103,7 +103,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // 解析请求体
     const body = await request.json();
-    const { content, contentType, attachments, replyToMessageId } = body;
+    const { content, contentType, attachments, replyToMessageId, miniAppData } = body;
 
     // 验证必填字段
     if (!content || content.trim().length === 0) {
@@ -121,20 +121,33 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const sequenceNumber = (lastMessage?.sequence_number || 0) + 1;
 
+    // 准备消息数据
+    const messageData: any = {
+      conversation_id: conversationId,
+      sender_type: 'user',
+      sender_id: user.id,
+      content: content.trim(),
+      content_type: contentType || 'text/markdown',
+      attachments: attachments || [],
+      reply_to_message_id: replyToMessageId,
+      sequence_number: sequenceNumber,
+      status: 'sent',
+    };
+
+    // 如果有 MiniApp 数据,添加到 metadata
+    if (miniAppData) {
+      messageData.metadata = {
+        miniApp: {
+          miniAppId: miniAppData.miniAppId,
+          installationId: miniAppData.installationId,
+        },
+      };
+    }
+
     // 创建消息
     const { data: message, error } = await supabase
       .from('messages')
-      .insert({
-        conversation_id: conversationId,
-        sender_type: 'user',
-        sender_id: user.id,
-        content: content.trim(),
-        content_type: contentType || 'text/markdown',
-        attachments: attachments || [],
-        reply_to_message_id: replyToMessageId,
-        sequence_number: sequenceNumber,
-        status: 'sent',
-      })
+      .insert(messageData)
       .select()
       .single();
 

@@ -3,72 +3,152 @@
  * T092: Create MiniApp gallery page
  */
 
-'use client'
+'use client';
 
-import React, { useEffect, useState } from 'react'
-import { MiniAppList } from '@/components/miniapp/MiniAppList'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import type { Database } from '@/types/database.types'
+import React, { useEffect, useState } from 'react';
+import { AppHeader } from '@/components/layouts/AppHeader';
+import { MiniAppList } from '@/components/miniapp/MiniAppList';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import type { Database } from '@/types/database.types';
 
-type MiniApp = Database['public']['Tables']['mini_apps']['Row']
+type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
 
 export default function MiniAppsPage() {
-  const [miniApps, setMiniApps] = useState<MiniApp[]>([])
-  const [installedIds, setInstalledIds] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [viewMode, setViewMode] = useState<'public' | 'user'>('public')
+  const [miniApps, setMiniApps] = useState<MiniApp[]>([]);
+  const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'public' | 'installed'>('public');
+
+  // 卸载确认对话框状态
+  const [uninstallDialog, setUninstallDialog] = useState<{
+    open: boolean;
+    miniApp: MiniApp | null;
+    step: 'confirm' | 'clearData';
+  }>({
+    open: false,
+    miniApp: null,
+    step: 'confirm',
+  });
 
   // 加载小应用列表
   useEffect(() => {
-    loadMiniApps()
-    loadInstalledApps()
-  }, [viewMode, searchQuery, selectedTags])
+    loadMiniApps();
+  }, [viewMode, searchQuery, selectedTags]);
 
   const loadMiniApps = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const params = new URLSearchParams({
-        type: viewMode,
-        limit: '50',
-      })
+      if (viewMode === 'installed') {
+        // 加载用户创建的和已安装的小应用,并去重
 
-      if (searchQuery) {
-        params.append('search', searchQuery)
-      }
+        // 1. 加载用户创建的小应用
+        const createdParams = new URLSearchParams({
+          type: 'user',
+          limit: '50',
+        });
 
-      if (selectedTags.length > 0) {
-        params.append('tags', selectedTags.join(','))
-      }
+        if (searchQuery) {
+          createdParams.append('search', searchQuery);
+        }
 
-      const response = await fetch(`/api/miniapps?${params}`)
-      const result = await response.json()
+        const createdResponse = await fetch(`/api/miniapps?${createdParams}`);
+        const createdResult = await createdResponse.json();
 
-      if (result.success) {
-        setMiniApps(result.data)
+        // 2. 加载已安装的小应用
+        const installedResponse = await fetch('/api/miniapps/installations');
+        const installedResult = await installedResponse.json();
+
+        if (createdResult.success && installedResult.success) {
+          // 提取已安装的小应用信息
+          const installedApps = installedResult.data
+            .map((inst: any) => inst.mini_app)
+            .filter((app: any) => app !== null);
+
+          // 创建一个 Map 用于去重,key 是小应用 ID
+          const appsMap = new Map<string, MiniApp>();
+
+          // 先添加用户创建的小应用
+          createdResult.data.forEach((app: MiniApp) => {
+            appsMap.set(app.id, app);
+          });
+
+          // 再添加已安装的小应用(如果已存在则不覆盖)
+          installedApps.forEach((app: MiniApp) => {
+            if (!appsMap.has(app.id)) {
+              appsMap.set(app.id, app);
+            }
+          });
+
+          // 转换为数组
+          const mergedApps = Array.from(appsMap.values());
+          setMiniApps(mergedApps);
+
+          // 设置已安装的 ID 集合
+          const ids = new Set(installedResult.data.map((inst: any) => inst.mini_app_id));
+          setInstalledIds(ids);
+        }
+      } else {
+        // 加载公开的小应用
+        const params = new URLSearchParams({
+          type: 'public',
+          limit: '50',
+        });
+
+        if (searchQuery) {
+          params.append('search', searchQuery);
+        }
+
+        if (selectedTags.length > 0) {
+          params.append('tags', selectedTags.join(','));
+        }
+
+        const response = await fetch(`/api/miniapps?${params}`);
+        const result = await response.json();
+
+        if (result.success) {
+          setMiniApps(result.data);
+        }
+
+        // 同时加载已安装的ID列表
+        await loadInstalledIds();
       }
     } catch (error) {
-      console.error('Failed to load mini apps:', error)
+      console.error('Failed to load mini apps:', error);
+      toast.error('加载失败', {
+        description: '无法加载小应用列表，请稍后重试',
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const loadInstalledApps = async () => {
+  const loadInstalledIds = async () => {
     try {
-      const response = await fetch('/api/miniapps/installations')
-      const result = await response.json()
+      const response = await fetch('/api/miniapps/installations');
+      const result = await response.json();
 
       if (result.success) {
-        const ids = new Set(result.data.map((inst: any) => inst.mini_app_id))
-        setInstalledIds(ids)
+        const ids = new Set(result.data.map((inst: any) => inst.mini_app_id));
+        setInstalledIds(ids);
       }
     } catch (error) {
-      console.error('Failed to load installed apps:', error)
+      console.error('Failed to load installed apps:', error);
     }
-  }
+  };
 
   const handleInstall = async (miniApp: MiniApp, permissions: string[]) => {
     try {
@@ -76,123 +156,240 @@ export default function MiniAppsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ granted_permissions: permissions }),
-      })
+      });
 
-      const result = await response.json()
+      const result = await response.json();
 
       if (result.success) {
-        setInstalledIds((prev) => new Set(prev).add(miniApp.id))
-        alert('Mini app installed successfully!')
+        setInstalledIds((prev) => new Set(prev).add(miniApp.id));
+        toast.success('安装成功', {
+          description: `${miniApp.display_name} 已成功安装`,
+        });
       } else {
-        alert(`Failed to install: ${result.error}`)
+        toast.error('安装失败', {
+          description: result.error || '安装小应用时出现错误',
+        });
       }
     } catch (error) {
-      console.error('Failed to install mini app:', error)
-      alert('Failed to install mini app')
+      console.error('Failed to install mini app:', error);
+      toast.error('安装失败', {
+        description: '无法安装小应用，请稍后重试',
+      });
     }
-  }
+  };
 
   const handleUninstall = async (miniApp: MiniApp) => {
-    if (!confirm(`Are you sure you want to uninstall ${miniApp.display_name}?`)) {
-      return
-    }
+    // 打开卸载确认对话框
+    setUninstallDialog({
+      open: true,
+      miniApp,
+      step: 'confirm',
+    });
+  };
+
+  const confirmUninstall = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // 进入第二步：询问是否清空数据
+    setUninstallDialog((prev) => ({
+      ...prev,
+      open: true,
+      step: 'clearData',
+    }));
+  };
+
+  const executeUninstall = async (clearData: boolean) => {
+    const miniApp = uninstallDialog.miniApp;
+    if (!miniApp) return;
 
     try {
-      const response = await fetch(`/api/miniapps/${miniApp.id}/install`, {
-        method: 'DELETE',
-      })
+      const url = clearData
+        ? `/api/miniapps/${miniApp.id}/install?clearData=true`
+        : `/api/miniapps/${miniApp.id}/install`;
 
-      const result = await response.json()
+      const response = await fetch(url, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
 
       if (result.success) {
         setInstalledIds((prev) => {
-          const newSet = new Set(prev)
-          newSet.delete(miniApp.id)
-          return newSet
-        })
-        alert('Mini app uninstalled successfully!')
+          const newSet = new Set(prev);
+          newSet.delete(miniApp.id);
+          return newSet;
+        });
+
+        // 重新加载列表
+        loadMiniApps();
+
+        const message = clearData
+          ? '小应用已卸载，所有数据已清空'
+          : '小应用已卸载，数据已保留（重新安装时可恢复）';
+
+        toast.success('卸载成功', {
+          description: message,
+        });
       } else {
-        alert(`Failed to uninstall: ${result.error}`)
+        toast.error('卸载失败', {
+          description: result.error || '卸载小应用时出现错误',
+        });
       }
     } catch (error) {
-      console.error('Failed to uninstall mini app:', error)
-      alert('Failed to uninstall mini app')
+      console.error('Failed to uninstall mini app:', error);
+      toast.error('卸载失败', {
+        description: '无法卸载小应用，请稍后重试',
+      });
+    } finally {
+      // 关闭对话框
+      setUninstallDialog({
+        open: false,
+        miniApp: null,
+        step: 'confirm',
+      });
     }
-  }
+  };
 
   const handleOpen = (miniApp: MiniApp) => {
-    window.location.href = `/miniapps/${miniApp.id}`
-  }
+    window.location.href = `/miniapps/${miniApp.id}`;
+  };
 
   const handleShare = async (miniApp: MiniApp) => {
     try {
       const response = await fetch(`/api/miniapps/${miniApp.id}/share`, {
         method: 'POST',
-      })
+      });
 
-      const result = await response.json()
+      const result = await response.json();
 
       if (result.success) {
-        const shareUrl = `${window.location.origin}/miniapps/import/${result.data.shareToken}`
-        await navigator.clipboard.writeText(shareUrl)
-        alert('Share link copied to clipboard!')
+        const shareUrl = `${window.location.origin}/miniapps/import/${result.data.shareToken}`;
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('分享链接已复制', {
+          description: '分享链接已复制到剪贴板',
+        });
       } else {
-        alert(`Failed to generate share link: ${result.error}`)
+        toast.error('生成分享链接失败', {
+          description: result.error || '生成分享链接时出现错误',
+        });
       }
     } catch (error) {
-      console.error('Failed to share mini app:', error)
-      alert('Failed to share mini app')
+      console.error('Failed to share mini app:', error);
+      toast.error('分享失败', {
+        description: '无法生成分享链接，请稍后重试',
+      });
     }
-  }
+  };
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      {/* 页面标题 */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Mini Apps</h1>
-        <p className="text-muted-foreground mt-2">
-          Discover and install mini apps to enhance your experience
-        </p>
-      </div>
-
-      {/* 搜索和过滤 */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <div className="flex-1">
-          <Input
-            type="search"
-            placeholder="Search mini apps..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full"
-          />
+    <>
+      <AppHeader />
+      <div className="container mx-auto py-8 px-4">
+        {/* 页面标题 */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">Mini Apps</h1>
+          <p className="text-muted-foreground mt-2">
+            Discover and install mini apps to enhance your experience
+          </p>
         </div>
 
-        <div className="flex gap-2">
-          <Button
-            variant={viewMode === 'public' ? 'default' : 'outline'}
-            onClick={() => setViewMode('public')}
-          >
-            Discover
-          </Button>
-          <Button
-            variant={viewMode === 'user' ? 'default' : 'outline'}
-            onClick={() => setViewMode('user')}
-          >
-            My Apps
-          </Button>
+        {/* 搜索和过滤 */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex-1">
+            <Input
+              type="search"
+              placeholder="Search mini apps..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant={viewMode === 'public' ? 'default' : 'outline'}
+              onClick={() => setViewMode('public')}
+            >
+              Discover
+            </Button>
+            <Button
+              variant={viewMode === 'installed' ? 'default' : 'outline'}
+              onClick={() => setViewMode('installed')}
+            >
+              My Apps
+            </Button>
+          </div>
         </div>
+
+        {/* 小应用列表 */}
+        <MiniAppList
+          miniApps={miniApps}
+          installedIds={installedIds}
+          loading={loading}
+          onInstall={handleInstall}
+          onUninstall={handleUninstall}
+          onOpen={handleOpen}
+          onShare={handleShare}
+        />
       </div>
 
-      {/* 小应用列表 */}
-      <MiniAppList
-        miniApps={miniApps}
-        installedIds={installedIds}
-        loading={loading}
-        onInstall={handleInstall}
-        onUninstall={handleUninstall}
-        onOpen={handleOpen}
-        onShare={handleShare}
-      />
-    </div>
-  )
+      {/* 卸载确认对话框 */}
+      <AlertDialog
+        open={uninstallDialog.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setUninstallDialog({
+              open: false,
+              miniApp: null,
+              step: 'confirm',
+            });
+          }
+        }}
+      >
+        <AlertDialogContent>
+          {uninstallDialog.step === 'confirm' ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>确认卸载</AlertDialogTitle>
+                <AlertDialogDescription>
+                  确定要卸载 "{uninstallDialog.miniApp?.display_name}" 吗？
+                  <br />
+                  <br />
+                  卸载后可以重新安装，数据可以选择保留或清空。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>取消</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmUninstall}>继续</AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          ) : (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>数据处理</AlertDialogTitle>
+                <AlertDialogDescription>
+                  是否同时清空 "{uninstallDialog.miniApp?.display_name}" 的所有数据？
+                  <br />
+                  <br />
+                  <strong>清空数据：</strong>所有数据将被永久删除，无法恢复
+                  <br />
+                  <strong>保留数据：</strong>重新安装时可以恢复数据
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => executeUninstall(false)}>
+                  保留数据
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => executeUninstall(true)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  清空数据
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }

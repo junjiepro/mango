@@ -3,85 +3,75 @@
  * T073: Create login page
  */
 
-'use client'
+'use client';
 
-import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { CenteredLayout } from '@/components/layouts/MainLayout'
-import { useToast } from '@/hooks/use-toast'
-import { logger } from '@mango/shared/utils'
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { CenteredLayout } from '@/components/layouts/MainLayout';
+import { toast } from 'sonner';
+import { logger } from '@mango/shared/utils';
 
 /**
  * 登录页面
  */
 export default function LoginPage() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const supabase = createClient()
+  const router = useRouter();
+  const supabase = createClient();
 
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!email || !password) {
-      toast({
-        title: '错误',
-        description: '请输入邮箱和密码',
-        variant: 'destructive',
-      })
-      return
+      toast.error('请输入邮箱和密码');
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
-      })
+      });
 
       if (error) {
-        throw error
+        throw error;
       }
 
-      logger.info('User logged in', { userId: data.user?.id })
+      logger.info('User logged in', { userId: data.user?.id });
 
-      toast({
-        title: '登录成功',
+      toast.success('登录成功', {
         description: '欢迎回来!',
-      })
+      });
 
       // 重定向到对话列表
-      router.push('/conversations')
-      router.refresh()
+      router.push('/conversations');
+      router.refresh();
     } catch (error: any) {
-      logger.error('Login failed', error)
+      logger.error('Login failed', error);
 
-      toast({
-        title: '登录失败',
+      toast.error('登录失败', {
         description: error.message || '请检查您的邮箱和密码',
-        variant: 'destructive',
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <CenteredLayout maxWidth="sm">
       <div className="rounded-lg border bg-card p-8 shadow-lg">
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold">登录 Mango</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            使用您的账号登录
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">使用您的账号登录</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -115,21 +105,14 @@ export default function LoginPage() {
             />
           </div>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading}
-          >
+          <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? '登录中...' : '登录'}
           </Button>
         </form>
 
         <div className="mt-6 text-center text-sm">
           <span className="text-muted-foreground">还没有账号? </span>
-          <Link
-            href="/auth/signup"
-            className="font-medium text-primary hover:underline"
-          >
+          <Link href="/auth/signup" className="font-medium text-primary hover:underline">
             立即注册
           </Link>
         </div>
@@ -144,5 +127,5 @@ export default function LoginPage() {
         </div>
       </div>
     </CenteredLayout>
-  )
+  );
 }

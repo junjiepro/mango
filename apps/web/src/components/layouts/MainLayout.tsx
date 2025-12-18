@@ -3,30 +3,24 @@
  * T041: Create layout component
  */
 
-'use client'
+'use client';
 
-import React, { ReactNode } from 'react'
-import { Toaster } from '@/components/ui/toaster'
+import React, { ReactNode } from 'react';
+import { Toaster } from '@/components/ui/sonner';
 
 interface MainLayoutProps {
-  children: ReactNode
-  header?: ReactNode
-  sidebar?: ReactNode
-  footer?: ReactNode
-  className?: string
+  children: ReactNode;
+  header?: ReactNode;
+  sidebar?: ReactNode;
+  footer?: ReactNode;
+  className?: string;
 }
 
 /**
  * MainLayout 组件
  * 应用的主要布局容器,包含 header、sidebar、main content 和 footer
  */
-export function MainLayout({
-  children,
-  header,
-  sidebar,
-  footer,
-  className = '',
-}: MainLayoutProps) {
+export function MainLayout({ children, header, sidebar, footer, className = '' }: MainLayoutProps) {
   return (
     <div className={`flex min-h-screen flex-col ${className}`}>
       {/* Header */}
@@ -41,31 +35,23 @@ export function MainLayout({
         {/* Sidebar */}
         {sidebar && (
           <aside className="hidden w-64 border-r bg-muted/40 lg:block">
-            <div className="sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
-              {sidebar}
-            </div>
+            <div className="sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">{sidebar}</div>
           </aside>
         )}
 
         {/* Main Content */}
         <main className="flex-1">
-          <div className="container mx-auto p-4 md:p-6 lg:p-8">
-            {children}
-          </div>
+          <div className="container mx-auto p-4 md:p-6 lg:p-8">{children}</div>
         </main>
       </div>
 
       {/* Footer */}
-      {footer && (
-        <footer className="border-t bg-muted/40">
-          {footer}
-        </footer>
-      )}
+      {footer && <footer className="border-t bg-muted/40">{footer}</footer>}
 
       {/* Toast Notifications */}
       <Toaster />
     </div>
-  )
+  );
 }
 
 /**
@@ -78,14 +64,10 @@ export function SimpleLayout({
   className = '',
 }: Omit<MainLayoutProps, 'sidebar'>) {
   return (
-    <MainLayout
-      header={header}
-      footer={footer}
-      className={className}
-    >
+    <MainLayout header={header} footer={footer} className={className}>
       {children}
     </MainLayout>
-  )
+  );
 }
 
 /**
@@ -95,17 +77,15 @@ export function FullscreenLayout({
   children,
   className = '',
 }: {
-  children: ReactNode
-  className?: string
+  children: ReactNode;
+  className?: string;
 }) {
   return (
     <div className={`flex min-h-screen flex-col ${className}`}>
-      <main className="flex-1">
-        {children}
-      </main>
+      <main className="flex-1">{children}</main>
       <Toaster />
     </div>
-  )
+  );
 }
 
 /**
@@ -116,23 +96,21 @@ export function CenteredLayout({
   maxWidth = 'md',
   className = '',
 }: {
-  children: ReactNode
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl'
-  className?: string
+  children: ReactNode;
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+  className?: string;
 }) {
   const maxWidthClass = {
     sm: 'max-w-sm',
     md: 'max-w-md',
     lg: 'max-w-lg',
     xl: 'max-w-xl',
-  }[maxWidth]
+  }[maxWidth];
 
   return (
     <div className={`flex min-h-screen items-center justify-center bg-muted/40 p-4 ${className}`}>
-      <div className={`w-full ${maxWidthClass}`}>
-        {children}
-      </div>
+      <div className={`w-full ${maxWidthClass}`}>{children}</div>
       <Toaster />
     </div>
-  )
+  );
 }

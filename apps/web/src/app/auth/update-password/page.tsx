@@ -12,7 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CenteredLayout } from '@/components/layouts/MainLayout'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { logger } from '@mango/shared/utils'
 
 /**
@@ -20,7 +20,6 @@ import { logger } from '@mango/shared/utils'
  */
 export default function UpdatePasswordPage() {
   const router = useRouter()
-  const { toast } = useToast()
   const supabase = createClient()
 
   const [password, setPassword] = useState('')
@@ -42,10 +41,8 @@ export default function UpdatePasswordPage() {
         if (session) {
           setIsValidSession(true)
         } else {
-          toast({
-            title: '会话无效',
+          toast.error('会话无效', {
             description: '请重新请求密码重置链接',
-            variant: 'destructive',
           })
           setTimeout(() => {
             router.push('/auth/reset-password')
@@ -53,10 +50,8 @@ export default function UpdatePasswordPage() {
         }
       } catch (error: any) {
         logger.error('Session check failed', error)
-        toast({
-          title: '验证失败',
+        toast.error('验证失败', {
           description: '请重新请求密码重置链接',
-          variant: 'destructive',
         })
         setTimeout(() => {
           router.push('/auth/reset-password')
@@ -67,36 +62,24 @@ export default function UpdatePasswordPage() {
     }
 
     checkSession()
-  }, [supabase, router, toast])
+  }, [supabase, router])
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // 验证输入
     if (!password || !confirmPassword) {
-      toast({
-        title: '错误',
-        description: '请填写所有字段',
-        variant: 'destructive',
-      })
+      toast.error('请填写所有字段')
       return
     }
 
     if (password !== confirmPassword) {
-      toast({
-        title: '错误',
-        description: '两次输入的密码不一致',
-        variant: 'destructive',
-      })
+      toast.error('两次输入的密码不一致')
       return
     }
 
     if (password.length < 6) {
-      toast({
-        title: '错误',
-        description: '密码至少需要6个字符',
-        variant: 'destructive',
-      })
+      toast.error('密码至少需要6个字符')
       return
     }
 
@@ -113,8 +96,7 @@ export default function UpdatePasswordPage() {
 
       logger.info('Password updated successfully')
 
-      toast({
-        title: '密码更新成功',
+      toast.success('密码更新成功', {
         description: '您现在可以使用新密码登录',
       })
 
@@ -125,10 +107,8 @@ export default function UpdatePasswordPage() {
     } catch (error: any) {
       logger.error('Password update failed', error)
 
-      toast({
-        title: '更新失败',
+      toast.error('更新失败', {
         description: error.message || '请稍后重试',
-        variant: 'destructive',
       })
     } finally {
       setIsLoading(false)

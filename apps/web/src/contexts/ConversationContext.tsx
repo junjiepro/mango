@@ -36,7 +36,11 @@ interface ConversationContextType {
   // 消息列表
   messages: Message[];
   isLoadingMessages: boolean;
-  sendMessage: (content: string, attachments?: any[]) => Promise<Message>;
+  sendMessage: (
+    content: string,
+    attachments?: any[],
+    miniAppData?: { miniAppId: string; installationId: string }
+  ) => Promise<Message>;
   loadMoreMessages: () => Promise<void>;
   hasMoreMessages: boolean;
 
@@ -84,14 +88,17 @@ export function ConversationProvider({ children, conversationId }: ConversationP
     async (eventType: string, eventData?: Record<string, any>) => {
       try {
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
         if (!user) return;
 
         // 获取用户所有已安装的 MiniApp
         const { data: installations, error: installError } = await supabase
           .from('mini_app_installations')
-          .select(`
+          .select(
+            `
             id,
             mini_app_id,
             mini_apps (
@@ -99,7 +106,8 @@ export function ConversationProvider({ children, conversationId }: ConversationP
               name,
               display_name
             )
-          `)
+          `
+          )
           .eq('user_id', user.id)
           .eq('status', 'active');
 
@@ -163,7 +171,9 @@ export function ConversationProvider({ children, conversationId }: ConversationP
   ) => {
     try {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (!user) return;
 
@@ -341,7 +351,11 @@ export function ConversationProvider({ children, conversationId }: ConversationP
 
   // 发送消息
   const sendMessage = useCallback(
-    async (content: string, attachments?: any[]): Promise<Message> => {
+    async (
+      content: string,
+      attachments?: any[],
+      miniAppData?: { miniAppId: string; installationId: string }
+    ): Promise<Message> => {
       if (!conversationId) {
         throw new Error('No conversation selected');
       }
@@ -351,6 +365,7 @@ export function ConversationProvider({ children, conversationId }: ConversationP
           conversationId,
           content,
           attachments,
+          miniAppData,
         });
 
         // 乐观更新 (实时订阅会处理最终状态)

@@ -11,14 +11,13 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CenteredLayout } from '@/components/layouts/MainLayout'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { logger } from '@mango/shared/utils'
 
 /**
  * 忘记密码页面 - 请求重置
  */
 export default function ResetPasswordPage() {
-  const { toast } = useToast()
   const supabase = createClient()
 
   const [email, setEmail] = useState('')
@@ -29,22 +28,14 @@ export default function ResetPasswordPage() {
     e.preventDefault()
 
     if (!email) {
-      toast({
-        title: '错误',
-        description: '请输入您的邮箱地址',
-        variant: 'destructive',
-      })
+      toast.error('请输入您的邮箱地址')
       return
     }
 
     // 验证邮箱格式
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      toast({
-        title: '错误',
-        description: '请输入有效的邮箱地址',
-        variant: 'destructive',
-      })
+      toast.error('请输入有效的邮箱地址')
       return
     }
 
@@ -63,17 +54,14 @@ export default function ResetPasswordPage() {
 
       setIsEmailSent(true)
 
-      toast({
-        title: '邮件已发送',
+      toast.success('邮件已发送', {
         description: '请检查您的邮箱，点击链接重置密码',
       })
     } catch (error: any) {
       logger.error('Password reset request failed', error)
 
-      toast({
-        title: '发送失败',
+      toast.error('发送失败', {
         description: error.message || '请稍后重试',
-        variant: 'destructive',
       })
     } finally {
       setIsLoading(false)

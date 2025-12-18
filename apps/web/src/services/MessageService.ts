@@ -3,35 +3,38 @@
  * T043: Create Message service
  */
 
-import { createClient } from '@/lib/supabase/client'
-import { AppError, ErrorType } from '@mango/shared/utils'
-import type { Database } from '@/types/database.types'
+import { createClient } from '@/lib/supabase/client';
+import { AppError, ErrorType } from '@mango/shared/utils';
+import type { Database } from '@/types/database.types';
 
-type Message = Database['public']['Tables']['messages']['Row']
-type MessageInsert = Database['public']['Tables']['messages']['Insert']
+type Message = Database['public']['Tables']['messages']['Row'];
+type MessageInsert = Database['public']['Tables']['messages']['Insert'];
 
 /**
  * MessageService 类
  * 处理消息的 CRUD 操作
  */
 export class MessageService {
-  private supabase = createClient()
+  private supabase = createClient();
 
   /**
    * 发送消息
    * 通过 API 路由发送，以触发 Agent 响应
    */
   async sendMessage(data: {
-    conversationId: string
-    content: string
-    contentType?: string
-    attachments?: any[]
-    replyToMessageId?: string
+    conversationId: string;
+    content: string;
+    contentType?: string;
+    attachments?: any[];
+    miniAppData?: { miniAppId: string; installationId: string };
+    replyToMessageId?: string;
   }): Promise<Message> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
     // 通过 API 路由发送消息，以触发 Agent 响应
@@ -44,21 +47,22 @@ export class MessageService {
         content: data.content,
         contentType: data.contentType,
         attachments: data.attachments,
+        miniAppData: data.miniAppData,
         replyToMessageId: data.replyToMessageId,
       }),
-    })
+    });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       throw new AppError(
         `Failed to send message: ${errorData.error || response.statusText}`,
         ErrorType.NETWORK_ERROR,
         response.status
-      )
+      );
     }
 
-    const message = await response.json()
-    return message
+    const message = await response.json();
+    return message;
   }
 
   /**
@@ -67,85 +71,85 @@ export class MessageService {
   async getMessages(
     conversationId: string,
     options?: {
-      limit?: number
-      offset?: number
-      beforeSequence?: number
-      afterSequence?: number
+      limit?: number;
+      offset?: number;
+      beforeSequence?: number;
+      afterSequence?: number;
     }
   ): Promise<{ messages: Message[]; hasMore: boolean }> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
-    const limit = options?.limit || 50
-    const offset = options?.offset || 0
+    const limit = options?.limit || 50;
+    const offset = options?.offset || 0;
 
     let query = this.supabase
       .from('messages')
       .select('*')
       .eq('conversation_id', conversationId)
-      .order('sequence_number', { ascending: true })
+      .order('sequence_number', { ascending: true });
 
     // 支持分页和游标查询
     if (options?.beforeSequence) {
-      query = query.lt('sequence_number', options.beforeSequence)
+      query = query.lt('sequence_number', options.beforeSequence);
     }
     if (options?.afterSequence) {
-      query = query.gt('sequence_number', options.afterSequence)
+      query = query.gt('sequence_number', options.afterSequence);
     }
 
-    query = query.range(offset, offset + limit)
+    query = query.range(offset, offset + limit);
 
-    const { data: messages, error } = await query
+    const { data: messages, error } = await query;
 
     if (error) {
       throw new AppError(
         `Failed to fetch messages: ${error.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
 
     return {
       messages: messages || [],
       hasMore: (messages?.length || 0) === limit + 1,
-    }
+    };
   }
 
   /**
    * 获取单条消息
    */
   async getMessage(messageId: string): Promise<Message> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
     const { data: message, error } = await this.supabase
       .from('messages')
       .select('*')
       .eq('id', messageId)
-      .single()
+      .single();
 
     if (error) {
       if (error.code === 'PGRST116') {
-        throw new AppError(
-          'Message not found',
-          ErrorType.RESOURCE_NOT_FOUND,
-          404
-        )
+        throw new AppError('Message not found', ErrorType.RESOURCE_NOT_FOUND, 404);
       }
       throw new AppError(
         `Failed to fetch message: ${error.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
 
-    return message
+    return message;
   }
 
   /**
@@ -154,15 +158,17 @@ export class MessageService {
   async updateMessage(
     messageId: string,
     updates: {
-      content?: string
-      status?: string
-      edited_at?: string
+      content?: string;
+      status?: string;
+      edited_at?: string;
     }
   ): Promise<Message> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
     const { data: message, error } = await this.supabase
@@ -174,27 +180,29 @@ export class MessageService {
       .eq('id', messageId)
       .eq('sender_id', user.id)
       .select()
-      .single()
+      .single();
 
     if (error) {
       throw new AppError(
         `Failed to update message: ${error.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
 
-    return message
+    return message;
   }
 
   /**
    * 删除消息 (软删除)
    */
   async deleteMessage(messageId: string): Promise<void> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
     const { error } = await this.supabase
@@ -204,14 +212,14 @@ export class MessageService {
         deleted_at: new Date().toISOString(),
       })
       .eq('id', messageId)
-      .eq('sender_id', user.id)
+      .eq('sender_id', user.id);
 
     if (error) {
       throw new AppError(
         `Failed to delete message: ${error.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
   }
 
@@ -219,10 +227,10 @@ export class MessageService {
    * 创建 Agent 响应消息
    */
   async createAgentMessage(data: {
-    conversationId: string
-    content: string
-    agentMetadata?: Record<string, any>
-    replyToMessageId?: string
+    conversationId: string;
+    content: string;
+    agentMetadata?: Record<string, any>;
+    replyToMessageId?: string;
   }): Promise<Message> {
     // 获取下一个序列号
     const { data: lastMessage } = await this.supabase
@@ -231,9 +239,9 @@ export class MessageService {
       .eq('conversation_id', data.conversationId)
       .order('sequence_number', { ascending: false })
       .limit(1)
-      .single()
+      .single();
 
-    const sequenceNumber = (lastMessage?.sequence_number || 0) + 1
+    const sequenceNumber = (lastMessage?.sequence_number || 0) + 1;
 
     const messageData: MessageInsert = {
       conversation_id: data.conversationId,
@@ -245,36 +253,35 @@ export class MessageService {
       reply_to_message_id: data.replyToMessageId,
       sequence_number: sequenceNumber,
       status: 'sent',
-    }
+    };
 
     const { data: message, error } = await this.supabase
       .from('messages')
       .insert(messageData)
       .select()
-      .single()
+      .single();
 
     if (error) {
       throw new AppError(
         `Failed to create agent message: ${error.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
 
-    return message
+    return message;
   }
 
   /**
    * 搜索消息
    */
-  async searchMessages(
-    conversationId: string,
-    query: string
-  ): Promise<Message[]> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+  async searchMessages(conversationId: string, query: string): Promise<Message[]> {
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
     const { data: messages, error } = await this.supabase
@@ -286,21 +293,21 @@ export class MessageService {
         config: 'simple',
       })
       .order('sequence_number', { ascending: true })
-      .limit(50)
+      .limit(50);
 
     if (error) {
       throw new AppError(
         `Failed to search messages: ${error.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
 
-    return messages || []
+    return messages || [];
   }
 }
 
 /**
  * 导出单例实例
  */
-export const messageService = new MessageService()
+export const messageService = new MessageService();

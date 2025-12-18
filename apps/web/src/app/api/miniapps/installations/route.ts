@@ -3,10 +3,9 @@
  * 获取用户的小应用安装列表
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { miniAppInstallationService } from '@/services/MiniAppInstallationService'
-import { AppError, ErrorType } from '@mango/shared/utils'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server';
+import { AppError, ErrorType } from '@mango/shared/utils';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * GET /api/miniapps/installations
@@ -14,22 +13,25 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
-    const searchParams = request.nextUrl.searchParams
-    const status = searchParams.get('status') || 'active'
-    const limit = parseInt(searchParams.get('limit') || '50')
-    const offset = parseInt(searchParams.get('offset') || '0')
+    const searchParams = request.nextUrl.searchParams;
+    const status = searchParams.get('status') || 'active';
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const offset = parseInt(searchParams.get('offset') || '0');
 
     // 获取安装列表,同时关联小应用信息
     const { data, error, count } = await supabase
       .from('mini_app_installations')
-      .select(`
+      .select(
+        `
         *,
         mini_app:mini_apps (
           id,
@@ -41,25 +43,27 @@ export async function GET(request: NextRequest) {
           stats,
           manifest
         )
-      `, { count: 'exact' })
+      `,
+        { count: 'exact' }
+      )
       .eq('user_id', user.id)
       .eq('status', status)
       .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new AppError(
         `Failed to get installations: ${error.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
 
     return NextResponse.json({
       success: true,
       data: data || [],
       count: count || 0,
-    })
+    });
   } catch (error) {
     if (error instanceof AppError) {
       return NextResponse.json(
@@ -69,7 +73,7 @@ export async function GET(request: NextRequest) {
           type: error.type,
         },
         { status: error.statusCode }
-      )
+      );
     }
 
     return NextResponse.json(
@@ -79,6 +83,6 @@ export async function GET(request: NextRequest) {
         type: ErrorType.INTERNAL_ERROR,
       },
       { status: 500 }
-    )
+    );
   }
 }

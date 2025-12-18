@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AppHeader } from '@/components/layouts/AppHeader'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { logger } from '@mango/shared/utils'
 import type { Database } from '@/types/database.types'
 
@@ -24,7 +24,6 @@ type UserProfile = Database['public']['Tables']['user_profiles']['Row']
  */
 export default function ProfilePage() {
   const router = useRouter()
-  const { toast } = useToast()
   const supabase = createClient()
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -56,10 +55,8 @@ export default function ProfilePage() {
       }
     } catch (error) {
       logger.error('Failed to load profile', error as Error)
-      toast({
-        title: '加载失败',
+      toast.error('加载失败', {
         description: '无法加载用户配置',
-        variant: 'destructive',
       })
     } finally {
       setIsLoading(false)
@@ -85,18 +82,15 @@ export default function ProfilePage() {
         bio: bio.trim() || null,
       })
 
-      toast({
-        title: '保存成功',
+      toast.success('保存成功', {
         description: '您的配置已更新',
       })
 
       loadProfile()
     } catch (error) {
       logger.error('Failed to save profile', error as Error)
-      toast({
-        title: '保存失败',
+      toast.error('保存失败', {
         description: '无法保存配置,请稍后重试',
-        variant: 'destructive',
       })
     } finally {
       setIsSaving(false)
@@ -110,10 +104,8 @@ export default function ProfilePage() {
       router.refresh()
     } catch (error) {
       logger.error('Logout failed', error as Error)
-      toast({
-        title: '登出失败',
+      toast.error('登出失败', {
         description: '请稍后重试',
-        variant: 'destructive',
       })
     }
   }

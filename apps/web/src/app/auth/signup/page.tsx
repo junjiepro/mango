@@ -12,7 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CenteredLayout } from '@/components/layouts/MainLayout'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { logger } from '@mango/shared/utils'
 
 /**
@@ -20,7 +20,6 @@ import { logger } from '@mango/shared/utils'
  */
 export default function SignupPage() {
   const router = useRouter()
-  const { toast } = useToast()
   const supabase = createClient()
 
   const [email, setEmail] = useState('')
@@ -34,29 +33,17 @@ export default function SignupPage() {
 
     // 验证输入
     if (!email || !password || !confirmPassword) {
-      toast({
-        title: '错误',
-        description: '请填写所有必填字段',
-        variant: 'destructive',
-      })
+      toast.error('请填写所有必填字段')
       return
     }
 
     if (password !== confirmPassword) {
-      toast({
-        title: '错误',
-        description: '两次输入的密码不一致',
-        variant: 'destructive',
-      })
+      toast.error('两次输入的密码不一致')
       return
     }
 
     if (password.length < 6) {
-      toast({
-        title: '错误',
-        description: '密码至少需要6个字符',
-        variant: 'destructive',
-      })
+      toast.error('密码至少需要6个字符')
       return
     }
 
@@ -80,8 +67,7 @@ export default function SignupPage() {
 
       logger.info('User signed up', { userId: data.user?.id })
 
-      toast({
-        title: '注册成功',
+      toast.success('注册成功', {
         description: '请检查您的邮箱以验证账号',
       })
 
@@ -92,10 +78,8 @@ export default function SignupPage() {
     } catch (error: any) {
       logger.error('Signup failed', error)
 
-      toast({
-        title: '注册失败',
+      toast.error('注册失败', {
         description: error.message || '请稍后重试',
-        variant: 'destructive',
       })
     } finally {
       setIsLoading(false)

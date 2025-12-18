@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
-import "./globals.css";
+import type { Metadata } from 'next';
+import './globals.css';
+import { Toaster } from '@/components/ui/sonner';
 
 export const metadata: Metadata = {
-  title: "Mango - 智能Agent对话平台",
-  description: "支持多模态对话、后台任务执行、小应用生态的智能Agent平台",
+  title: 'Mango - 智能Agent对话平台',
+  description: '支持多模态对话、后台任务执行、小应用生态的智能Agent平台',
 };
 
 export default function RootLayout({
@@ -15,6 +16,7 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body className="antialiased">
         {children}
+        <Toaster />
       </body>
     </html>
   );

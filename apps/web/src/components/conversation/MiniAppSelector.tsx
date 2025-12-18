@@ -30,19 +30,25 @@ interface MiniAppSelectorProps {
 
 /**
  * MiniAppSelector 组件
- * 显示已安装的小应用列表供用户选择
+ * 显示已安装的小应用列表供用户选择,支持切换到应用商店
  */
 export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorProps) {
   const [open, setOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<'installed' | 'discover'>('installed')
   const [installations, setInstallations] = useState<any[]>([])
+  const [publicApps, setPublicApps] = useState<any[]>([])
+  const [installedIds, setInstalledIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     if (open) {
       loadInstallations()
+      if (viewMode === 'discover') {
+        loadPublicApps()
+      }
     }
-  }, [open])
+  }, [open, viewMode])
 
   const loadInstallations = async () => {
     setLoading(true)
@@ -52,9 +58,36 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
 
       if (result.success) {
         setInstallations(result.data)
+        const ids = new Set(result.data.map((inst: any) => inst.mini_app_id))
+        setInstalledIds(ids)
       }
     } catch (error) {
       console.error('Failed to load installations:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadPublicApps = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({
+        type: 'public',
+        limit: '50',
+      })
+
+      if (searchQuery) {
+        params.append('search', searchQuery)
+      }
+
+      const response = await fetch(`/api/miniapps?${params}`)
+      const result = await response.json()
+
+      if (result.success) {
+        setPublicApps(result.data)
+      }
+    } catch (error) {
+      console.error('Failed to load public apps:', error)
     } finally {
       setLoading(false)
     }
@@ -66,6 +99,30 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
     setSearchQuery('')
   }
 
+  const handleInstall = async (miniApp: any) => {
+    try {
+      const permissions = miniApp.manifest?.required_permissions || ['storage']
+      const response = await fetch(`/api/miniapps/${miniApp.id}/install`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ granted_permissions: permissions }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // 重新加载已安装列表
+        await loadInstallations()
+        alert('小应用安装成功!')
+      } else {
+        alert(`安装失败: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Failed to install mini app:', error)
+      alert('安装小应用失败')
+    }
+  }
+
   const filteredInstallations = installations.filter((inst) => {
     const miniApp = inst.mini_app
     if (!miniApp) return false
@@ -75,6 +132,15 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
       miniApp.display_name.toLowerCase().includes(query) ||
       miniApp.description.toLowerCase().includes(query) ||
       (miniApp.tags || []).some((tag: string) => tag.toLowerCase().includes(query))
+    )
+  })
+
+  const filteredPublicApps = publicApps.filter((app) => {
+    const query = searchQuery.toLowerCase()
+    return (
+      app.display_name.toLowerCase().includes(query) ||
+      app.description.toLowerCase().includes(query) ||
+      (app.tags || []).some((tag: string) => tag.toLowerCase().includes(query))
     )
   })
 
@@ -109,9 +175,31 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
           <DialogHeader>
             <DialogTitle>选择小应用</DialogTitle>
             <DialogDescription>
-              选择一个已安装的小应用在对话中调用
+              {viewMode === 'installed'
+                ? '选择一个已安装的小应用在对话中调用'
+                : '浏览并安装公开的小应用'}
             </DialogDescription>
           </DialogHeader>
+
+          {/* 视图切换按钮 */}
+          <div className="flex gap-2 mb-4">
+            <Button
+              variant={viewMode === 'installed' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('installed')}
+              className="flex-1"
+            >
+              已安装
+            </Button>
+            <Button
+              variant={viewMode === 'discover' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('discover')}
+              className="flex-1"
+            >
+              应用商店
+            </Button>
+          </div>
 
           {/* 搜索框 */}
           <div className="mb-4">
@@ -119,7 +207,12 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
               type="search"
               placeholder="搜索小应用..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                if (viewMode === 'discover') {
+                  loadPublicApps()
+                }
+              }}
             />
           </div>
 
@@ -140,81 +233,154 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
                   </div>
                 ))}
               </div>
-            ) : filteredInstallations.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {searchQuery ? '未找到匹配的小应用' : '暂无已安装的小应用'}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredInstallations.map((installation) => {
-                  const miniApp = installation.mini_app
-                  if (!miniApp) return null
+            ) : viewMode === 'installed' ? (
+              // 已安装视图
+              filteredInstallations.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {searchQuery ? '未找到匹配的小应用' : '暂无已安装的小应用'}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredInstallations.map((installation) => {
+                    const miniApp = installation.mini_app
+                    if (!miniApp) return null
 
-                  return (
-                    <button
-                      key={installation.id}
-                      onClick={() => handleSelect(installation)}
-                      className={cn(
-                        'w-full flex items-center gap-3 p-3 rounded-lg border',
-                        'hover:bg-accent hover:border-primary transition-colors',
-                        'text-left'
-                      )}
-                    >
-                      {miniApp.icon_url ? (
-                        <img
-                          src={miniApp.icon_url}
-                          alt={miniApp.display_name}
-                          className="h-10 w-10 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                          <svg
-                            className="h-5 w-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                            />
-                          </svg>
-                        </div>
-                      )}
-
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-sm truncate">
-                          {installation.custom_name || miniApp.display_name}
-                        </h3>
-                        <p className="text-xs text-muted-foreground line-clamp-1">
-                          {miniApp.description}
-                        </p>
-                      </div>
-
-                      <svg
-                        className="h-5 w-5 text-muted-foreground"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                    return (
+                      <button
+                        key={installation.id}
+                        onClick={() => handleSelect(installation)}
+                        className={cn(
+                          'w-full flex items-center gap-3 p-3 rounded-lg border',
+                          'hover:bg-accent hover:border-primary transition-colors',
+                          'text-left'
+                        )}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-                  )
-                })}
-              </div>
+                        {miniApp.icon_url ? (
+                          <img
+                            src={miniApp.icon_url}
+                            alt={miniApp.display_name}
+                            className="h-10 w-10 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <svg
+                              className="h-5 w-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                              />
+                            </svg>
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-sm truncate">
+                            {installation.custom_name || miniApp.display_name}
+                          </h3>
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {miniApp.description}
+                          </p>
+                        </div>
+
+                        <svg
+                          className="h-5 w-5 text-muted-foreground"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            ) : (
+              // 应用商店视图
+              filteredPublicApps.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {searchQuery ? '未找到匹配的小应用' : '暂无公开的小应用'}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredPublicApps.map((miniApp) => {
+                    const isInstalled = installedIds.has(miniApp.id)
+
+                    return (
+                      <div
+                        key={miniApp.id}
+                        className={cn(
+                          'w-full flex items-center gap-3 p-3 rounded-lg border',
+                          'text-left'
+                        )}
+                      >
+                        {miniApp.icon_url ? (
+                          <img
+                            src={miniApp.icon_url}
+                            alt={miniApp.display_name}
+                            className="h-10 w-10 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <svg
+                              className="h-5 w-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                              />
+                            </svg>
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-sm truncate">
+                            {miniApp.display_name}
+                          </h3>
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {miniApp.description}
+                          </p>
+                        </div>
+
+                        {isInstalled ? (
+                          <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded">
+                            已安装
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleInstall(miniApp)}
+                          >
+                            安装
+                          </Button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
             )}
           </div>
 
           {/* 底部提示 */}
-          {!loading && installations.length === 0 && (
+          {!loading && viewMode === 'installed' && installations.length === 0 && (
             <div className="text-center py-4 border-t">
               <p className="text-sm text-muted-foreground mb-2">
                 还没有安装任何小应用
@@ -222,12 +388,9 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setOpen(false)
-                  window.location.href = '/miniapps'
-                }}
+                onClick={() => setViewMode('discover')}
               >
-                前往小应用商店
+                浏览应用商店
               </Button>
             </div>
           )}

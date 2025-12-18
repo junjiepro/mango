@@ -145,10 +145,12 @@ pnpm format
    - 后台任务执行
    - 实时同步
 
-2. **使用和管理小应用** (P2)
+2. **使用和管理小应用** (P2) ✅ **已完成**
    - 小应用创建和安装
+   - Agent 智能调用小应用
    - 被动调用和主动触发
    - 权限管理和沙箱隔离
+   - 数据持久化存储
 
 3. **通过CLI工具接入本地MCP/ACP服务** (P3)
    - CLI工具配置
@@ -167,6 +169,124 @@ pnpm format
 6. **多语言国际化支持** (P6)
    - 中文/英文界面
    - 多语言Agent理解
+
+## MiniApp 功能
+
+### 什么是 MiniApp?
+
+MiniApp (小应用) 是 Mango 平台的可扩展功能模块,允许用户创建自定义的应用来扩展 Agent 的能力。小应用可以:
+
+- 📦 **数据管理**: 存储和管理结构化数据 (待办事项、笔记、倒计时等)
+- 🤖 **Agent 集成**: 被 Agent 智能调用,无缝融入对话流程
+- 🔔 **主动触发**: 根据时间或事件自动发送提醒
+- 🔒 **安全隔离**: 在沙箱环境中运行,确保安全性
+- 🔄 **数据持久化**: 使用 Storage API 持久化保存数据
+
+### 快速开始
+
+#### 1. 创建小应用
+
+在对话中告诉 Agent:
+
+```
+"帮我创建一个待办事项管理小应用"
+```
+
+Agent 会自动生成小应用代码并创建。
+
+#### 2. 使用小应用
+
+在消息输入框中:
+
+1. 点击小应用图标 (📦)
+2. 选择要使用的小应用
+3. 输入你的指令,例如: "添加一个待办事项:完成项目报告"
+
+Agent 会自动理解你的意图并调用小应用。
+
+### MiniApp 开发
+
+#### 代码结构
+
+每个 MiniApp 都是一段 JavaScript 代码,支持 CRUD 操作:
+
+```javascript
+// 根据 action 执行不同操作
+switch (action) {
+  case 'create':
+    // 创建数据
+    return await createItem(params);
+
+  case 'read':
+    // 读取数据
+    return await getItems(params);
+
+  case 'update':
+    // 更新数据
+    return await updateItem(params);
+
+  case 'delete':
+    // 删除数据
+    return await deleteItem(params);
+}
+```
+
+#### 可用 API
+
+**Storage API** - 数据持久化:
+
+```javascript
+// 保存数据
+await storage.set('key', value);
+
+// 读取数据
+const value = await storage.get('key');
+```
+
+**Context 变量**:
+
+```javascript
+action  // 当前操作: 'create' | 'read' | 'update' | 'delete'
+params  // 操作参数对象
+```
+
+#### 示例代码
+
+查看完整示例:
+
+- [待办事项管理器](./docs/miniapp-examples.md#待办事项管理器)
+- [笔记本](./docs/miniapp-examples.md#笔记本)
+- [倒计时提醒](./docs/miniapp-examples.md#倒计时提醒)
+- [简单计算器](./docs/miniapp-examples.md#简单计算器)
+
+### 工作原理
+
+```
+用户选择 MiniApp
+    ↓
+发送消息到 Agent
+    ↓
+Agent 识别用户意图
+    ↓
+调用 invoke_miniapp 工具
+    ↓
+在沙箱中执行 MiniApp 代码
+    ↓
+返回结果给用户
+```
+
+### 安全性
+
+- ✅ **沙箱隔离**: MiniApp 在隔离环境中运行
+- ✅ **权限控制**: 限制可访问的 API
+- ✅ **执行限制**: 最大执行时间 5 秒,内存 10MB
+- ✅ **代码审查**: 创建时进行安全检查
+
+### 更多资源
+
+- [MiniApp 示例代码](./docs/miniapp-examples.md)
+- [MiniApp 开发指南](./specs/001-agent-chat-platform/spec.md#user-story-2)
+- [API 参考文档](./specs/001-agent-chat-platform/contracts/)
 
 ## 贡献指南
 

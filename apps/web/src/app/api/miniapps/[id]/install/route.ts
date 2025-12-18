@@ -70,6 +70,10 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    // 获取查询参数
+    const searchParams = request.nextUrl.searchParams
+    const clearData = searchParams.get('clearData') === 'true'
+
     // 先获取安装记录
     const installation = await miniAppInstallationService.getInstallation(params.id)
 
@@ -77,11 +81,12 @@ export async function DELETE(
       throw new AppError('Mini app not installed', ErrorType.NOT_FOUND, 404)
     }
 
-    await miniAppInstallationService.uninstallMiniApp(installation.id)
+    await miniAppInstallationService.uninstallMiniApp(installation.id, { clearData })
 
     return NextResponse.json({
       success: true,
       message: 'Mini app uninstalled successfully',
+      dataCleared: clearData,
     })
   } catch (error) {
     if (error instanceof AppError) {
