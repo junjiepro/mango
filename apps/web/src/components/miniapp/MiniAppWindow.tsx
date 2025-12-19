@@ -4,114 +4,114 @@
  * 处理MiniApp的所有API请求
  */
 
-'use client'
+'use client';
 
-import React, { useState, useCallback } from 'react'
-import { MiniAppContainer } from './MiniAppContainer'
-import { Button } from '@/components/ui/button'
-import { X, Minimize2, Maximize2, RefreshCw } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import type { Database } from '@/types/database.types'
+import React, { useState, useCallback } from 'react';
+import { MiniAppContainer } from './MiniAppContainer';
+import { Button } from '@/components/ui/button';
+import { X, Minimize2, Maximize2, RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { Database } from '@/types/database.types';
 
-type MiniApp = Database['public']['Tables']['mini_apps']['Row']
-type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row']
+type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
+type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row'];
 
 interface SecureMessage {
-  id: string
-  type: 'REQUEST' | 'RESPONSE' | 'EVENT'
-  action: string
-  version: string
-  nonce: string
-  timestamp: number
-  payload: any
-  signature?: string
+  id: string;
+  type: 'REQUEST' | 'RESPONSE' | 'EVENT';
+  action: string;
+  version: string;
+  nonce: string;
+  timestamp: number;
+  payload: any;
+  signature?: string;
 }
 
 interface MiniAppWindowProps {
-  miniApp: MiniApp
-  installation: MiniAppInstallation
-  onClose?: () => void
-  className?: string
+  miniApp: MiniApp;
+  installation: MiniAppInstallation;
+  onClose?: () => void;
+  className?: string;
 }
 
 /**
  * MiniAppWindow 组件
  * 提供完整的MiniApp运行环境和API处理
  */
-export function MiniAppWindow({
-  miniApp,
-  installation,
-  onClose,
-  className,
-}: MiniAppWindowProps) {
-  const [isMaximized, setIsMaximized] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
-  const containerRef = React.useRef<any>(null)
+export function MiniAppWindow({ miniApp, installation, onClose, className }: MiniAppWindowProps) {
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const containerRef = React.useRef<any>(null);
 
   // 处理来自MiniApp的消息
-  const handleMessage = useCallback(async (message: SecureMessage) => {
-    console.log('Received message from MiniApp:', message)
+  const handleMessage = useCallback(
+    async (message: SecureMessage) => {
+      console.log('Received message from MiniApp:', message);
 
-    try {
-      let response: any = null
+      try {
+        let response: any = null;
 
-      // 根据action处理不同的API请求
-      switch (message.action) {
-        case 'storage.get':
-          response = await handleStorageGet(message.payload.key)
-          break
+        // 根据action处理不同的API请求
+        switch (message.action) {
+          case 'storage.get':
+            response = await handleStorageGet(message.payload.key);
+            break;
 
-        case 'storage.set':
-          response = await handleStorageSet(message.payload.key, message.payload.value)
-          break
+          case 'storage.set':
+            response = await handleStorageSet(message.payload.key, message.payload.value);
+            break;
 
-        case 'storage.remove':
-          response = await handleStorageRemove(message.payload.key)
-          break
+          case 'storage.remove':
+            response = await handleStorageRemove(message.payload.key);
+            break;
 
-        case 'notification.send':
-          response = await handleNotificationSend(
-            message.payload.title,
-            message.payload.body,
-            message.payload.options
-          )
-          break
+          case 'notification.send':
+            response = await handleNotificationSend(
+              message.payload.title,
+              message.payload.body,
+              message.payload.options
+            );
+            break;
 
-        case 'user.getInfo':
-          response = await handleGetUserInfo()
-          break
+          case 'user.getInfo':
+            response = await handleGetUserInfo();
+            break;
 
-        default:
-          console.warn('Unknown action:', message.action)
-          response = { error: 'Unknown action' }
+          default:
+            console.warn('Unknown action:', message.action);
+            response = { error: 'Unknown action' };
+        }
+
+        // 发送响应回MiniApp
+        if (containerRef.current?.sendMessage) {
+          await containerRef.current.sendMessage(message.id, 'response', {
+            id: message.id,
+            result: response,
+          });
+        }
+      } catch (error) {
+        console.error('Error handling message:', error);
       }
-
-      // 发送响应回MiniApp
-      if (containerRef.current?.sendMessage) {
-        await containerRef.current.sendMessage('response', {
-          id: message.id,
-          result: response,
-        })
-      }
-    } catch (error) {
-      console.error('Error handling message:', error)
-    }
-  }, [installation.id])
+    },
+    [installation.id]
+  );
 
   // 存储API处理
   const handleStorageGet = async (key: string) => {
     try {
-      const response = await fetch(`/api/miniapp-data?installation_id=${installation.id}&key=${key}`)
+      const response = await fetch(
+        `/api/miniapp-data?installation_id=${installation.id}&key=${key}`
+      );
       if (!response.ok) {
-        throw new Error('Failed to get data')
+        throw new Error('Failed to get data');
       }
-      const data = await response.json()
-      return data.data?.value || null
+      const data = await response.json();
+      return data.data?.value || null;
     } catch (error) {
-      console.error('Storage get error:', error)
-      return null
+      console.error('Storage get error:', error);
+      return null;
     }
-  }
+  };
 
   const handleStorageSet = async (key: string, value: any) => {
     try {
@@ -123,16 +123,16 @@ export function MiniAppWindow({
           key,
           value,
         }),
-      })
+      });
       if (!response.ok) {
-        throw new Error('Failed to set data')
+        throw new Error('Failed to set data');
       }
-      return { success: true }
+      return { success: true };
     } catch (error) {
-      console.error('Storage set error:', error)
-      return { success: false, error: (error as Error).message }
+      console.error('Storage set error:', error);
+      return { success: false, error: (error as Error).message };
     }
-  }
+  };
 
   const handleStorageRemove = async (key: string) => {
     try {
@@ -143,28 +143,28 @@ export function MiniAppWindow({
           installation_id: installation.id,
           key,
         }),
-      })
+      });
       if (!response.ok) {
-        throw new Error('Failed to remove data')
+        throw new Error('Failed to remove data');
       }
-      return { success: true }
+      return { success: true };
     } catch (error) {
-      console.error('Storage remove error:', error)
-      return { success: false, error: (error as Error).message }
+      console.error('Storage remove error:', error);
+      return { success: false, error: (error as Error).message };
     }
-  }
+  };
 
   // 通知API处理
   const handleNotificationSend = async (title: string, body: string, options?: any) => {
     try {
       // 检查浏览器通知权限
       if (!('Notification' in window)) {
-        return { success: false, error: 'Notifications not supported' }
+        return { success: false, error: 'Notifications not supported' };
       }
 
-      let permission = Notification.permission
+      let permission = Notification.permission;
       if (permission === 'default') {
-        permission = await Notification.requestPermission()
+        permission = await Notification.requestPermission();
       }
 
       if (permission === 'granted') {
@@ -172,45 +172,45 @@ export function MiniAppWindow({
           body,
           icon: miniApp.icon_url || undefined,
           ...options,
-        })
-        return { success: true }
+        });
+        return { success: true };
       } else {
-        return { success: false, error: 'Notification permission denied' }
+        return { success: false, error: 'Notification permission denied' };
       }
     } catch (error) {
-      console.error('Notification error:', error)
-      return { success: false, error: (error as Error).message }
+      console.error('Notification error:', error);
+      return { success: false, error: (error as Error).message };
     }
-  }
+  };
 
   // 用户信息API处理
   const handleGetUserInfo = async () => {
     try {
-      const response = await fetch('/api/auth/user')
+      const response = await fetch('/api/auth/user');
       if (!response.ok) {
-        throw new Error('Failed to get user info')
+        throw new Error('Failed to get user info');
       }
-      const data = await response.json()
+      const data = await response.json();
       return {
         id: data.user?.id,
         email: data.user?.email,
         // 只返回必要的用户信息，保护隐私
-      }
+      };
     } catch (error) {
-      console.error('Get user info error:', error)
-      return null
+      console.error('Get user info error:', error);
+      return null;
     }
-  }
+  };
 
   // 刷新MiniApp
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1)
-  }
+    setRefreshKey((prev) => prev + 1);
+  };
 
   // 切换最大化
   const toggleMaximize = () => {
-    setIsMaximized(prev => !prev)
-  }
+    setIsMaximized((prev) => !prev);
+  };
 
   return (
     <div
@@ -224,11 +224,7 @@ export function MiniAppWindow({
       <div className="flex items-center justify-between px-4 py-2 bg-muted border-b">
         <div className="flex items-center gap-2">
           {miniApp.icon_url && (
-            <img
-              src={miniApp.icon_url}
-              alt={miniApp.display_name}
-              className="w-5 h-5 rounded"
-            />
+            <img src={miniApp.icon_url} alt={miniApp.display_name} className="w-5 h-5 rounded" />
           )}
           <span className="font-medium text-sm">{miniApp.display_name}</span>
         </div>
@@ -250,11 +246,7 @@ export function MiniAppWindow({
             className="h-7 w-7 p-0"
             title={isMaximized ? '还原' : '最大化'}
           >
-            {isMaximized ? (
-              <Minimize2 className="h-4 w-4" />
-            ) : (
-              <Maximize2 className="h-4 w-4" />
-            )}
+            {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </Button>
           {onClose && (
             <Button
@@ -279,10 +271,10 @@ export function MiniAppWindow({
           installation={installation}
           onMessage={handleMessage}
           onError={(error) => {
-            console.error('MiniApp error:', error)
+            console.error('MiniApp error:', error);
           }}
         />
       </div>
     </div>
-  )
+  );
 }

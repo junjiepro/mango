@@ -34,240 +34,10 @@ interface MiniAppContainerProps {
 }
 
 export interface MiniAppContainerRef {
-  sendMessage: (action: string, payload: any) => Promise<any>;
+  sendMessage: (messageId: string, action: string, payload: any) => Promise<any>;
 }
 
-/**
- * MiniAppContainer 组件
- * 使用 iframe 沙箱运行小应用代码
- */
-export const MiniAppContainer = React.forwardRef<MiniAppContainerRef, MiniAppContainerProps>(
-  ({ miniApp, installation, className, onMessage, onError }, ref) => {
-    const iframeRef = useRef<HTMLIFrameElement>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const messageHandlers = useRef<Map<string, (response: any) => void>>(new Map());
-
-    // 生成随机 nonce
-    const generateNonce = () => {
-      return (
-        Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-      );
-    };
-
-    // 发送消息到 iframe
-    const sendMessage = (action: string, payload: any): Promise<any> => {
-      return new Promise((resolve, reject) => {
-        if (!iframeRef.current?.contentWindow) {
-          reject(new Error('Iframe not ready'));
-          return;
-        }
-
-        const message: SecureMessage = {
-          id: generateNonce(),
-          type: 'REQUEST',
-          action,
-          version: '1.0.0',
-          nonce: generateNonce(),
-          timestamp: Date.now(),
-          payload,
-        };
-
-        // 保存回调
-        messageHandlers.current.set(message.id, resolve);
-
-        // 设置超时
-        setTimeout(() => {
-          if (messageHandlers.current.has(message.id)) {
-            messageHandlers.current.delete(message.id);
-            reject(new Error('Message timeout'));
-          }
-        }, 30000); // 30秒超时
-
-        // 发送消息
-        iframeRef.current.contentWindow.postMessage(message, '*');
-      });
-    };
-
-    // 处理来自 iframe 的消息
-    useEffect(() => {
-      const handleMessage = (event: MessageEvent) => {
-        // 验证来源
-        if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) {
-          return;
-        }
-
-        try {
-          const message = event.data as SecureMessage;
-
-          // 验证消息格式
-          if (!message.id || !message.type || !message.action) {
-            console.warn('Invalid message format:', message);
-            return;
-          }
-
-          // 验证时间戳（防止重放攻击）
-          const now = Date.now();
-          if (Math.abs(now - message.timestamp) > 60000) {
-            // 1分钟内有效
-            console.warn('Message timestamp expired');
-            return;
-          }
-
-          // 处理响应
-          if (message.type === 'RESPONSE') {
-            const handler = messageHandlers.current.get(message.id);
-            if (handler) {
-              handler(message.payload);
-              messageHandlers.current.delete(message.id);
-            }
-          }
-
-          // 处理事件
-          if (message.type === 'EVENT') {
-            onMessage?.(message);
-          }
-        } catch (error) {
-          console.error('Error handling message:', error);
-          onError?.(error as Error);
-        }
-      };
-
-      window.addEventListener('message', handleMessage);
-      return () => window.removeEventListener('message', handleMessage);
-    }, [onMessage, onError]);
-
-    // 创建沙箱 HTML
-    const createSandboxHTML = () => {
-      const runtimeConfig = (miniApp.runtime_config as any) || {};
-      const manifest = (miniApp.manifest as any) || {};
-
-      // 如果提供了自定义 HTML，使用自定义 HTML 并注入 MiniApp API
-      if (miniApp.html) {
-        // 注入 MiniApp API 到自定义 HTML
-        const apiScript = `
-    <script>
-      // MiniApp API
-      window.MiniAppAPI = {
-        // 发送消息到父窗口
-        sendMessage: (action, payload) => {
-          return new Promise((resolve, reject) => {
-            if (!action) {
-              reject(new Error('Missing action'));
-              return;
-            }
-              
-            const messageId = Math.random().toString(36).substring(2, 15);
-            const message = {
-              id: messageId,
-              type: 'REQUEST',
-              action,
-              version: '1.0.0',
-              nonce: Math.random().toString(36).substring(2, 15),
-              timestamp: Date.now(),
-              payload,
-            };
-
-            const handleResponse = (event) => {
-              if (event.data.id === messageId && event.data.type === 'RESPONSE') {
-                window.removeEventListener('message', handleResponse);
-                resolve(event.data.payload);
-              }
-            };
-
-            window.addEventListener('message', handleResponse);
-            window.parent.postMessage(message, '*');
-
-            // 超时处理
-            setTimeout(() => {
-              window.removeEventListener('message', handleResponse);
-              reject(new Error('Request timeout'));
-            }, 30000);
-          });
-        },
-
-        // 存储 API
-        storage: {
-          get: (key) => window.MiniAppAPI.sendMessage('storage.get', { key }),
-          set: (key, value) => window.MiniAppAPI.sendMessage('storage.set', { key, value }),
-          remove: (key) => window.MiniAppAPI.sendMessage('storage.remove', { key }),
-        },
-
-        // 通知 API
-        notification: {
-          send: (title, body, options) =>
-            window.MiniAppAPI.sendMessage('notification.send', { title, body, options }),
-        },
-
-        // 用户信息 API
-        user: {
-          getInfo: () => window.MiniAppAPI.sendMessage('user.getInfo', {}),
-        },
-
-        // 调用 MiniApp 代码（类似 edge function 的 invoke_miniapp）
-        invokeMiniApp: async (action, params = {}) => {
-          try {
-            // 创建执行上下文
-            const context = {
-              action,
-              params,
-              storage: window.MiniAppAPI.storage,
-              console: window.console,
-            };
-
-            // 将 context 暴露为全局变量供用户代码访问
-            window.__miniapp_context__ = context;
-
-            // 执行用户代码（用户代码可以直接访问 action, params, storage, console）
-            const result = await (async function() {
-              const { action, params, storage, console } = window.__miniapp_context__;
-              ${miniApp.code}
-            })();
-
-            // 清理全局变量
-            delete window.__miniapp_context__;
-
-            return result;
-          } catch (error) {
-            console.error('MiniApp invocation error:', error);
-            delete window.__miniapp_context__;
-            throw error;
-          }
-        },
-      };
-
-      // 错误处理
-      window.addEventListener('error', (event) => {
-        console.error('MiniApp error:', event.error);
-        window.parent.postMessage({
-          id: 'error',
-          type: 'EVENT',
-          action: 'error',
-          version: '1.0.0',
-          nonce: Math.random().toString(36).substring(2, 15),
-          timestamp: Date.now(),
-          payload: { error: event.error?.message || 'Unknown error', stack: event.error?.stack },
-        }, '*');
-      });
-    </script>
-      `;
-
-        // 在 </head> 或 </body> 之前注入 API 脚本
-        let html = miniApp.html;
-        if (html.includes('</head>')) {
-          html = html.replace('</head>', `${apiScript}</head>`);
-        } else if (html.includes('</body>')) {
-          html = html.replace('</body>', `${apiScript}</body>`);
-        } else {
-          // 如果没有 head 或 body 标签，在末尾添加
-          html = html + apiScript;
-        }
-
-        return html;
-      }
-
-      // 默认模板（使用 code 字段）
-      return `
+const DEFAULT_HTML = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -624,86 +394,6 @@ export const MiniAppContainer = React.forwardRef<MiniAppContainerRef, MiniAppCon
   </div>
 
   <script>
-    // MiniApp API
-    const MiniAppAPI = {
-      sendMessage: (action, payload) => {
-        return new Promise((resolve, reject) => {
-          const messageId = Math.random().toString(36).substring(2, 15);
-          const message = {
-            id: messageId,
-            type: 'REQUEST',
-            action,
-            version: '1.0.0',
-            nonce: Math.random().toString(36).substring(2, 15),
-            timestamp: Date.now(),
-            payload,
-          };
-
-          const handleResponse = (event) => {
-            if (event.data.id === messageId && event.data.type === 'RESPONSE') {
-              window.removeEventListener('message', handleResponse);
-              resolve(event.data.payload);
-            }
-          };
-
-          window.addEventListener('message', handleResponse);
-          window.parent.postMessage(message, '*');
-
-          setTimeout(() => {
-            window.removeEventListener('message', handleResponse);
-            reject(new Error('Request timeout'));
-          }, 30000);
-        });
-      },
-
-      storage: {
-        get: (key) => MiniAppAPI.sendMessage('storage.get', { key }),
-        set: (key, value) => MiniAppAPI.sendMessage('storage.set', { key, value }),
-        remove: (key) => MiniAppAPI.sendMessage('storage.remove', { key }),
-      },
-
-      notification: {
-        send: (title, body, options) =>
-          MiniAppAPI.sendMessage('notification.send', { title, body, options }),
-      },
-
-      user: {
-        getInfo: () => MiniAppAPI.sendMessage('user.getInfo', {}),
-      },
-
-      // 调用 MiniApp 代码（类似 edge function 的 invoke_miniapp）
-      invokeMiniApp: async (action, params = {}) => {
-        try {
-          // 创建执行上下文
-          const context = {
-            action,
-            params,
-            storage: MiniAppAPI.storage,
-            console: window.console,
-          };
-
-          // 将 context 暴露为全局变量供用户代码访问
-          window.__miniapp_context__ = context;
-
-          // 执行用户代码（用户代码可以直接访问 action, params, storage, console）
-          // 注意：用户代码应该返回结果或使用 return 语句
-          const result = await (async function() {
-            const { action, params, storage, console } = window.__miniapp_context__;
-            ${miniApp.code}
-          })();
-
-          // 清理全局变量
-          delete window.__miniapp_context__;
-
-          return result;
-        } catch (error) {
-          console.error('MiniApp invocation error:', error);
-          delete window.__miniapp_context__;
-          throw error;
-        }
-      },
-    };
-
     // 测试函数 - 定义为全局函数
     window.showResult = function(elementId, message, isError = false) {
       const el = document.getElementById(elementId);
@@ -852,6 +542,235 @@ export const MiniAppContainer = React.forwardRef<MiniAppContainerRef, MiniAppCon
 </body>
 </html>
     `;
+
+/**
+ * MiniAppContainer 组件
+ * 使用 iframe 沙箱运行小应用代码
+ */
+export const MiniAppContainer = React.forwardRef<MiniAppContainerRef, MiniAppContainerProps>(
+  ({ miniApp, installation, className, onMessage, onError }, ref) => {
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const messageHandlers = useRef<Map<string, (response: any) => void>>(new Map());
+
+    // 生成随机 nonce
+    const generateNonce = () => {
+      return (
+        Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+      );
+    };
+
+    // 发送消息到 iframe
+    const sendMessage = (messageId: string, action: string, payload: any): Promise<any> => {
+      return new Promise((resolve, reject) => {
+        if (!iframeRef.current?.contentWindow) {
+          reject(new Error('Iframe not ready'));
+          return;
+        }
+
+        const message: SecureMessage = {
+          id: messageId,
+          type: 'RESPONSE',
+          action,
+          version: '1.0.0',
+          nonce: generateNonce(),
+          timestamp: Date.now(),
+          payload,
+        };
+
+        // 保存回调
+        messageHandlers.current.set(message.id, resolve);
+
+        // 设置超时
+        setTimeout(() => {
+          if (messageHandlers.current.has(message.id)) {
+            messageHandlers.current.delete(message.id);
+            reject(new Error('Message timeout'));
+          }
+        }, 30000); // 30秒超时
+
+        // 发送消息
+        iframeRef.current.contentWindow.postMessage(message, '*');
+      });
+    };
+
+    // 处理来自 iframe 的消息
+    useEffect(() => {
+      const handleMessage = (event: MessageEvent) => {
+        // 验证来源
+        if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) {
+          return;
+        }
+
+        try {
+          const message = event.data as SecureMessage;
+
+          // 验证消息格式
+          if (!message.id || !message.type || !message.action) {
+            console.warn('Invalid message format:', message);
+            return;
+          }
+
+          // 验证时间戳（防止重放攻击）
+          const now = Date.now();
+          if (Math.abs(now - message.timestamp) > 60000) {
+            // 1分钟内有效
+            console.warn('Message timestamp expired');
+            return;
+          }
+
+          // 处理响应
+          if (message.type === 'RESPONSE') {
+            const handler = messageHandlers.current.get(message.id);
+            if (handler) {
+              handler(message.payload);
+              messageHandlers.current.delete(message.id);
+            }
+          }
+
+          // 处理请求和事件
+          if (message.type === 'REQUEST' || message.type === 'EVENT') {
+            onMessage?.(message);
+          }
+        } catch (error) {
+          console.error('Error handling message:', error);
+          onError?.(error as Error);
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
+    }, [onMessage, onError]);
+
+    // 创建沙箱 HTML
+    const createSandboxHTML = () => {
+      const runtimeConfig = (miniApp.runtime_config as any) || {};
+      const manifest = (miniApp.manifest as any) || {};
+
+      // 注入 MiniApp API 到自定义 HTML
+      const apiScript = `
+    <script>
+      // MiniApp API
+      window.MiniAppAPI = {
+        // 发送消息到父窗口
+        sendMessage: (action, payload) => {
+          return new Promise((resolve, reject) => {
+            if (!action) {
+              reject(new Error('Missing action'));
+              return;
+            }
+              
+            const messageId = Math.random().toString(36).substring(2, 15);
+            const message = {
+              id: messageId,
+              type: 'REQUEST',
+              action,
+              version: '1.0.0',
+              nonce: Math.random().toString(36).substring(2, 15),
+              timestamp: Date.now(),
+              payload,
+            };
+
+            const handleResponse = (event) => {
+              if (event.data.id === messageId && event.data.type === 'RESPONSE') {
+                window.removeEventListener('message', handleResponse);
+                window.parent.postMessage(event.data, '*');
+                resolve(event.data.payload);
+              }
+            };
+
+            window.addEventListener('message', handleResponse);
+            window.parent.postMessage(message, '*');
+
+            // 超时处理
+            setTimeout(() => {
+              window.removeEventListener('message', handleResponse);
+              reject(new Error('Request timeout'));
+            }, 30000);
+          });
+        },
+
+        // 存储 API
+        storage: {
+          get: (key) => window.MiniAppAPI.sendMessage('storage.get', { key }),
+          set: (key, value) => window.MiniAppAPI.sendMessage('storage.set', { key, value }),
+          remove: (key) => window.MiniAppAPI.sendMessage('storage.remove', { key }),
+        },
+
+        // 通知 API
+        notification: {
+          send: (title, body, options) =>
+            window.MiniAppAPI.sendMessage('notification.send', { title, body, options }),
+        },
+
+        // 用户信息 API
+        user: {
+          getInfo: () => window.MiniAppAPI.sendMessage('user.getInfo', {}),
+        },
+
+        // 调用 MiniApp 代码（类似 edge function 的 invoke_miniapp）
+        invokeMiniApp: async (action, params = {}) => {
+          try {
+            // 创建执行上下文
+            const context = {
+              action,
+              params,
+              storage: window.MiniAppAPI.storage,
+              console: window.console,
+            };
+
+            // 将 context 暴露为全局变量供用户代码访问
+            window.__miniapp_context__ = context;
+
+            // 执行用户代码（用户代码可以直接访问 action, params, storage, console）
+            const result = await (async function() {
+              const { action, params, storage, console } = window.__miniapp_context__;
+              ${miniApp.code}
+            })();
+
+            // 清理全局变量
+            delete window.__miniapp_context__;
+
+            return result;
+          } catch (error) {
+            console.error('MiniApp invocation error:', error);
+            delete window.__miniapp_context__;
+            throw error;
+          }
+        },
+      };
+
+      // 错误处理
+      window.addEventListener('error', (event) => {
+        console.error('MiniApp error:', event.error);
+        window.parent.postMessage({
+          id: 'error',
+          type: 'EVENT',
+          action: 'error',
+          version: '1.0.0',
+          nonce: Math.random().toString(36).substring(2, 15),
+          timestamp: Date.now(),
+          payload: { error: event.error?.message || 'Unknown error', stack: event.error?.stack },
+        }, '*');
+      });
+    </script>
+      `;
+
+      // 如果提供了自定义 HTML，使用自定义 HTML 并注入 MiniApp API
+      const htmlContent = miniApp.html || DEFAULT_HTML;
+      // 在 </head> 或 </body> 之前注入 API 脚本
+      let html = htmlContent;
+      if (html.includes('</head>')) {
+        html = html.replace('</head>', `${apiScript}</head>`);
+      } else if (html.includes('</body>')) {
+        html = html.replace('</body>', `${apiScript}</body>`);
+      } else {
+        // 如果没有 head 或 body 标签，在末尾添加
+        html = html + apiScript;
+      }
+
+      return html;
     };
 
     // 加载小应用
