@@ -26,8 +26,11 @@ import {
 import { logger } from '@mango/shared/utils';
 import { cn } from '@/lib/utils';
 import { HtmlContentRenderer, isHtmlContent, parseContentSegments } from './HtmlContentRenderer';
+import { MiniAppReference } from './MiniAppReference';
 
 type MessageType = Database['public']['Tables']['messages']['Row'];
+type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
+type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row'];
 
 interface ToolCall {
   tool: string;
@@ -48,6 +51,7 @@ interface MiniAppInvocation {
 
 interface MessageItemProps {
   message: MessageType;
+  installations?: any[];
   showSender?: boolean;
   showActions?: boolean;
   onCopy?: (content: string) => void;
@@ -60,6 +64,8 @@ interface MessageItemProps {
   toolCalls?: ToolCall[];
   // 小应用调用支持
   miniAppInvocation?: MiniAppInvocation;
+  // MiniApp 引用支持
+  onOpenMiniApp?: (miniApp: MiniApp, installation: MiniAppInstallation) => void;
 }
 
 /**
@@ -68,6 +74,7 @@ interface MessageItemProps {
  */
 export function MessageItem({
   message,
+  installations,
   showSender = true,
   showActions = true,
   onCopy,
@@ -78,6 +85,7 @@ export function MessageItem({
   streamingFiles = [],
   toolCalls = [],
   miniAppInvocation,
+  onOpenMiniApp,
 }: MessageItemProps) {
   const isUser = message.sender_type === 'user';
   const isAgent = message.sender_type === 'agent';
@@ -86,6 +94,19 @@ export function MessageItem({
 
   // 确定消息角色
   const messageRole = isUser ? 'user' : 'assistant';
+
+  // 从 metadata 中提取 MiniApp 引用
+  const miniAppReferences = useMemo(() => {
+    const metadata = message.metadata as any;
+    if (!metadata || !metadata.miniApp) {
+      return [];
+    }
+    return (
+      installations
+        ?.filter((install) => install.id === metadata.miniApp.installationId)
+        ?.map((install) => ({ miniApp: install.mini_app, installation: install })) || []
+    );
+  }, [message.metadata, installations]);
 
   // 状态：刷新后的附件
   const [refreshedAttachments, setRefreshedAttachments] = useState<any[]>([]);
@@ -478,6 +499,25 @@ export function MessageItem({
           </div>
         )}
       </Message>
+
+      {/* MiniApp 引用显示 - 在消息外部 */}
+      {miniAppReferences.length > 0 && (
+        <div
+          className={cn(
+            'mt-2 space-y-2 w-fit',
+            messageRole === 'user' ? 'ml-auto max-w-[80%]' : 'mr-auto max-w-[80%]'
+          )}
+        >
+          {miniAppReferences.map((ref: any, index: number) => (
+            <MiniAppReference
+              key={index}
+              miniApp={ref.miniApp}
+              installation={ref.installation}
+              onOpen={onOpenMiniApp}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { use } from 'react';
+import React, { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConversationProvider, useConversation } from '@/contexts/ConversationContext';
 import { MessageList } from '@/components/conversation/MessageList';
@@ -14,6 +14,14 @@ import { TaskProgressIndicator } from '@/components/task/TaskProgressIndicator';
 import { AppHeader } from '@/components/layouts/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { MiniAppWindow } from '@/components/miniapp/MiniAppWindow';
+import { MiniAppQuickAccess } from '@/components/conversation/MiniAppQuickAccess';
+import { Package } from 'lucide-react';
+import type { Database } from '@/types/database.types';
+
+type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
+type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row'];
 
 /**
  * 对话详情内容组件
@@ -32,6 +40,55 @@ function ConversationDetailContent() {
   } = useConversation();
 
   const router = useRouter();
+  const [miniAppDialogOpen, setMiniAppDialogOpen] = useState(false);
+  const [selectedMiniApp, setSelectedMiniApp] = useState<{
+    miniApp: MiniApp;
+    installation: MiniAppInstallation;
+  } | null>(null);
+  const [installations, setInstallations] = useState<any[]>([]);
+  const [loadingInstallations, setLoadingInstallations] = useState(false);
+  const [showQuickAccess, setShowQuickAccess] = useState(true);
+
+  // 加载已安装的 MiniApp
+  const loadInstallations = async () => {
+    setLoadingInstallations(true);
+    try {
+      const response = await fetch('/api/miniapps/installations');
+      const result = await response.json();
+
+      if (result.success) {
+        setInstallations(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to load installations:', error);
+    } finally {
+      setLoadingInstallations(false);
+    }
+  };
+
+  // 打开 MiniApp 选择器
+  const handleOpenMiniAppSelector = () => {
+    loadInstallations();
+    setMiniAppDialogOpen(true);
+  };
+
+  // 选择 MiniApp
+  const handleSelectMiniApp = (installation: any) => {
+    setSelectedMiniApp({
+      miniApp: installation.mini_app,
+      installation: installation,
+    });
+    setMiniAppDialogOpen(false);
+  };
+
+  // 打开 MiniApp（从消息或快速访问栏）
+  const handleOpenMiniApp = (miniApp: MiniApp, installation: MiniAppInstallation) => {
+    setSelectedMiniApp({ miniApp, installation });
+  };
+
+  React.useEffect(() => {
+    loadInstallations();
+  }, []);
 
   if (error) {
     return (
@@ -74,6 +131,17 @@ function ConversationDetailContent() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* MiniApp 按钮 */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenMiniAppSelector}
+              className="gap-2"
+            >
+              <Package className="h-4 w-4" />
+              小应用
+            </Button>
+
             {/* 实时连接状态 */}
             <div className="flex items-center gap-2 text-xs">
               <div
@@ -96,9 +164,11 @@ function ConversationDetailContent() {
           <MessageList
             conversationId={currentConversation.id}
             messages={messages}
+            installations={installations}
             isLoading={isLoadingMessages}
             hasMore={hasMoreMessages}
             onLoadMore={loadMoreMessages}
+            onOpenMiniApp={handleOpenMiniApp}
             className="flex-1"
           />
 
@@ -109,6 +179,15 @@ function ConversationDetailContent() {
                 onSendMessage={sendMessage}
                 placeholder="输入消息... (Ctrl+Enter 发送)"
               />
+              {/* MiniApp 快速访问栏 */}
+              {showQuickAccess && (
+                <MiniAppQuickAccess
+                  messages={messages}
+                  installations={installations}
+                  onOpenMiniApp={handleOpenMiniApp}
+                  onClose={() => setShowQuickAccess(false)}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -141,6 +220,91 @@ function ConversationDetailContent() {
           </div>
         )}
       </div>
+
+      {/* MiniApp 选择器弹窗 */}
+      <Dialog open={miniAppDialogOpen} onOpenChange={setMiniAppDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>选择小应用</DialogTitle>
+          </DialogHeader>
+
+          <div className="max-h-[400px] overflow-y-auto">
+            {loadingInstallations ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 p-3 rounded-lg border animate-pulse"
+                  >
+                    <div className="h-10 w-10 rounded-lg bg-muted" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-muted rounded w-32" />
+                      <div className="h-3 bg-muted rounded w-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : installations.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="mb-4">暂无已安装的小应用</p>
+                <Button variant="outline" size="sm" onClick={() => router.push('/miniapps')}>
+                  前往应用商店
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {installations.map((installation) => {
+                  const miniApp = installation.mini_app;
+                  if (!miniApp) return null;
+
+                  return (
+                    <button
+                      key={installation.id}
+                      onClick={() => handleSelectMiniApp(installation)}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent hover:border-primary transition-colors text-left"
+                    >
+                      {miniApp.icon_url ? (
+                        <img
+                          src={miniApp.icon_url}
+                          alt={miniApp.display_name}
+                          className="h-10 w-10 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Package className="h-5 w-5" />
+                        </div>
+                      )}
+
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm truncate">
+                          {installation.custom_name || miniApp.display_name}
+                        </h3>
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                          {miniApp.description}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* MiniApp 窗口弹窗 */}
+      {selectedMiniApp && (
+        <Dialog open={!!selectedMiniApp} onOpenChange={(open) => !open && setSelectedMiniApp(null)}>
+          <DialogContent className="sm:max-w-[900px] max-h-[80vh] p-0">
+            <MiniAppWindow
+              miniApp={selectedMiniApp.miniApp}
+              installation={selectedMiniApp.installation}
+              onClose={() => setSelectedMiniApp(null)}
+              className="h-[70vh]"
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

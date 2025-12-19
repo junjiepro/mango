@@ -39,6 +39,8 @@ export async function GET(request: NextRequest) {
           display_name,
           description,
           icon_url,
+          html,
+          code,
           tags,
           stats,
           manifest

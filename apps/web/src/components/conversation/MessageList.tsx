@@ -22,12 +22,17 @@ import { cn } from '@/lib/utils';
 
 type Message = Database['public']['Tables']['messages']['Row'];
 
+type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
+type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row'];
+
 interface MessageListProps {
   conversationId: string | null;
   messages: Message[];
+  installations?: any[];
   isLoading?: boolean;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  onOpenMiniApp?: (miniApp: MiniApp, installation: MiniAppInstallation) => void;
   className?: string;
 }
 
@@ -38,9 +43,11 @@ interface MessageListProps {
 export function MessageList({
   conversationId,
   messages: initialMessages,
+  installations,
   isLoading = false,
   hasMore = false,
   onLoadMore,
+  onOpenMiniApp,
   className = '',
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -156,11 +163,13 @@ export function MessageList({
             <MessageItem
               key={message.id}
               message={message}
+              installations={installations}
               showSender={showSender}
               streamingContent={streamingContent}
               isStreaming={isStreaming}
               streamingFiles={streamingFiles}
               toolCalls={toolCalls}
+              onOpenMiniApp={onOpenMiniApp}
             />
           );
         })}

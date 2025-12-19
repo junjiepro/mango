@@ -39,81 +39,78 @@ interface MiniAppWindowProps {
  * 提供完整的MiniApp运行环境和API处理
  */
 export function MiniAppWindow({ miniApp, installation, onClose, className }: MiniAppWindowProps) {
-  const [isMaximized, setIsMaximized] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const containerRef = React.useRef<any>(null);
 
   // 处理来自MiniApp的消息
-  const handleMessage = useCallback(
-    async (message: SecureMessage) => {
-      console.log('Received message from MiniApp:', message);
+  const handleMessage = async (message: any) => {
+    try {
+      let result: any = null;
 
-      try {
-        let response: any = null;
-
-        // 根据action处理不同的API请求
-        switch (message.action) {
-          case 'storage.get':
-            response = await handleStorageGet(message.payload.key);
-            break;
-
-          case 'storage.set':
-            response = await handleStorageSet(message.payload.key, message.payload.value);
-            break;
-
-          case 'storage.remove':
-            response = await handleStorageRemove(message.payload.key);
-            break;
-
-          case 'notification.send':
-            response = await handleNotificationSend(
-              message.payload.title,
-              message.payload.body,
-              message.payload.options
-            );
-            break;
-
-          case 'user.getInfo':
-            response = await handleGetUserInfo();
-            break;
-
-          default:
-            console.warn('Unknown action:', message.action);
-            response = { error: 'Unknown action' };
-        }
-
-        // 发送响应回MiniApp
-        if (containerRef.current?.sendMessage) {
-          await containerRef.current.sendMessage(message.id, 'response', {
-            id: message.id,
-            result: response,
-          });
-        }
-      } catch (error) {
-        console.error('Error handling message:', error);
+      // 处理不同的消息类型
+      switch (message.action) {
+        case 'storage.get':
+          result = await handleStorageGet(message.payload.key);
+          break;
+        case 'storage.set':
+          result = await handleStorageSet(message.payload.key, message.payload.value);
+          break;
+        case 'storage.remove':
+          result = await handleStorageRemove(message.payload.key);
+          break;
+        case 'notification.send':
+          result = await handleNotificationSend(message.payload);
+          break;
+        case 'user.getInfo':
+          result = await handleGetUserInfo();
+          break;
+        default:
+          console.warn('Unknown message action:', message.action);
+          result = { error: 'Unknown action' };
       }
-    },
-    [installation.id]
-  );
 
-  // 存储API处理
+      // 通过 ref 发送响应回 iframe
+      if (containerRef.current && message.id) {
+        await containerRef.current.sendMessage(message.id, 'response', {
+          id: message.id,
+          result,
+        });
+      }
+    } catch (error) {
+      console.error('Error handling message:', error);
+
+      // 发送错误响应
+      if (containerRef.current && message.id) {
+        await containerRef.current.sendMessage(message.id, 'response', {
+          id: message.id,
+          error: (error as Error).message,
+        });
+      }
+    }
+  };
+
   const handleStorageGet = async (key: string) => {
+    if (!installation) return null;
+
     try {
       const response = await fetch(
         `/api/miniapp-data?installation_id=${installation.id}&key=${key}`
       );
-      if (!response.ok) {
-        throw new Error('Failed to get data');
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        return result.data.value;
       }
-      const data = await response.json();
-      return data.data?.value || null;
+      return null;
     } catch (error) {
-      console.error('Storage get error:', error);
+      console.error('Failed to get storage:', error);
       return null;
     }
   };
 
   const handleStorageSet = async (key: string, value: any) => {
+    if (!installation) return false;
+
     try {
       const response = await fetch('/api/miniapp-data', {
         method: 'POST',
@@ -124,80 +121,72 @@ export function MiniAppWindow({ miniApp, installation, onClose, className }: Min
           value,
         }),
       });
-      if (!response.ok) {
-        throw new Error('Failed to set data');
-      }
-      return { success: true };
+      const result = await response.json();
+
+      return result.success;
     } catch (error) {
-      console.error('Storage set error:', error);
-      return { success: false, error: (error as Error).message };
+      console.error('Failed to set storage:', error);
+      return false;
     }
   };
 
   const handleStorageRemove = async (key: string) => {
+    if (!installation) return false;
+
     try {
-      const response = await fetch('/api/miniapp-data', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          installation_id: installation.id,
-          key,
-        }),
+      const response = await fetch(
+        `/api/miniapp-data?installation_id=${installation.id}&key=${key}`,
+        { method: 'DELETE' }
+      );
+      const result = await response.json();
+
+      return result.success;
+    } catch (error) {
+      console.error('Failed to remove storage:', error);
+      return false;
+    }
+  };
+
+  const handleNotificationSend = async (payload: any) => {
+    // 检查权限
+    if (!installation?.granted_permissions?.includes('system:notification')) {
+      console.warn('Notification permission not granted');
+      return false;
+    }
+
+    // 发送浏览器通知
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(payload.title, {
+        body: payload.body,
+        ...payload.options,
       });
-      if (!response.ok) {
-        throw new Error('Failed to remove data');
-      }
-      return { success: true };
-    } catch (error) {
-      console.error('Storage remove error:', error);
-      return { success: false, error: (error as Error).message };
+      return true;
     }
+
+    return false;
   };
 
-  // 通知API处理
-  const handleNotificationSend = async (title: string, body: string, options?: any) => {
-    try {
-      // 检查浏览器通知权限
-      if (!('Notification' in window)) {
-        return { success: false, error: 'Notifications not supported' };
-      }
-
-      let permission = Notification.permission;
-      if (permission === 'default') {
-        permission = await Notification.requestPermission();
-      }
-
-      if (permission === 'granted') {
-        new Notification(title, {
-          body,
-          icon: miniApp.icon_url || undefined,
-          ...options,
-        });
-        return { success: true };
-      } else {
-        return { success: false, error: 'Notification permission denied' };
-      }
-    } catch (error) {
-      console.error('Notification error:', error);
-      return { success: false, error: (error as Error).message };
-    }
-  };
-
-  // 用户信息API处理
   const handleGetUserInfo = async () => {
+    // 检查权限
+    if (!installation?.granted_permissions?.includes('user:read')) {
+      console.warn('User read permission not granted');
+      return null;
+    }
+
     try {
-      const response = await fetch('/api/auth/user');
-      if (!response.ok) {
-        throw new Error('Failed to get user info');
+      const response = await fetch('/api/profile');
+      const result = await response.json();
+
+      if (result.success) {
+        return {
+          id: result.data.id,
+          display_name: result.data.display_name,
+          avatar_url: result.data.avatar_url,
+        };
       }
-      const data = await response.json();
-      return {
-        id: data.user?.id,
-        email: data.user?.email,
-        // 只返回必要的用户信息，保护隐私
-      };
+      return null;
     } catch (error) {
-      console.error('Get user info error:', error);
+      console.error('Failed to get user info:', error);
       return null;
     }
   };
@@ -207,16 +196,11 @@ export function MiniAppWindow({ miniApp, installation, onClose, className }: Min
     setRefreshKey((prev) => prev + 1);
   };
 
-  // 切换最大化
-  const toggleMaximize = () => {
-    setIsMaximized((prev) => !prev);
-  };
-
   return (
     <div
       className={cn(
         'flex flex-col bg-background border rounded-lg shadow-lg overflow-hidden',
-        isMaximized ? 'fixed inset-4 z-50' : 'w-full h-[600px]',
+        'w-full h-[600px]',
         className
       )}
     >
@@ -234,31 +218,11 @@ export function MiniAppWindow({ miniApp, installation, onClose, className }: Min
             size="sm"
             variant="ghost"
             onClick={handleRefresh}
-            className="h-7 w-7 p-0"
+            className="h-7 w-7 p-0 mr-6"
             title="刷新"
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={toggleMaximize}
-            className="h-7 w-7 p-0"
-            title={isMaximized ? '还原' : '最大化'}
-          >
-            {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          </Button>
-          {onClose && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onClose}
-              className="h-7 w-7 p-0"
-              title="关闭"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
         </div>
       </div>
 

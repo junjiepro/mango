@@ -113,8 +113,6 @@ export default function MiniAppDetailPage() {
   };
 
   const handleMessage = async (message: any) => {
-    console.log('Received message from mini app:', message);
-
     try {
       let result: any = null;
 

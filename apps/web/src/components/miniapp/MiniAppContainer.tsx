@@ -257,6 +257,7 @@ const DEFAULT_HTML = `
 
     #app {
       margin-top: 24px;
+      margin-bottom: 24px;
       padding: 20px;
       background: hsl(48, 100%, 97%);
       border: 2px dashed var(--mango-orange);
@@ -313,6 +314,26 @@ const DEFAULT_HTML = `
     </div>
 
     <div class="content">
+      <!-- 用户代码区域 -->
+      <div class="section">
+        <h2>用户代码 <span class="badge">Custom Code</span></h2>
+        <div class="api-item">
+          <h3>▶️ 运行自定义代码</h3>
+          <p style="font-size: 13px; color: var(--mango-gray-600); margin-bottom: 12px;">
+            指定操作类型（action）和参数（params）来执行您的代码
+          </p>
+          <div class="input-group">
+            <input type="text" id="codeAction" placeholder="操作类型 (action)" value="execute" style="flex: 0 0 150px;">
+            <textarea id="codeParams" placeholder='参数 (JSON格式，例如: {"name": "test", "value": 123})' rows="3">{}</textarea>
+          </div>
+          <button onclick="runUserCode()">运行代码</button>
+          <div id="codeResult" class="result"></div>
+        </div>
+      </div>
+
+      <!-- 代码输出区域 -->
+      <div id="app"></div>
+
       <!-- 存储 API -->
       <div class="section">
         <h2>存储 API <span class="badge">Storage</span></h2>
@@ -370,26 +391,6 @@ const DEFAULT_HTML = `
           <div id="userResult" class="result"></div>
         </div>
       </div>
-
-      <!-- 用户代码区域 -->
-      <div class="section">
-        <h2>用户代码 <span class="badge">Custom Code</span></h2>
-        <div class="api-item">
-          <h3>▶️ 运行自定义代码</h3>
-          <p style="font-size: 13px; color: var(--mango-gray-600); margin-bottom: 12px;">
-            指定操作类型（action）和参数（params）来执行您的代码
-          </p>
-          <div class="input-group">
-            <input type="text" id="codeAction" placeholder="操作类型 (action)" value="execute" style="flex: 0 0 150px;">
-            <textarea id="codeParams" placeholder='参数 (JSON格式，例如: {"name": "test", "value": 123})' rows="3">{}</textarea>
-          </div>
-          <button onclick="runUserCode()">运行代码</button>
-          <div id="codeResult" class="result"></div>
-        </div>
-      </div>
-
-      <!-- 代码输出区域 -->
-      <div id="app"></div>
     </div>
   </div>
 
@@ -466,9 +467,6 @@ const DEFAULT_HTML = `
       }
     };
 
-    // 用户代码执行标志
-    let userCodeExecuted = false;
-
     // 运行用户代码（支持 action 和 params 参数传递，类似 edge function）
     window.runUserCode = async function() {
       const app = document.getElementById('app');
@@ -499,8 +497,6 @@ const DEFAULT_HTML = `
 
         // 使用 invokeMiniApp 方法执行代码
         const result = await MiniAppAPI.invokeMiniApp(action, params);
-
-        userCodeExecuted = true;
 
         // 显示成功消息
         const actionInfo = 'Action: ' + action;
