@@ -42,6 +42,7 @@ export class MiniAppService {
     display_name: string;
     description: string;
     code: string;
+    html?: string;
     icon_url?: string;
     manifest?: MiniAppManifest;
     runtime_config?: MiniAppRuntimeConfig;
@@ -84,6 +85,7 @@ export class MiniAppService {
       description: data.description,
       code: data.code,
       code_hash,
+      html: data.html,
       icon_url: data.icon_url,
       manifest: data.manifest || defaultManifest,
       runtime_config: data.runtime_config || defaultRuntimeConfig,
@@ -249,6 +251,7 @@ export class MiniAppService {
       display_name?: string;
       description?: string;
       code?: string;
+      html?: string;
       icon_url?: string;
       manifest?: MiniAppManifest;
       runtime_config?: MiniAppRuntimeConfig;

@@ -5,9 +5,10 @@
 
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { MiniAppContainer } from '@/components/miniapp/MiniAppContainer'
+import { AppHeader } from '@/components/layouts/AppHeader'
+import { MiniAppContainer, MiniAppContainerRef } from '@/components/miniapp/MiniAppContainer'
 import { TriggerConfigDialog } from '@/components/miniapp/TriggerConfigDialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -32,6 +33,7 @@ export default function MiniAppDetailPage() {
   const params = useParams()
   const router = useRouter()
   const miniAppId = params.id as string
+  const containerRef = useRef<MiniAppContainerRef>(null)
 
   const [miniApp, setMiniApp] = useState<MiniApp | null>(null)
   const [installation, setInstallation] = useState<MiniAppInstallation | null>(null)
@@ -113,20 +115,48 @@ export default function MiniAppDetailPage() {
   const handleMessage = async (message: any) => {
     console.log('Received message from mini app:', message)
 
-    // 处理不同的消息类型
-    switch (message.action) {
-      case 'storage.get':
-        return handleStorageGet(message.payload.key)
-      case 'storage.set':
-        return handleStorageSet(message.payload.key, message.payload.value)
-      case 'storage.remove':
-        return handleStorageRemove(message.payload.key)
-      case 'notification.send':
-        return handleNotificationSend(message.payload)
-      case 'user.getInfo':
-        return handleGetUserInfo()
-      default:
-        console.warn('Unknown message action:', message.action)
+    try {
+      let result: any = null
+
+      // 处理不同的消息类型
+      switch (message.action) {
+        case 'storage.get':
+          result = await handleStorageGet(message.payload.key)
+          break
+        case 'storage.set':
+          result = await handleStorageSet(message.payload.key, message.payload.value)
+          break
+        case 'storage.remove':
+          result = await handleStorageRemove(message.payload.key)
+          break
+        case 'notification.send':
+          result = await handleNotificationSend(message.payload)
+          break
+        case 'user.getInfo':
+          result = await handleGetUserInfo()
+          break
+        default:
+          console.warn('Unknown message action:', message.action)
+          result = { error: 'Unknown action' }
+      }
+
+      // 通过 ref 发送响应回 iframe
+      if (containerRef.current && message.id) {
+        await containerRef.current.sendMessage('response', {
+          id: message.id,
+          result,
+        })
+      }
+    } catch (error) {
+      console.error('Error handling message:', error)
+
+      // 发送错误响应
+      if (containerRef.current && message.id) {
+        await containerRef.current.sendMessage('response', {
+          id: message.id,
+          error: (error as Error).message,
+        })
+      }
     }
   }
 
@@ -239,50 +269,61 @@ export default function MiniAppDetailPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="mb-6">
-          <Skeleton className="h-8 w-64 mb-2" />
-          <Skeleton className="h-4 w-96" />
+      <>
+        <AppHeader />
+        <div className="container mx-auto py-8 px-4">
+          <div className="mb-6">
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-96" />
+          </div>
+          <Skeleton className="h-[600px] w-full rounded-lg" />
         </div>
-        <Skeleton className="h-[600px] w-full rounded-lg" />
-      </div>
+      </>
     )
   }
 
   if (error || !miniApp) {
     return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold text-destructive">Error</h2>
-          <p className="text-muted-foreground mt-2">{error || 'Mini app not found'}</p>
-          <Button onClick={() => router.push('/miniapps')} className="mt-4">
-            Back to Gallery
-          </Button>
+      <>
+        <AppHeader />
+        <div className="container mx-auto py-8 px-4">
+          <div className="text-center py-12">
+            <h2 className="text-2xl font-bold text-destructive">Error</h2>
+            <p className="text-muted-foreground mt-2">{error || 'Mini app not found'}</p>
+            <Button onClick={() => router.push('/miniapps')} className="mt-4">
+              Back to Gallery
+            </Button>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
   if (!installation) {
     return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold">Mini App Not Installed</h2>
-          <p className="text-muted-foreground mt-2">
-            Please install this mini app from the gallery first
-          </p>
-          <Button onClick={() => router.push('/miniapps')} className="mt-4">
-            Go to Gallery
-          </Button>
+      <>
+        <AppHeader />
+        <div className="container mx-auto py-8 px-4">
+          <div className="text-center py-12">
+            <h2 className="text-2xl font-bold">Mini App Not Installed</h2>
+            <p className="text-muted-foreground mt-2">
+              Please install this mini app from the gallery first
+            </p>
+            <Button onClick={() => router.push('/miniapps')} className="mt-4">
+              Go to Gallery
+            </Button>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      {/* 页面标题 */}
-      <div className="mb-6 flex items-center justify-between">
+    <>
+      <AppHeader />
+      <div className="container mx-auto py-8 px-4">
+        {/* 页面标题 */}
+        <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">{miniApp.display_name}</h1>
           <p className="text-muted-foreground mt-1">{miniApp.description}</p>
@@ -346,11 +387,12 @@ export default function MiniAppDetailPage() {
       )}
 
       {/* 小应用容器 */}
-      <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-lg border bg-card shadow-sm overflow-hidden" style={{ height: 'calc(100vh - 280px)' }}>
         <MiniAppContainer
+          ref={containerRef}
           miniApp={miniApp}
           installation={installation}
-          className="h-[600px]"
+          className="h-full"
           onMessage={handleMessage}
           onError={handleError}
         />
@@ -366,6 +408,7 @@ export default function MiniAppDetailPage() {
           onSave={saveTriggerConfig}
         />
       )}
-    </div>
+      </div>
+    </>
   )
 }
