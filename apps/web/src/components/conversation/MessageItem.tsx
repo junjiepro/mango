@@ -25,6 +25,7 @@ import {
 } from '@/lib/storage/attachment-utils';
 import { logger } from '@mango/shared/utils';
 import { cn } from '@/lib/utils';
+import { HtmlContentRenderer, isHtmlContent, parseContentSegments } from './HtmlContentRenderer';
 
 type MessageType = Database['public']['Tables']['messages']['Row'];
 
@@ -225,6 +226,13 @@ export function MessageItem({
   // 确定要显示的内容：优先使用流式内容，否则使用消息内容
   const displayContent = streamingContent || message.content;
 
+  // 检测内容是否为 HTML 或包含混合内容
+  const contentSegments = useMemo(() => parseContentSegments(displayContent), [displayContent]);
+  const hasHtmlContent = useMemo(
+    () => contentSegments.some((segment) => segment.type === 'html'),
+    [contentSegments]
+  );
+
   // 获取工具调用的显示名称
   const getToolDisplayName = (toolName: string) => {
     const toolNames: Record<string, string> = {
@@ -406,7 +414,11 @@ export function MessageItem({
 
         {/* 消息内容 */}
         <MessageContent>
-          <MessageResponse>{displayContent}</MessageResponse>
+          {hasHtmlContent ? (
+            <HtmlContentRenderer content={displayContent} />
+          ) : (
+            <MessageResponse>{displayContent}</MessageResponse>
+          )}
 
           {/* Agent 元数据 - 显示在消息内容内部 */}
           {isAgent && message.agent_metadata && (
