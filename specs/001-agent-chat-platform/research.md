@@ -763,7 +763,7 @@ export default app;
 
 ### 6.3 设备认证和安全机制
 
-**决策：基于 device_secret + binding_token 的双层认证**
+**决策：基于临时绑定码 + Realtime Channel + 正式绑定码的三阶段认证**
 
 **安全架构**：
 
@@ -773,86 +773,268 @@ export default app;
 │   (Agent)   │                    │   Service    │
 └──────┬──────┘                    └──────┬───────┘
        │                                  │
-       │ 1. 用户访问 /bind 页面            │
-       │    输入 device_secret            │
+       │                                  │ 1. CLI 启动
+       │                                  │    生成临时绑定码 (8位)
+       │                                  │    创建 Cloudflare Tunnel
+       │                                  ├──────────────────────────>
+       │                                  │ 2. 调用 API 创建临时绑定码记录
+       │                                  │    建立 Realtime Channel
+       │                                  │    发送设备 URL 到 Channel
+       │                                  │
+       │ 3. 用户访问绑定页面              │
+       │    输入临时绑定码                │
+       │    订阅 Realtime Channel        │
        ├──────────────────────────────────>
        │                                  │
-       │ 2. 验证 device_secret            │
-       │    创建 binding 记录              │
-       │    生成 binding_token            │
+       │ 4. 从 Channel 获取设备 URL       │
+       │    进行 health check            │
        <──────────────────────────────────┤
        │                                  │
-       │ 3. Agent 请求 (带 binding_token) │
+       │ 5. 用户触发绑定                  │
+       │    通过设备 URL 发送绑定请求     │
        ├──────────────────────────────────>
        │                                  │
-       │ 4. 验证 binding_token            │
-       │    调用本地 MCP 服务              │
-       │                                  │
-       │ 5. 返回结果                      │
+       │                                  │ 6. 设备生成正式绑定码 (256位)
+       │                                  │    保存到本地
+       │ 7. 返回绑定码                    │
        <──────────────────────────────────┤
+       │                                  │
+       │ 8. Mango 记录绑定关系            │
+       │    临时绑定码失效                │
+       │                                  │
+       │ 9. Agent 请求 (带 binding_code)  │
+       ├──────────────────────────────────>
+       │                                  │
+       │ 10. 验证 binding_code            │
+       │     调用本地 MCP 服务             │
+       │                                  │
+       │ 11. 返回结果                     │
+       <──────────────────────────────────┤
+       │                                  │
+       │                                  │ 12. 设备 URL 变更时
+       │                                  │     调用 Edge Function
+       │                                  │     更新 device_url
+       │                                  ├──────────────────────────>
 ```
 
 **实现方案**：
 
-1. **device_secret 生成和存储**：
+1. **临时绑定码生成和管理（运行时内存）**：
 
 ```typescript
 import { randomBytes } from 'crypto';
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
-import { homedir } from 'os';
+import { createClient } from '@supabase/supabase-js';
 
-class SecretManager {
-  private secretPath: string;
+class TempBindingManager {
+  private supabase: SupabaseClient;
+  private tempCode: string | null = null;
+  private channel: RealtimeChannel | null = null;
 
-  constructor() {
-    // 存储在用户目录下的隐藏文件
-    const configDir = join(homedir(), '.mango');
-    this.secretPath = join(configDir, 'device_secret');
+  constructor(supabaseUrl: string, supabaseKey: string) {
+    this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
-  getOrCreateSecret(): string {
-    if (existsSync(this.secretPath)) {
-      return readFileSync(this.secretPath, 'utf-8').trim();
-    }
-
-    // 生成 256 位随机密钥
-    const secret = randomBytes(32).toString('base64url');
-
-    // 安全存储（仅当前用户可读）
-    mkdirSync(dirname(this.secretPath), { recursive: true, mode: 0o700 });
-    writeFileSync(this.secretPath, secret, { mode: 0o600 });
-
-    console.log(`Generated device secret: ${secret}`);
-    console.log(`Stored at: ${this.secretPath}`);
-
-    return secret;
+  // 生成临时绑定码（8位随机字符串，仅存在于内存中）
+  generateTempCode(): string {
+    this.tempCode = randomBytes(4).toString('hex'); // 8位十六进制
+    return this.tempCode;
   }
 
-  getSecret(): string {
-    if (!existsSync(this.secretPath)) {
-      throw new Error('Device secret not found. Please run the service first.');
+  // 建立 Realtime Channel 并发送设备 URL
+  async publishDeviceUrls(deviceUrls: {
+    cloudflare_url: string;
+    localhost_url: string;
+    hostname_url: string;
+  }, deviceInfo: any) {
+    if (!this.tempCode) {
+      throw new Error('Temp code not generated');
     }
-    return readFileSync(this.secretPath, 'utf-8').trim();
+
+    // 建立 Realtime Channel
+    this.channel = this.supabase.channel(`binding:${this.tempCode}`);
+
+    // 订阅 Channel
+    await this.channel.subscribe();
+
+    // 发送设备 URL 到 Channel
+    await this.channel.send({
+      type: 'broadcast',
+      event: 'device_urls',
+      payload: {
+        device_urls: deviceUrls,
+        device_info: deviceInfo,
+        timestamp: Date.now()
+      }
+    });
+
+    console.log(`Device URLs published to channel: binding:${this.tempCode}`);
+  }
+
+  // 清理 Channel（绑定完成后调用）
+  async cleanup() {
+    if (this.channel) {
+      await this.supabase.removeChannel(this.channel);
+      this.channel = null;
+    }
+    this.tempCode = null;
+  }
+
+  getTempCode(): string | null {
+    return this.tempCode;
   }
 }
 ```
 
-2. **设备绑定验证**：
+2. **绑定页面订阅和验证**：
 
 ```typescript
-// 设备服务端验证
-app.post('/bind', async (c) => {
-  const { device_secret, user_id } = await c.req.json();
+// Web 端绑定页面
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
-  // 验证 device_secret
-  const localSecret = secretManager.getSecret();
-  if (device_secret !== localSecret) {
-    return c.json({ error: 'Invalid device_secret' }, 401);
+function BindingPage() {
+  const [tempCode, setTempCode] = useState('');
+  const [deviceUrls, setDeviceUrls] = useState(null);
+  const [deviceInfo, setDeviceInfo] = useState(null);
+  const [healthCheckStatus, setHealthCheckStatus] = useState('pending');
+
+  useEffect(() => {
+    if (!tempCode) return;
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const channel = supabase.channel(`binding:${tempCode}`);
+
+    // 订阅 Channel 获取设备 URL
+    channel
+      .on('broadcast', { event: 'device_urls' }, (payload) => {
+        const { device_urls, device_info } = payload.payload;
+        setDeviceUrls(device_urls);
+        setDeviceInfo(device_info);
+        performHealthCheck(device_urls);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tempCode]);
+
+  // 进行 health check
+  async function performHealthCheck(urls: any) {
+    try {
+      // 优先尝试 cloudflare_url
+      const response = await fetch(`${urls.cloudflare_url}/health`);
+      if (response.ok) {
+        setHealthCheckStatus('success');
+        return;
+      }
+    } catch (error) {
+      console.error('Health check failed:', error);
+    }
+
+    setHealthCheckStatus('failed');
   }
+
+  // 用户触发绑定
+  async function handleBind() {
+    if (!deviceUrls || healthCheckStatus !== 'success') return;
+
+    // 通过设备 URL 发送绑定请求
+    const response = await fetch(`${deviceUrls.cloudflare_url}/bind`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: currentUserId,
+        binding_name: bindingName
+      })
+    });
+
+    const { binding_code, device_id } = await response.json();
+
+    // 记录绑定关系到 Mango 数据库
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    await supabase.from('device_bindings').insert({
+      device_id: device_id,
+      user_id: currentUserId,
+      binding_name: bindingName,
+      device_url: deviceUrls.cloudflare_url,
+      binding_code: binding_code,
+      status: 'active'
+    });
+
+    // 绑定完成，临时绑定码自动失效（CLI 端会关闭 Channel）
+    alert('设备绑定成功！');
+  }
+
+  return (
+    <div>
+      <input
+        value={tempCode}
+        onChange={(e) => setTempCode(e.target.value)}
+        placeholder="输入临时绑定码"
+      />
+      {healthCheckStatus === 'success' && (
+        <>
+          <div>设备信息: {JSON.stringify(deviceInfo)}</div>
+          <input
+            value={bindingName}
+            onChange={(e) => setBindingName(e.target.value)}
+            placeholder="设备别名（如：工作电脑）"
+          />
+          <button onClick={handleBind}>绑定设备</button>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+3. **设备端绑定处理**：
+
+```typescript
+import { Hono } from 'hono';
+import { randomBytes } from 'crypto';
+import { writeFileSync, readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
+
+const app = new Hono();
+
+class BindingCodeManager {
+  private bindingCodePath: string;
+
+  constructor() {
+    const configDir = join(homedir(), '.mango');
+    this.bindingCodePath = join(configDir, 'binding_code');
+  }
+
+  // 生成并保存正式绑定码
+  generateAndSave(): string {
+    const bindingCode = randomBytes(32).toString('base64url'); // 256位
+    writeFileSync(this.bindingCodePath, bindingCode, { mode: 0o600 });
+    return bindingCode;
+  }
+
+  // 读取绑定码
+  read(): string | null {
+    if (!existsSync(this.bindingCodePath)) {
+      return null;
+    }
+    return readFileSync(this.bindingCodePath, 'utf-8').trim();
+  }
+}
+
+const bindingCodeManager = new BindingCodeManager();
+
+// 绑定端点
+app.post('/bind', async (c) => {
+  const { user_id, binding_name } = await c.req.json();
 
   // 生成设备 ID（基于硬件信息）
   const deviceId = await generateDeviceId();
+
+  // 生成并保存正式绑定码
+  const bindingCode = bindingCodeManager.generateAndSave();
 
   // 创建或更新设备记录
   const { data: device } = await supabase
@@ -860,72 +1042,86 @@ app.post('/bind', async (c) => {
     .upsert({
       device_id: deviceId,
       platform: process.platform,
+      hostname: os.hostname(),
       last_seen_at: new Date().toISOString()
     })
     .select()
     .single();
 
-  // 创建绑定记录
-  const bindingToken = randomBytes(32).toString('base64url');
-  const { data: binding } = await supabase
-    .from('device_bindings')
-    .insert({
-      device_id: device.id,
-      user_id: user_id,
-      tunnel_url: tunnelUrl,
-      binding_token: bindingToken,
-      status: 'active'
-    })
-    .select()
-    .single();
-
   return c.json({
-    binding_id: binding.id,
-    binding_token: bindingToken,
-    tunnel_url: tunnelUrl
+    binding_code: bindingCode,
+    device_id: device.id
   });
 });
 
-// Agent 请求验证中间件
+// MCP 代理端点（需要 binding_code 认证）
 app.use('/mcp/*', async (c, next) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return c.json({ error: 'Missing authorization' }, 401);
   }
 
-  const bindingToken = authHeader.replace('Bearer ', '');
+  const bindingCode = authHeader.replace('Bearer ', '');
+  const localBindingCode = bindingCodeManager.read();
 
-  // 验证 binding_token
-  const { data: binding, error } = await supabase
-    .from('device_bindings')
-    .select('*')
-    .eq('binding_token', bindingToken)
-    .eq('status', 'active')
-    .single();
-
-  if (error || !binding) {
-    return c.json({ error: 'Invalid or expired token' }, 401);
+  if (!localBindingCode || bindingCode !== localBindingCode) {
+    return c.json({ error: 'Invalid binding code' }, 401);
   }
 
-  // 更新最后访问时间
-  await supabase
-    .from('device_bindings')
-    .update({ updated_at: new Date().toISOString() })
-    .eq('id', binding.id);
-
-  c.set('binding', binding);
   await next();
 });
 ```
 
-**安全措施**：
-- device_secret 存储在本地文件系统，权限设置为仅当前用户可读（0o600）
-- binding_token 用于 API 请求认证，存储在数据库中
-- Cloudflare Tunnel 自动提供 HTTPS 加密
-- 支持绑定撤销和 token 过期机制
-- 设备 ID 基于硬件信息生成，确保唯一性
+4. **设备 URL 更新机制**：
 
-**结论**：采用双层认证机制，device_secret 用于设备绑定，binding_token 用于 API 请求认证，确保安全性。
+```typescript
+// Supabase Edge Function: update-device-url
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+serve(async (req) => {
+  const { binding_code, new_device_url } = await req.json();
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+
+  // 验证 binding_code 并更新 device_url
+  const { data, error } = await supabase
+    .from('device_bindings')
+    .update({
+      device_url: new_device_url,
+      updated_at: new Date().toISOString()
+    })
+    .eq('binding_code', binding_code)
+    .eq('status', 'active')
+    .select();
+
+  if (error || !data || data.length === 0) {
+    return new Response(
+      JSON.stringify({ error: 'Invalid binding code or binding not found' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  return new Response(
+    JSON.stringify({ success: true, updated: data[0] }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+});
+```
+
+**安全措施**：
+- 临时绑定码仅 8 位，仅存在于 CLI 运行时内存中，不持久化
+- 使用 Supabase Realtime Channel 传输设备 URL，避免轮询
+- 正式绑定码 256 位，存储在本地文件系统，权限设置为仅当前用户可读（0o600）
+- 绑定完成后 CLI 主动关闭 Realtime Channel，临时绑定码自动失效
+- Cloudflare Tunnel 自动提供 HTTPS 加密
+- 设备 URL 更新通过 Edge Function，需要 binding_code 认证
+- 支持绑定撤销和状态管理
+
+**结论**：采用三阶段认证机制，临时绑定码（运行时内存）用于初始连接，Realtime Channel 用于设备发现，正式绑定码用于长期 API 认证，确保安全性和用户体验。
 
 ### 6.4 跨平台 CLI 工具最佳实践
 

@@ -598,25 +598,93 @@ mango start
 🥭 Mango Device Service
 
 ✓ Configuration loaded
-✓ Device secret: abc123def456ghi789...
 ✓ Server running on port 3000
-✓ Tunnel URL: https://random-id.trycloudflare.com
+✓ Cloudflare Tunnel created
+  - Cloudflare URL: https://random-id.trycloudflare.com
+  - Localhost URL: http://localhost:3000
+  - Hostname URL: http://your-hostname.local:3000
+
+✓ Temporary binding code generated: a1b2c3d4
+
+✓ Realtime Channel established: binding:a1b2c3d4
+✓ Device URLs published to channel
 
 ✓ Device service is ready!
 
 Bind URL:
-  https://app.mango.ai/devices/bind?secret=abc123...
+  https://app.mango.ai/devices/bind?code=a1b2c3d4
 
 Press Ctrl+C to stop the service
 ```
 
 ### 11.4 绑定设备
 
-1. CLI 启动后会自动打开浏览器
-2. 登录您的 Mango 账户
-3. 输入 `device_secret`（从控制台复制）
-4. 设置设备名称（如"工作电脑"）
-5. 点击"绑定设备"
+**新的绑定流程**（使用临时绑定码 + Realtime Channel）：
+
+1. **CLI 启动后会自动打开浏览器**
+   - 浏览器会打开绑定页面，URL 中包含临时绑定码（如 `?code=a1b2c3d4`）
+   - **注意**：临时绑定码仅存在于 CLI 运行时内存中，不会持久化到数据库
+
+2. **登录您的 Mango 账户**
+   - 如果未登录，系统会提示您登录
+
+3. **页面自动获取设备信息**
+   - 页面会自动订阅 Realtime Channel `binding:a1b2c3d4`
+   - 从 Channel 中获取设备 URL（cloudflare_url、localhost_url、hostname_url）
+   - 自动进行 health check，验证设备是否可访问
+
+4. **设备可用后，进入绑定状态**
+   - 页面显示设备信息（平台、主机名等）
+   - 输入设备别名（如"工作电脑"、"家用 Mac"）
+   - 点击"绑定设备"按钮
+
+5. **完成绑定**
+   - 页面通过设备 URL 发送绑定请求
+   - 设备生成并保存正式绑定码（256位）
+   - 设备返回绑定码给 Mango
+   - Mango 记录绑定关系（设备 ID、用户 ID、设备 URL、绑定码）
+   - CLI 关闭 Realtime Channel，临时绑定码自动失效
+
+6. **后续通信**
+   - Agent 通过设备 URL 调用 MCP 服务
+   - 使用正式绑定码进行认证
+   - 设备 URL 变更时，设备会自动更新到 Mango
+
+**绑定流程图**：
+
+```
+CLI 启动
+  ↓
+生成临时绑定码 (8位，运行时内存)
+  ↓
+创建 Cloudflare Tunnel
+  ↓
+建立 Realtime Channel
+  ↓
+发送设备 URL 到 Channel
+  ↓
+打开绑定页面 ──→ 用户登录
+  ↓                  ↓
+等待绑定请求 ←── 订阅 Channel
+  ↓                  ↓
+接收绑定请求 ←── 获取设备 URL
+  ↓                  ↓
+生成正式绑定码 ←── Health Check
+  ↓                  ↓
+返回绑定码 ────→ 用户触发绑定
+  ↓                  ↓
+保存绑定码 ←────── 记录绑定关系
+  ↓                  ↓
+关闭 Channel      绑定完成
+临时绑定码失效
+```
+
+**安全说明**：
+- 临时绑定码仅 8 位，仅存在于 CLI 运行时内存中
+- 绑定完成后，CLI 主动关闭 Realtime Channel
+- 临时绑定码随 CLI 进程结束而消失，无需清理
+- 正式绑定码 256 位，存储在本地 `~/.mango/binding_code` 文件中
+- 后续所有 API 请求使用正式绑定码认证
 
 ### 11.5 配置 MCP 服务
 

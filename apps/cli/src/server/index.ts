@@ -1,22 +1,27 @@
 /**
  * Device Service HTTP Server
  * 使用Hono框架构建轻量级HTTP服务器
+ * 新的绑定流程：临时绑定码 + Realtime Channel + 正式绑定码
  */
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { serve } from '@hono/node-server';
+import os from 'os';
 import type { CLIConfig } from '../types/index.js';
 import { mcpConnector } from '../lib/connectors/mcp-connector.js';
 import { acpConnector } from '../lib/connectors/acp-connector.js';
 import { serviceHealthChecker } from '../lib/service-health.js';
 import { findAvailablePort } from '../lib/port-utils.js';
+import { bindingCodeManager } from '../lib/binding-code-manager.js';
+import { generateDeviceId } from '../lib/device-id.js';
+import { createClient } from '@supabase/supabase-js';
 
 /**
  * 创建HTTP服务器
  */
-export function createServer(config: CLIConfig, deviceSecret: string) {
+export function createServer(config: CLIConfig) {
   const app = new Hono();
 
   // 全局中间件
@@ -32,29 +37,45 @@ export function createServer(config: CLIConfig, deviceSecret: string) {
     });
   });
 
-  // 设备绑定端点
+  // 设备绑定端点（新的绑定流程）
   app.post('/bind', async (c) => {
     try {
       const body = await c.req.json();
-      const { device_secret, user_id, binding_name } = body;
+      const { user_id, binding_name } = body;
 
-      // 验证 device_secret
-      if (device_secret !== deviceSecret) {
-        return c.json({ error: 'Invalid device_secret' }, 401);
+      if (!user_id || !binding_name) {
+        return c.json({ error: 'Missing required fields: user_id, binding_name' }, 400);
       }
 
-      // TODO: 实现设备绑定逻辑
-      // 1. 生成设备ID
-      // 2. 创建或更新设备记录
-      // 3. 创建绑定记录
-      // 4. 生成binding_token
+      // 1. 生成设备 ID（基于硬件信息）
+      const deviceId = generateDeviceId();
 
+      // 2. 生成并保存正式绑定码（256位）
+      const bindingCode = bindingCodeManager.generateAndSave();
+
+      // 3. 转换 platform 格式以匹配数据库约束
+      const platformMap: Record<string, string> = {
+        'win32': 'windows',
+        'darwin': 'macos',
+        'linux': 'linux',
+      };
+      const platform = platformMap[process.platform] || 'linux';
+
+      // 4. 返回设备信息和绑定码给 Web 端
+      // Web 端负责创建 devices 和 device_bindings 记录
       return c.json({
-        message: 'Device binding is in progress',
-        device_secret,
+        success: true,
+        binding_code: bindingCode,
+        device_info: {
+          device_id: deviceId,
+          device_name: binding_name,
+          platform: platform,
+          hostname: os.hostname(),
+        },
       });
     } catch (error) {
-      return c.json({ error: 'Invalid request body' }, 400);
+      console.error('Bind endpoint error:', error);
+      return c.json({ error: 'Internal server error' }, 500);
     }
   });
 
@@ -66,17 +87,39 @@ export function createServer(config: CLIConfig, deviceSecret: string) {
     });
   });
 
-  // 配置管理端点（POST）
+  // 配置管理端点（POST）- 保存绑定配置
   app.post('/setting', async (c) => {
     try {
       const body = await c.req.json();
-      // TODO: 实现配置更新逻辑
+      const { binding_code, device_id, device_name, user_id, platform, hostname } = body;
+
+      // 验证必需字段
+      if (!binding_code || !device_id || !device_name) {
+        return c.json({ error: 'Missing required fields: binding_code, device_id, device_name' }, 400);
+      }
+
+      // 保存完整的绑定配置
+      bindingCodeManager.saveConfig({
+        bindingCode: binding_code,
+        deviceId: device_id,
+        deviceName: device_name,
+        boundAt: new Date().toISOString(),
+        lastUsedAt: new Date().toISOString(),
+        userId: user_id,
+        metadata: {
+          platform: platform || process.platform,
+          hostname: hostname || os.hostname(),
+          arch: os.arch(),
+        },
+      });
+
       return c.json({
-        message: 'Configuration update is in progress',
-        config: body,
+        success: true,
+        message: 'Binding configuration saved successfully',
       });
     } catch (error) {
-      return c.json({ error: 'Invalid request body' }, 400);
+      console.error('Failed to save binding configuration:', error);
+      return c.json({ error: 'Failed to save configuration' }, 500);
     }
   });
 
@@ -228,11 +271,8 @@ export function createServer(config: CLIConfig, deviceSecret: string) {
  * 启动HTTP服务器
  * @returns 返回实际使用的端口号
  */
-export async function startServer(
-  config: CLIConfig,
-  deviceSecret: string
-): Promise<number> {
-  const app = createServer(config, deviceSecret);
+export async function startServer(config: CLIConfig): Promise<number> {
+  const app = createServer(config);
 
   // 查找可用端口
   const availablePort = await findAvailablePort(config.port);
@@ -245,7 +285,6 @@ export async function startServer(
           port: availablePort,
         },
         (info) => {
-          console.log(`Server running on http://localhost:${info.port}`);
           resolve(info.port);
         }
       );

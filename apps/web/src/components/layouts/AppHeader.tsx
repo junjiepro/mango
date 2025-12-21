@@ -11,7 +11,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import type { User } from '@supabase/supabase-js';
-import { Bot, User, UserIcon } from 'lucide-react';
+import { Bot, UserIcon, Laptop } from 'lucide-react';
 
 interface AppHeaderProps {
   className?: string;
@@ -78,7 +78,7 @@ export function AppHeader({ className = '' }: AppHeaderProps) {
             <nav className="hidden md:flex items-center gap-1">
               <Link href="/conversations">
                 <Button variant={isActive('/conversations') ? 'secondary' : 'ghost'} size="sm">
-                  <Bot />
+                  <Bot className="h-4 w-4" />
                   对话
                 </Button>
               </Link>
@@ -99,9 +99,15 @@ export function AppHeader({ className = '' }: AppHeaderProps) {
                   小应用
                 </Button>
               </Link>
+              <Link href="/settings/devices">
+                <Button variant={isActive('/settings/devices') ? 'secondary' : 'ghost'} size="sm">
+                  <Laptop className="h-4 w-4" />
+                  设备管理
+                </Button>
+              </Link>
               <Link href="/profile">
                 <Button variant={isActive('/profile') ? 'secondary' : 'ghost'} size="sm">
-                  <UserIcon />
+                  <UserIcon className="h-4 w-4" />
                   个人信息
                 </Button>
               </Link>

@@ -1,6 +1,13 @@
 /**
  * Device Binding Page
- * 设备绑定页面 - 用户输入 device_secret 绑定设备
+ * 设备绑定页面 - 使用新的绑定流程
+ *
+ * 新流程：
+ * 1. 用户输入临时绑定码
+ * 2. 订阅 Realtime Channel
+ * 3. 获取设备 URL
+ * 4. Health Check
+ * 5. 用户输入设备别名并触发绑定
  */
 
 'use client';
@@ -12,66 +19,113 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Wifi, WifiOff } from 'lucide-react';
+import { useDeviceBinding } from '@/hooks/useDeviceBinding';
+import { createClient } from '@/lib/supabase/client';
 
 export default function DeviceBindPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // 从 URL 参数获取预填充的值
-  const [deviceSecret, setDeviceSecret] = useState(searchParams.get('secret') || '');
-  const [tunnelUrl, setTunnelUrl] = useState(searchParams.get('tunnel') || '');
+  // 从 URL 参数获取临时绑定码
+  const [tempCode, setTempCode] = useState(searchParams.get('code') || '');
   const [bindingName, setBindingName] = useState('');
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isBinding, setIsBinding] = useState(false);
+  const [bindError, setBindError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // 自动提交（如果 URL 参数完整）
-  useEffect(() => {
-    const secret = searchParams.get('secret');
-    const tunnel = searchParams.get('tunnel');
-
-    if (secret && tunnel && !success && !isLoading) {
-      handleBind();
-    }
-  }, [searchParams]);
+  // 使用 Realtime Channel 订阅 Hook
+  const {
+    deviceUrls,
+    deviceInfo,
+    healthCheckStatus,
+    isConnected,
+    error: channelError,
+    retryHealthCheck,
+  } = useDeviceBinding(tempCode);
 
   const handleBind = async () => {
-    setError(null);
-    setIsLoading(true);
+    if (!deviceUrls || healthCheckStatus !== 'success') {
+      return;
+    }
+
+    setBindError(null);
+    setIsBinding(true);
 
     try {
-      // 验证输入
-      if (!deviceSecret.trim()) {
-        setError('Device secret is required');
-        setIsLoading(false);
-        return;
+      const supabase = createClient();
+
+      // 获取当前用户
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Please login first');
       }
 
-      if (!tunnelUrl.trim()) {
-        setError('Tunnel URL is required');
-        setIsLoading(false);
-        return;
-      }
-
-      // 调用绑定 API
-      const response = await fetch('/api/devices/bind', {
+      // 1. 通过设备 URL 发送绑定请求到 CLI
+      const deviceUrl = deviceUrls.cloudflare_url || deviceUrls.localhost_url;
+      const bindResponse = await fetch(`${deviceUrl}/bind`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          device_secret: deviceSecret,
-          tunnel_url: tunnelUrl,
-          binding_name: bindingName || undefined,
+          user_id: user.id,
+          binding_name: bindingName || `${deviceInfo?.platform} Device`,
         }),
       });
 
-      const data = await response.json();
+      if (!bindResponse.ok) {
+        const errorData = await bindResponse.json();
+        throw new Error(errorData.error || 'Failed to bind device');
+      }
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to bind device');
+      const bindData = await bindResponse.json();
+      const { binding_code, device_info } = bindData;
+
+      // 2. 在 Mango 数据库中创建设备绑定记录(新的合并表结构)
+      // 一次性创建包含所有设备和绑定信息的记录
+      const { error: bindingError } = await supabase.from('device_bindings').insert({
+        user_id: user.id,
+        device_id: device_info.device_id,
+        device_name: device_info.device_name,
+        platform: device_info.platform,
+        hostname: device_info.hostname,
+        binding_name: bindingName || `${deviceInfo?.platform} Device`,
+        device_url: deviceUrl,
+        binding_code: binding_code,
+        status: 'active',
+      });
+
+      if (bindingError) {
+        console.error('Failed to save binding:', bindingError);
+        throw new Error('Failed to save binding to database');
+      }
+
+      // 3. 通知 CLI 端保存绑定配置到本地
+      try {
+        const settingResponse = await fetch(`${deviceUrl}/setting`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            binding_code: binding_code,
+            device_id: device_info.device_id,
+            device_name: device_info.device_name,
+            user_id: user.id,
+            platform: device_info.platform,
+            hostname: device_info.hostname,
+          }),
+        });
+
+        if (!settingResponse.ok) {
+          console.warn('Failed to save binding config to CLI, but binding was successful');
+        }
+      } catch (settingError) {
+        // 即使保存到 CLI 失败，绑定仍然成功（已保存到数据库）
+        console.warn('Failed to notify CLI to save config:', settingError);
       }
 
       setSuccess(true);
@@ -81,9 +135,9 @@ export default function DeviceBindPage() {
         router.push('/settings/devices');
       }, 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setBindError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
-      setIsLoading(false);
+      setIsBinding(false);
     }
   };
 
@@ -93,7 +147,7 @@ export default function DeviceBindPage() {
         <CardHeader>
           <CardTitle>Bind Device</CardTitle>
           <CardDescription>
-            Connect your local device to your Mango account to enable local tool access
+            Connect your local device to your Mango account using the temporary binding code
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -106,93 +160,164 @@ export default function DeviceBindPage() {
             </Alert>
           ) : (
             <>
-              {error && (
+              {/* 错误提示 */}
+              {(channelError || bindError) && (
                 <Alert variant="destructive">
                   <XCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>{channelError || bindError}</AlertDescription>
                 </Alert>
               )}
 
+              {/* 步骤 1: 输入临时绑定码 */}
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="device-secret">Device Secret *</Label>
+                  <Label htmlFor="temp-code">Temporary Binding Code *</Label>
                   <Input
-                    id="device-secret"
-                    type="password"
-                    placeholder="Enter your device secret"
-                    value={deviceSecret}
-                    onChange={(e) => setDeviceSecret(e.target.value)}
-                    disabled={isLoading}
-                    required
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    The device secret is displayed when you start the Mango CLI tool
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="tunnel-url">Tunnel URL *</Label>
-                  <Input
-                    id="tunnel-url"
-                    type="url"
-                    placeholder="https://your-tunnel.trycloudflare.com"
-                    value={tunnelUrl}
-                    onChange={(e) => setTunnelUrl(e.target.value)}
-                    disabled={isLoading}
-                    required
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    The public tunnel URL created by Cloudflare Tunnel
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="binding-name">Device Name (Optional)</Label>
-                  <Input
-                    id="binding-name"
+                    id="temp-code"
                     type="text"
-                    placeholder="My Work Laptop"
-                    value={bindingName}
-                    onChange={(e) => setBindingName(e.target.value)}
-                    disabled={isLoading}
+                    placeholder="Enter 8-character code (e.g., a1b2c3d4)"
+                    value={tempCode}
+                    onChange={(e) => setTempCode(e.target.value.toLowerCase())}
+                    disabled={isConnected || isBinding}
+                    maxLength={8}
+                    required
                   />
                   <p className="text-sm text-muted-foreground">
-                    A friendly name to identify this device
+                    The temporary code is displayed when you start the Mango CLI tool
                   </p>
                 </div>
+
+                {/* 连接状态指示器 */}
+                {tempCode && (
+                  <div className="flex items-center gap-2 text-sm">
+                    {isConnected ? (
+                      <>
+                        <Wifi className="h-4 w-4 text-green-600" />
+                        <span className="text-green-600">Connected to device</span>
+                      </>
+                    ) : (
+                      <>
+                        <WifiOff className="h-4 w-4 text-gray-400" />
+                        <span className="text-gray-600">Waiting for device...</span>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="flex gap-4">
-                <Button
-                  onClick={handleBind}
-                  disabled={isLoading || !deviceSecret || !tunnelUrl}
-                  className="flex-1"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Binding...
-                    </>
-                  ) : (
-                    'Bind Device'
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => router.push('/settings/devices')}
-                  disabled={isLoading}
-                >
-                  Cancel
-                </Button>
-              </div>
+              {/* 步骤 2: 显示设备信息和 Health Check 状态 */}
+              {deviceUrls && deviceInfo && (
+                <div className="space-y-4 rounded-lg border p-4 bg-muted/50">
+                  <h4 className="font-medium text-sm">Device Information</h4>
 
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Platform:</span>
+                      <span className="font-medium">{deviceInfo.platform}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Hostname:</span>
+                      <span className="font-medium">{deviceInfo.hostname}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Device URL:</span>
+                      <span className="font-mono text-xs">
+                        {deviceUrls.cloudflare_url || deviceUrls.localhost_url}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Health Check 状态 */}
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Health Check:</span>
+                      <div className="flex items-center gap-2">
+                        {healthCheckStatus === 'checking' && (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                            <span className="text-sm text-blue-600">Checking...</span>
+                          </>
+                        )}
+                        {healthCheckStatus === 'success' && (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            <span className="text-sm text-green-600">Device is accessible</span>
+                          </>
+                        )}
+                        {healthCheckStatus === 'failed' && (
+                          <>
+                            <XCircle className="h-4 w-4 text-red-600" />
+                            <span className="text-sm text-red-600">Device not accessible</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={retryHealthCheck}
+                              className="ml-2"
+                            >
+                              Retry
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 步骤 3: 输入设备别名并绑定 */}
+              {healthCheckStatus === 'success' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="binding-name">Device Name *</Label>
+                    <Input
+                      id="binding-name"
+                      type="text"
+                      placeholder="My Work Laptop"
+                      value={bindingName}
+                      onChange={(e) => setBindingName(e.target.value)}
+                      disabled={isBinding}
+                      required
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      A friendly name to identify this device
+                    </p>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <Button
+                      onClick={handleBind}
+                      disabled={isBinding || !bindingName.trim()}
+                      className="flex-1"
+                    >
+                      {isBinding ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Binding...
+                        </>
+                      ) : (
+                        'Bind Device'
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push('/settings/devices')}
+                      disabled={isBinding}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* 使用说明 */}
               <div className="rounded-lg bg-muted p-4 space-y-2">
                 <h4 className="font-medium text-sm">How to bind your device:</h4>
                 <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
                   <li>Install and start the Mango CLI tool on your local machine</li>
-                  <li>Copy the device secret and tunnel URL from the CLI output</li>
-                  <li>Paste them into the form above and click "Bind Device"</li>
-                  <li>Your device will be connected and ready to use</li>
+                  <li>Copy the temporary binding code from the CLI output</li>
+                  <li>Paste it into the form above</li>
+                  <li>Wait for the device to be detected (automatic)</li>
+                  <li>Enter a device name and click "Bind Device"</li>
                 </ol>
               </div>
             </>

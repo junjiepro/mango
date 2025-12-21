@@ -221,75 +221,85 @@ Based on plan.md monorepo structure:
 
 ## Phase 5: User Story 3 - 通过CLI工具接入本地MCP/ACP服务 (Priority: P3)
 
-**Goal**: 技术用户通过CLI启动设备服务,通过Cloudflare Tunnel暴露到公网,完成设备绑定,配置本地MCP/ACP服务,Agent可调用这些服务
+**Goal**: 技术用户通过CLI启动设备服务,通过Cloudflare Tunnel暴露到公网,使用临时绑定码+Realtime Channel完成设备绑定,配置本地MCP/ACP服务,Agent可调用这些服务
 
-**Independent Test**: 安装CLI,启动设备服务,完成设备绑定,配置本地MCP服务,在对话中让Agent调用该服务
+**Independent Test**: 安装CLI,启动设备服务,输入临时绑定码完成绑定,配置本地MCP服务,在对话中让Agent调用该服务
 
 ### Database Schema for Devices
 
-- [ ] T105 [US3] Create `devices` table migration in `supabase/migrations/20250124000015_devices.sql` (id, device_secret_hash, created_at, last_seen_at, metadata)
-- [ ] T106 [US3] Create `device_bindings` table migration in `supabase/migrations/20250124000016_device_bindings.sql` (id, device_id, user_id, tunnel_url, status, settings, created_at)
-- [ ] T107 [US3] Add RLS policies for devices and device_bindings tables
-- [ ] T108 [US3] Add indexes for device lookups and binding queries
+- [ ] T105 [US3] Create `devices` table migration in `supabase/migrations/20250124000015_devices.sql` (id, device_id, device_name, platform, hostname, created_at, last_seen_at)
+- [ ] T106 [US3] Create `device_bindings` table migration in `supabase/migrations/20250124000016_device_bindings.sql` (id, device_id, user_id, binding_name, device_url, binding_code, status, config, created_at, updated_at, expires_at)
+- [ ] T107 [US3] Create `mcp_services` table migration in `supabase/migrations/20250124000017_mcp_services.sql` (id, binding_id, service_name, command, args, env, status, created_at, updated_at)
+- [ ] T108 [US3] Add RLS policies for devices, device_bindings, and mcp_services tables
+- [ ] T109 [US3] Add indexes for device lookups, binding queries, and MCP service queries
 
 ### CLI Core Infrastructure
 
-- [ ] T109 [P] [US3] Create CLI entry point and command parser in `apps/cli/src/index.ts` using commander.js
-- [ ] T110 [P] [US3] Create device secret generator and manager in `apps/cli/src/lib/device-secret.ts`
-- [ ] T111 [P] [US3] Create CLI config manager in `apps/cli/src/lib/config.ts` (支持命令行参数: ignore_open_bind_url, app_url, supabase_url, supabase_anon_key, device_secret)
-- [ ] T112 [P] [US3] Create CLI output formatter and logger in `apps/cli/src/lib/formatter.ts`
+- [ ] T110 [P] [US3] Create CLI entry point and command parser in `apps/cli/src/index.ts` using commander.js
+- [ ] T111 [P] [US3] Create temp binding code manager in `apps/cli/src/lib/temp-binding-manager.ts` (生成临时绑定码（运行时内存）, 创建 Realtime Channel, 发送设备 URL)
+- [ ] T112 [P] [US3] Create binding code manager in `apps/cli/src/lib/binding-code-manager.ts` (生成和管理正式绑定码)
+- [ ] T113 [P] [US3] Create CLI config manager in `apps/cli/src/lib/config.ts` (支持命令行参数: ignore_open_bind_url, app_url, supabase_url, supabase_anon_key)
+- [ ] T114 [P] [US3] Create CLI output formatter and logger in `apps/cli/src/lib/formatter.ts`
+- [ ] T115 [P] [US3] Create device ID generator in `apps/cli/src/lib/device-id.ts` (基于硬件信息生成唯一设备 ID)
 
-### Device Service HTTP Server
+### Device Service HTTP Server (Hono)
 
-- [ ] T113 [P] [US3] Create HTTP server foundation in `apps/cli/src/server/index.ts` (Express/Fastify)
-- [ ] T114 [P] [US3] Implement /health endpoint in `apps/cli/src/server/routes/health.ts`
-- [ ] T115 [P] [US3] Implement /bind endpoint in `apps/cli/src/server/routes/bind.ts` (验证 device_secret, 调用远程 API 建立绑定)
-- [ ] T116 [P] [US3] Implement /setting endpoint in `apps/cli/src/server/routes/setting.ts` (GET/POST 配置管理)
-- [ ] T117 [US3] Implement /mcp endpoint in `apps/cli/src/server/routes/mcp.ts` (streamable HTTP MCP 服务代理)
-- [ ] T118 [US3] Implement /acp endpoint in `apps/cli/src/server/routes/acp.ts` (ACP 协议服务代理)
+- [ ] T116 [P] [US3] Create HTTP server foundation using Hono in `apps/cli/src/server/index.ts`
+- [ ] T117 [P] [US3] Implement /health endpoint in `apps/cli/src/server/routes/health.ts`
+- [ ] T118 [P] [US3] Implement /bind endpoint in `apps/cli/src/server/routes/bind.ts` (接收绑定请求, 生成正式绑定码, 返回给 Mango)
+- [ ] T119 [P] [US3] Implement /setting endpoint in `apps/cli/src/server/routes/setting.ts` (GET/POST 配置管理)
+- [ ] T120 [US3] Implement /mcp endpoint in `apps/cli/src/server/routes/mcp.ts` (streamable HTTP MCP 服务代理, 需要 binding_code 认证)
+- [ ] T121 [US3] Implement /acp endpoint in `apps/cli/src/server/routes/acp.ts` (ACP 协议服务代理, 需要 binding_code 认证)
+- [ ] T122 [US3] Add binding_code authentication middleware in `apps/cli/src/server/middleware/auth.ts`
 
 ### Cloudflare Tunnel Integration
 
-- [ ] T119 [P] [US3] Create Cloudflare Tunnel manager in `apps/cli/src/lib/tunnel-manager.ts` (使用 cloudflared 或 SDK)
-- [ ] T120 [US3] Implement tunnel creation and lifecycle management in CLI startup flow
-- [ ] T121 [US3] Add tunnel URL reporting to device service and remote database
+- [ ] T123 [P] [US3] Create Cloudflare Tunnel manager in `apps/cli/src/lib/tunnel-manager.ts` (使用 cloudflared CLI)
+- [ ] T124 [US3] Implement tunnel creation and lifecycle management in CLI startup flow
+- [ ] T125 [US3] Add tunnel URL collection (cloudflare_url, localhost_url, hostname_url) and reporting
 
 ### MCP/ACP Service Configuration
 
-- [ ] T122 [P] [US3] Create MCP service config schema in `apps/cli/src/types/mcp-config.ts`
-- [ ] T123 [P] [US3] Create ACP service config schema in `apps/cli/src/types/acp-config.ts`
-- [ ] T124 [P] [US3] Implement local MCP service connector in `apps/cli/src/lib/connectors/mcp-connector.ts` (支持 stdio transport)
-- [ ] T125 [P] [US3] Implement local ACP service connector in `apps/cli/src/lib/connectors/acp-connector.ts`
-- [ ] T126 [US3] Create service health check and status monitoring in `apps/cli/src/lib/health-check.ts`
+- [ ] T126 [P] [US3] Create MCP service config schema in `apps/cli/src/types/mcp-config.ts`
+- [ ] T127 [P] [US3] Create ACP service config schema in `apps/cli/src/types/acp-config.ts`
+- [ ] T128 [P] [US3] Implement local MCP service connector in `apps/cli/src/lib/connectors/mcp-connector.ts` (支持 stdio transport)
+- [ ] T129 [P] [US3] Implement local ACP service connector in `apps/cli/src/lib/connectors/acp-connector.ts`
+- [ ] T130 [US3] Create service health check and status monitoring in `apps/cli/src/lib/health-check.ts`
 
 ### Device Binding Flow (Web)
 
-- [ ] T127 [P] [US3] Create device binding API route in `apps/web/src/app/api/devices/bind/route.ts` (验证 device_secret, 创建绑定记录)
-- [ ] T128 [P] [US3] Create device binding page in `apps/web/src/app/devices/bind/page.tsx` (输入 device_secret 的 UI)
-- [ ] T129 [P] [US3] Create device list API route in `apps/web/src/app/api/devices/route.ts` (GET 用户的设备绑定列表)
-- [ ] T130 [US3] Create device management page in `apps/web/src/app/settings/devices/page.tsx` (显示绑定的设备, 在线状态, 解绑操作)
+- [ ] T131 [P] [US3] Create device binding page in `apps/web/src/app/devices/bind/page.tsx` (输入临时绑定码, 订阅 Realtime Channel, 获取设备 URL, 进行 health check)
+- [ ] T132 [P] [US3] Create device binding API route in `apps/web/src/app/api/devices/bind/route.ts` (通过设备 URL 发送绑定请求, 记录绑定关系)
+- [ ] T133 [P] [US3] Create device list API route in `apps/web/src/app/api/devices/route.ts` (GET 用户的设备绑定列表)
+- [ ] T134 [US3] Create device management page in `apps/web/src/app/settings/devices/page.tsx` (显示绑定的设备, 在线状态, 解绑操作)
+- [ ] T135 [US3] Implement Realtime Channel subscription hook in `apps/web/src/hooks/useDeviceBinding.ts` (订阅 binding:${tempCode} channel)
+
+### Device URL Update Mechanism
+
+- [ ] T136 [US3] Create Supabase Edge Function for device URL update in `supabase/functions/update-device-url/index.ts` (验证 binding_code, 更新 device_url)
+- [ ] T137 [US3] Implement device URL change detection and update logic in CLI (监听 tunnel URL 变化, 调用 Edge Function 更新)
 
 ### CLI Startup Flow
 
-- [ ] T131 [US3] Implement CLI startup command in `apps/cli/src/commands/start.ts` (生成 device_secret, 启动 HTTP 服务, 创建 tunnel, 打开绑定页面)
-- [ ] T132 [US3] Add browser auto-open logic for binding page (支持 --ignore-open-bind-url 参数)
-- [ ] T133 [US3] Add graceful shutdown handling for device service
+- [ ] T138 [US3] Implement CLI startup command in `apps/cli/src/commands/start.ts` (生成临时绑定码（内存）, 启动 HTTP 服务, 创建 tunnel, 建立 Realtime Channel, 发送设备 URL, 打开绑定页面)
+- [ ] T139 [US3] Add browser auto-open logic for binding page with temp code (支持 --ignore-open-bind-url 参数)
+- [ ] T140 [US3] Add graceful shutdown handling for device service (清理 Realtime Channel, 关闭 tunnel)
 
 ### Agent Integration with Device Services
 
-- [ ] T134 [US3] Create device service client in `apps/web/src/services/DeviceService.ts` (通过 tunnel URL 调用设备服务)
-- [ ] T135 [US3] Update Tool Registry to discover tools from user's bound devices
-- [ ] T136 [US3] Implement device service proxy in Agent Edge Function `supabase/functions/process-agent-message/index.ts` (调用设备的 /mcp 端点)
-- [ ] T137 [US3] Add device availability check before tool invocation
-- [ ] T138 [US3] Implement error handling for device offline/unreachable scenarios
+- [ ] T141 [US3] Create device service client in `apps/web/src/services/DeviceService.ts` (通过 device_url 调用设备服务, 使用 binding_code 认证)
+- [ ] T142 [US3] Update Tool Registry to discover tools from user's bound devices
+- [ ] T143 [US3] Implement device service proxy in Agent Edge Function `supabase/functions/process-agent-message/index.ts` (调用设备的 /mcp 端点, 使用 binding_code 认证)
+- [ ] T144 [US3] Add device availability check before tool invocation (检查 device_url 是否可访问)
+- [ ] T145 [US3] Implement error handling for device offline/unreachable scenarios
 
 ### CLI User Experience
 
-- [ ] T139 [P] [US3] Create CLI help command in `apps/cli/src/commands/help.ts`
-- [ ] T140 [P] [US3] Create CLI version command in `apps/cli/src/commands/version.ts`
-- [ ] T141 [P] [US3] Create CLI status command in `apps/cli/src/commands/status.ts` (显示设备服务状态, 绑定状态, 配置的服务)
-- [ ] T142 [US3] Package CLI as executable using pkg or ncc in `apps/cli/package.json`
-- [ ] T143 [US3] Create CLI installation guide and security documentation in `apps/cli/README.md` (包含 device_secret 管理和安全最佳实践)
+- [ ] T146 [P] [US3] Create CLI help command in `apps/cli/src/commands/help.ts`
+- [ ] T147 [P] [US3] Create CLI version command in `apps/cli/src/commands/version.ts`
+- [ ] T148 [P] [US3] Create CLI status command in `apps/cli/src/commands/status.ts` (显示设备服务状态, 绑定状态, 配置的服务)
+- [ ] T149 [US3] Package CLI as executable using pkg or ncc in `apps/cli/package.json`
+- [ ] T150 [US3] Create CLI installation guide and security documentation in `apps/cli/README.md` (包含临时绑定码（运行时内存）和正式绑定码的安全最佳实践)
 
 **Checkpoint**: User Story 3 complete - CLI tool启动设备服务, 通过Cloudflare Tunnel暴露, 完成设备绑定, 配置本地MCP/ACP服务, Agent可调用这些服务
 

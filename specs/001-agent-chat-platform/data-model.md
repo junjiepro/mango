@@ -883,9 +883,10 @@ CREATE INDEX idx_links_feedback ON learning_record_feedback_links(feedback_recor
 ```sql
 CREATE TABLE devices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  device_id TEXT UNIQUE NOT NULL,
-  device_name TEXT,
+  device_id TEXT UNIQUE NOT NULL,  -- 设备唯一标识（基于硬件信息生成）
+  device_name TEXT,                -- 用户自定义设备名称
   platform TEXT NOT NULL CHECK (platform IN ('windows', 'macos', 'linux')),
+  hostname TEXT,                   -- 主机名
   created_at TIMESTAMPTZ DEFAULT NOW(),
   last_seen_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -898,6 +899,7 @@ CREATE INDEX idx_devices_last_seen ON devices(last_seen_at);
 - `device_id`: 设备唯一标识（基于硬件信息生成）
 - `device_name`: 用户自定义设备名称
 - `platform`: 操作系统平台
+- `hostname`: 主机名
 - `last_seen_at`: 设备最后活跃时间
 
 **RLS策略**：
@@ -912,11 +914,22 @@ CREATE POLICY "Users can view their bound devices"
       SELECT device_id FROM device_bindings WHERE user_id = auth.uid()
     )
   );
+
+-- 允许匿名用户创建设备记录（CLI 工具调用）
+CREATE POLICY "Anyone can create devices"
+  ON devices FOR INSERT
+  WITH CHECK (true);
+
+-- 允许设备更新自己的 last_seen_at
+CREATE POLICY "Devices can update their own last_seen_at"
+  ON devices FOR UPDATE
+  USING (true)
+  WITH CHECK (true);
 ```
 
 ---
 
-## 2.14 设备绑定 (device_bindings) - User Story 3
+## 2.15 设备绑定 (device_bindings) - User Story 3
 
 **描述**：设备与用户之间的绑定关系，支持多对多关系
 
@@ -927,29 +940,45 @@ CREATE TABLE device_bindings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   device_id UUID REFERENCES devices(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  binding_name TEXT,
-  tunnel_url TEXT NOT NULL,
-  binding_token TEXT UNIQUE NOT NULL,
+  binding_name TEXT,               -- 用户自定义绑定名称（如"工作电脑"）
+  device_url TEXT NOT NULL,        -- 设备当前 URL（可能是 cloudflare_url 或 localhost_url）
+  binding_code TEXT UNIQUE NOT NULL,  -- 正式绑定码（256位随机字符串）
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'expired')),
-  config JSONB DEFAULT '{}',
+  config JSONB DEFAULT '{}',       -- 绑定级别的配置数据
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  expires_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ,          -- 可选的过期时间
   UNIQUE(device_id, user_id, binding_name)
 );
 
 CREATE INDEX idx_device_bindings_user ON device_bindings(user_id);
 CREATE INDEX idx_device_bindings_device ON device_bindings(device_id);
-CREATE INDEX idx_device_bindings_token ON device_bindings(binding_token);
+CREATE INDEX idx_device_bindings_code ON device_bindings(binding_code);
 CREATE INDEX idx_device_bindings_status ON device_bindings(status);
 ```
 
 **字段说明**：
 - `binding_name`: 用户自定义绑定名称（如"工作电脑"、"家用Mac"）
-- `tunnel_url`: Cloudflare Tunnel 公网 URL
-- `binding_token`: 用于 API 认证的 token（256位随机字符串）
+- `device_url`: 设备当前 URL（设备会主动更新此字段）
+- `binding_code`: 正式绑定码（256位随机字符串，用于设备认证）
 - `status`: 绑定状态（active/inactive/expired）
 - `config`: 绑定级别的配置数据
+
+**绑定流程**：
+
+```
+1. CLI 启动 → 生成临时绑定码（运行时内存中）→ 建立 Realtime Channel → 发送设备 URL
+2. 用户访问绑定页面 → 输入临时绑定码 → 订阅 Channel → 获取设备 URL
+3. 页面进行 health check → 访问正常 → 显示可绑定状态
+4. 用户触发绑定 → 通过设备 URL 发送绑定请求 → 设备生成正式绑定码
+5. 设备返回绑定码 → Mango 记录绑定关系 → CLI 关闭 Realtime Channel
+6. 后续设备 URL 变更 → 设备调用 Edge Function 更新 device_url
+```
+
+**说明**：
+- 临时绑定码仅存在于 CLI 运行时内存中，不持久化到数据库
+- Realtime Channel 名称为 `binding:${临时绑定码}`
+- 临时绑定码在绑定完成后即可丢弃，Channel 自动关闭
 
 **状态转换**：
 
@@ -993,6 +1022,12 @@ CREATE POLICY "Users can update their own bindings"
 CREATE POLICY "Users can delete their own bindings"
   ON device_bindings FOR DELETE
   USING (auth.uid() = user_id);
+
+-- 允许设备通过 binding_code 更新自己的 device_url
+CREATE POLICY "Devices can update their own device_url"
+  ON device_bindings FOR UPDATE
+  USING (true)
+  WITH CHECK (true);
 ```
 
 ---

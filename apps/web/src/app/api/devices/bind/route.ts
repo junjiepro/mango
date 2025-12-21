@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
 
     const { device_secret, binding_name, tunnel_url } = validation.data;
 
+    let healthData;
     // 验证 device_secret 并获取设备信息
     // 通过 tunnel_url 调用设备的 /health 端点验证
     try {
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const healthData = await healthResponse.json();
+      healthData = await healthResponse.json();
       console.log('Device health check:', healthData);
     } catch (error) {
       console.error('Failed to reach device:', error);
@@ -75,50 +76,11 @@ export async function POST(request: NextRequest) {
     // 生成设备 ID (基于 device_secret 的哈希)
     const deviceId = await generateDeviceId(device_secret);
 
-    // 检查设备是否已存在
-    const { data: existingDevice } = await supabase
-      .from('devices')
-      .select('id')
-      .eq('device_id', deviceId)
-      .single();
-
-    let deviceDbId: string;
-
-    if (existingDevice) {
-      // 更新现有设备的最后在线时间
-      deviceDbId = existingDevice.id;
-      await supabase
-        .from('devices')
-        .update({ last_seen_at: new Date().toISOString() })
-        .eq('id', deviceDbId);
-    } else {
-      // 创建新设备记录
-      const { data: newDevice, error: deviceError } = await supabase
-        .from('devices')
-        .insert({
-          device_id: deviceId,
-          device_name: binding_name || `Device ${deviceId.substring(0, 8)}`,
-          platform: 'unknown', // 可以从设备健康检查中获取
-        })
-        .select()
-        .single();
-
-      if (deviceError || !newDevice) {
-        console.error('Failed to create device:', deviceError);
-        return NextResponse.json(
-          { error: 'Failed to create device record' },
-          { status: 500 }
-        );
-      }
-
-      deviceDbId = newDevice.id;
-    }
-
-    // 检查是否已存在绑定
+    // 检查是否已存在绑定 - 新的合并表结构
     const { data: existingBinding } = await supabase
       .from('device_bindings')
       .select('id, status')
-      .eq('device_id', deviceDbId)
+      .eq('device_id', deviceId)
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -127,8 +89,12 @@ export async function POST(request: NextRequest) {
       const { data: updatedBinding, error: updateError } = await supabase
         .from('device_bindings')
         .update({
-          tunnel_url,
+          device_url: tunnel_url,
+          device_name: binding_name || `Device ${deviceId.substring(0, 8)}`,
+          platform: healthData?.platform || 'linux',
+          hostname: healthData?.hostname,
           status: 'active',
+          last_seen_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingBinding.id)
@@ -137,10 +103,7 @@ export async function POST(request: NextRequest) {
 
       if (updateError || !updatedBinding) {
         console.error('Failed to update binding:', updateError);
-        return NextResponse.json(
-          { error: 'Failed to update device binding' },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to update device binding' }, { status: 500 });
       }
 
       return NextResponse.json({
@@ -149,18 +112,21 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 生成 binding_token
-    const bindingToken = await generateBindingToken();
+    // 生成 binding_code
+    const bindingCode = await generateBindingToken();
 
-    // 创建新绑定
+    // 创建新绑定 - 一次性创建包含所有设备和绑定信息
     const { data: newBinding, error: bindingError } = await supabase
       .from('device_bindings')
       .insert({
-        device_id: deviceDbId,
         user_id: user.id,
+        device_id: deviceId,
+        device_name: binding_name || `Device ${deviceId.substring(0, 8)}`,
+        platform: healthData?.platform || 'linux',
+        hostname: healthData?.hostname,
         binding_name: binding_name || `Device ${deviceId.substring(0, 8)}`,
-        tunnel_url,
-        binding_token: bindingToken,
+        device_url: tunnel_url,
+        binding_code: bindingCode,
         status: 'active',
       })
       .select()
@@ -168,10 +134,7 @@ export async function POST(request: NextRequest) {
 
     if (bindingError || !newBinding) {
       console.error('Failed to create binding:', bindingError);
-      return NextResponse.json(
-        { error: 'Failed to create device binding' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to create device binding' }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -180,10 +143,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Device binding error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 

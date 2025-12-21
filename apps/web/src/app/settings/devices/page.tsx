@@ -22,26 +22,25 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2, Plus, Trash2, Circle, ExternalLink, RefreshCw } from 'lucide-react';
+import { AppHeader } from '@/components/layouts/AppHeader';
 
-interface Device {
+// 新的合并表结构 - device_bindings 包含所有设备和绑定信息
+interface DeviceBinding {
   id: string;
   device_id: string;
   device_name: string;
   platform: string;
-  last_seen_at: string;
-}
-
-interface DeviceBinding {
-  id: string;
+  hostname: string;
   binding_name: string;
-  tunnel_url: string;
+  device_url: string;
+  binding_code: string;
   status: 'active' | 'inactive' | 'expired';
   created_at: string;
   updated_at: string;
   expires_at: string | null;
-  is_online: boolean;
-  last_check_at: string;
-  devices: Device;
+  last_seen_at: string;
+  is_online?: boolean;
+  last_check_at?: string;
 }
 
 export default function DeviceManagementPage() {
@@ -59,10 +58,11 @@ export default function DeviceManagementPage() {
     loadDevices();
   }, []);
 
-  const loadDevices = async () => {
+  const loadDevices = async (checkOnline = false) => {
     try {
       setError(null);
-      const response = await fetch('/api/devices');
+      const url = checkOnline ? '/api/devices?check_online=true' : '/api/devices';
+      const response = await fetch(url);
 
       if (!response.ok) {
         throw new Error('Failed to load devices');
@@ -80,7 +80,7 @@ export default function DeviceManagementPage() {
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    loadDevices();
+    loadDevices(true); // 刷新时检查在线状态
   };
 
   const handleDeleteClick = (deviceId: string) => {
@@ -121,7 +121,7 @@ export default function DeviceManagementPage() {
     if (binding.status !== 'active') {
       return <Badge variant="secondary">Inactive</Badge>;
     }
-    if (binding.is_online) {
+    if (binding.is_online === true) {
       return (
         <Badge variant="default" className="bg-green-500">
           <Circle className="mr-1 h-2 w-2 fill-current" />
@@ -129,48 +129,56 @@ export default function DeviceManagementPage() {
         </Badge>
       );
     }
-    return (
-      <Badge variant="destructive">
-        <Circle className="mr-1 h-2 w-2 fill-current" />
-        Offline
-      </Badge>
-    );
+    if (binding.is_online === false) {
+      return (
+        <Badge variant="destructive">
+          <Circle className="mr-1 h-2 w-2 fill-current" />
+          Offline
+        </Badge>
+      );
+    }
+    return <Badge variant="outline">Unknown</Badge>;
   };
 
   if (isLoading) {
     return (
-      <div className="container mx-auto max-w-6xl py-8 px-4">
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex min-h-screen flex-col">
+        <AppHeader />
+        <div className="container mx-auto max-w-6xl py-8 px-4">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto max-w-6xl py-8 px-4">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Device Management</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your connected devices and local services
-          </p>
+    <div className="flex min-h-screen flex-col">
+      <AppHeader />
+      <div className="container mx-auto max-w-6xl py-8 px-4">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Device Management</h1>
+            <p className="text-muted-foreground mt-1">
+              Manage your connected devices and local services
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button onClick={() => router.push('/devices/bind')}>
+              <Plus className="mr-2 h-4 w-4" />
+              Bind New Device
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </Button>
-          <Button onClick={() => router.push('/devices/bind')}>
-            <Plus className="mr-2 h-4 w-4" />
-            Bind New Device
-          </Button>
-        </div>
-      </div>
 
       {error && (
         <Alert variant="destructive" className="mb-6">
@@ -207,7 +215,7 @@ export default function DeviceManagementPage() {
                       {getStatusBadge(binding)}
                     </CardTitle>
                     <CardDescription>
-                      Platform: {binding.devices.platform} • Bound on{' '}
+                      Platform: {binding.platform} • Bound on{' '}
                       {formatDate(binding.created_at)}
                     </CardDescription>
                   </div>
@@ -226,36 +234,44 @@ export default function DeviceManagementPage() {
                   <div>
                     <p className="text-muted-foreground">Device ID</p>
                     <p className="font-mono text-xs mt-1">
-                      {binding.devices.device_id.substring(0, 16)}...
+                      {binding.device_id.substring(0, 16)}...
                     </p>
                   </div>
                   <div>
+                    <p className="text-muted-foreground">Hostname</p>
+                    <p className="mt-1">{binding.hostname || 'N/A'}</p>
+                  </div>
+                  <div>
                     <p className="text-muted-foreground">Last Seen</p>
-                    <p className="mt-1">{formatDate(binding.devices.last_seen_at)}</p>
+                    <p className="mt-1">{formatDate(binding.last_seen_at)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Status</p>
+                    <p className="mt-1 capitalize">{binding.status}</p>
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Tunnel URL</p>
+                  <p className="text-sm text-muted-foreground">Device URL</p>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 text-xs bg-muted px-3 py-2 rounded">
-                      {binding.tunnel_url}
+                      {binding.device_url}
                     </code>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => window.open(binding.tunnel_url, '_blank')}
+                      onClick={() => window.open(binding.device_url, '_blank')}
                     >
                       <ExternalLink className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
 
-                {binding.status === 'active' && !binding.is_online && (
+                {binding.status === 'active' && binding.is_online === false && (
                   <Alert>
                     <AlertDescription className="text-sm">
                       This device appears to be offline. Make sure the Mango CLI tool is
-                      running and the tunnel is active.
+                      running and the device URL is accessible.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -293,6 +309,7 @@ export default function DeviceManagementPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }
