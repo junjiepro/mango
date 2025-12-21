@@ -39,7 +39,9 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
 
     // 2. 生成设备 ID
     const deviceInfo = getDeviceInfoSummary();
-    formatter.success(`Device ID: ${formatter.highlight(deviceInfo.deviceId.substring(0, 20) + '...')}`);
+    formatter.success(
+      `Device ID: ${formatter.highlight(deviceInfo.deviceId.substring(0, 20) + '...')}`
+    );
     formatter.dim(`Platform: ${deviceInfo.platform} (${deviceInfo.arch})`);
     formatter.dim(`Hostname: ${deviceInfo.hostname}`);
 
@@ -48,12 +50,14 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     const hasBindingCode = existingConfig !== null;
 
     if (hasBindingCode) {
-      formatter.newline();
-      formatter.success('Device is already bound');
-      formatter.labeled('Binding Code', existingConfig!.bindingCode.substring(0, 20) + '...');
-      formatter.labeled('Device Name', existingConfig!.deviceName);
-      formatter.labeled('Bound At', new Date(existingConfig!.boundAt).toLocaleString());
-
+      Object.keys(existingConfig).forEach((key) => {
+        const config = existingConfig[key];
+        formatter.newline();
+        formatter.success('Device is already bound');
+        formatter.labeled('Binding Code', config!.bindingCode.substring(0, 20) + '...');
+        formatter.labeled('Device Name', config!.deviceName);
+        formatter.labeled('Bound At', new Date(config!.boundAt).toLocaleString());
+      });
       // 更新最后使用时间
       bindingCodeManager.updateLastUsedAt();
     }
@@ -65,7 +69,9 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     try {
       actualPort = await startServer(config);
       if (actualPort !== config.port) {
-        serverSpinner.succeed(`Server running on port ${actualPort} (port ${config.port} was in use)`);
+        serverSpinner.succeed(
+          `Server running on port ${actualPort} (port ${config.port} was in use)`
+        );
       } else {
         serverSpinner.succeed(`Server running on port ${actualPort}`);
       }
@@ -89,7 +95,9 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
       formatter.info('Please install cloudflared to enable tunnel functionality:');
       formatter.dim('  macOS: brew install cloudflare/cloudflare/cloudflared');
       formatter.dim('  Windows: choco install cloudflared');
-      formatter.dim('  Linux: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/');
+      formatter.dim(
+        '  Linux: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/'
+      );
       formatter.newline();
       formatter.info('Continuing without tunnel...');
     } else {

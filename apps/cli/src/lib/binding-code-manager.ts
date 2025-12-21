@@ -7,7 +7,7 @@
  */
 
 import { randomBytes } from 'crypto';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 
@@ -41,6 +41,7 @@ export interface BindingConfig {
 export class BindingCodeManager {
   private bindingConfigPath: string;
   private configDir: string;
+  private bindingCodes: Set<string> = new Set();
 
   constructor() {
     // 存储在用户目录下的隐藏文件
@@ -77,34 +78,64 @@ export class BindingCodeManager {
    * 完整配置需要在绑定成功后通过 saveConfig 保存
    */
   generateAndSave(): string {
-    return this.generateBindingCode();
+    const code = this.generateBindingCode();
+    this.bindingCodes.add(code);
+    return code;
   }
 
   /**
    * 保存绑定配置
+   * @param bindingCode 绑定码
+   * @param config 配置信息
+   * @param initConfig 初始配置（用于首次设置时的默认值）
+   *
+   * @throws Error 当绑定码不在允许列表中时抛出异常
    */
-  saveConfig(config: BindingConfig): void {
+  saveConfig(
+    bindingCode: string,
+    config: Partial<BindingConfig>,
+    initConfig?: BindingConfig
+  ): void {
     this.ensureConfigDir();
 
     // 更新最后使用时间
     config.lastUsedAt = new Date().toISOString();
 
-    // 安全存储（仅当前用户可读）
-    const configJson = JSON.stringify(config, null, 2);
-    writeFileSync(this.bindingConfigPath, configJson, { mode: 0o600 });
+    const prevConfig = this.readConfig() || {};
+    const existing = !!prevConfig[bindingCode];
+    const canUpdate = (this.bindingCodes.has(bindingCode) && initConfig) || existing;
+
+    if (canUpdate) {
+      // 安全存储（仅当前用户可读）
+      const configJson = JSON.stringify(
+        {
+          ...prevConfig,
+          [bindingCode]: existing ? { ...prevConfig[bindingCode], ...config } : initConfig,
+        },
+        null,
+        2
+      );
+      writeFileSync(this.bindingConfigPath, configJson, { mode: 0o600 });
+
+      this.bindingCodes.delete(bindingCode);
+    } else {
+      throw new Error(
+        `Cannot update binding code: ${bindingCode} not found in active codes or existing config`
+      );
+    }
   }
 
   /**
    * 读取绑定配置
    */
-  readConfig(): BindingConfig | null {
+  readConfig(): Record<string, BindingConfig> | null {
     if (!existsSync(this.bindingConfigPath)) {
       return null;
     }
 
     try {
       const configJson = readFileSync(this.bindingConfigPath, 'utf-8');
-      return JSON.parse(configJson) as BindingConfig;
+      return JSON.parse(configJson) as Record<string, BindingConfig>;
     } catch (error) {
       return null;
     }
@@ -113,9 +144,9 @@ export class BindingCodeManager {
   /**
    * 读取绑定码（兼容旧接口）
    */
-  read(): string | null {
+  read(): string[] {
     const config = this.readConfig();
-    return config?.bindingCode || null;
+    return Object.keys(config || {});
   }
 
   /**
@@ -134,8 +165,12 @@ export class BindingCodeManager {
       return false;
     }
 
-    config.lastUsedAt = new Date().toISOString();
-    this.saveConfig(config);
+    const lastUsedAt = new Date().toISOString();
+    Object.values(config).forEach((value) => {
+      value.lastUsedAt = lastUsedAt;
+      this.saveConfig(value.bindingCode, value);
+    });
+
     return true;
   }
 
@@ -148,8 +183,7 @@ export class BindingCodeManager {
     }
 
     try {
-      const fs = require('fs');
-      fs.unlinkSync(this.bindingConfigPath);
+      unlinkSync(this.bindingConfigPath);
       return true;
     } catch (error) {
       return false;

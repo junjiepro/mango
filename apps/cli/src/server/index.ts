@@ -55,9 +55,9 @@ export function createServer(config: CLIConfig) {
 
       // 3. 转换 platform 格式以匹配数据库约束
       const platformMap: Record<string, string> = {
-        'win32': 'windows',
-        'darwin': 'macos',
-        'linux': 'linux',
+        win32: 'windows',
+        darwin: 'macos',
+        linux: 'linux',
       };
       const platform = platformMap[process.platform] || 'linux';
 
@@ -92,14 +92,16 @@ export function createServer(config: CLIConfig) {
     try {
       const body = await c.req.json();
       const { binding_code, device_id, device_name, user_id, platform, hostname } = body;
+      const rest = { ...body };
+      delete rest.binding_code;
 
       // 验证必需字段
-      if (!binding_code || !device_id || !device_name) {
-        return c.json({ error: 'Missing required fields: binding_code, device_id, device_name' }, 400);
+      if (!binding_code) {
+        return c.json({ error: 'Missing required field: binding_code' }, 400);
       }
 
       // 保存完整的绑定配置
-      bindingCodeManager.saveConfig({
+      bindingCodeManager.saveConfig(binding_code, rest, {
         bindingCode: binding_code,
         deviceId: device_id,
         deviceName: device_name,
