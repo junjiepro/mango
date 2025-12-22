@@ -9,6 +9,7 @@ import { formatter } from './formatter.js';
 export class TunnelManager {
   private process: ChildProcess | null = null;
   private tunnelUrl: string | null = null;
+  private urlChangeCallback: ((newUrl: string) => void) | null = null;
 
   /**
    * 创建Cloudflare Tunnel
@@ -32,10 +33,23 @@ export class TunnelManager {
 
         // 匹配 Cloudflare Tunnel URL
         const match = output.match(/https:\/\/[^\s]+\.trycloudflare\.com/);
-        if (match && !this.tunnelUrl) {
+        if (match) {
           const url = match[0];
-          this.tunnelUrl = url;
-          resolve(url);
+
+          // 检测 URL 变化
+          if (this.tunnelUrl && this.tunnelUrl !== url) {
+            formatter.warning(`Tunnel URL changed: ${this.tunnelUrl} -> ${url}`);
+            this.tunnelUrl = url;
+
+            // 触发回调
+            if (this.urlChangeCallback) {
+              this.urlChangeCallback(url);
+            }
+          } else if (!this.tunnelUrl) {
+            // 首次获取 URL
+            this.tunnelUrl = url;
+            resolve(url);
+          }
         }
       });
 
@@ -79,6 +93,13 @@ export class TunnelManager {
   }
 
   /**
+   * 设置 URL 变化回调
+   */
+  onUrlChange(callback: (newUrl: string) => void): void {
+    this.urlChangeCallback = callback;
+  }
+
+  /**
    * 清理Tunnel进程
    */
   cleanup(): void {
@@ -86,6 +107,7 @@ export class TunnelManager {
       this.process.kill('SIGTERM');
       this.process = null;
       this.tunnelUrl = null;
+      this.urlChangeCallback = null;
     }
   }
 

@@ -15,14 +15,19 @@ import { acpConnector } from '../lib/connectors/acp-connector.js';
 import { serviceHealthChecker } from '../lib/service-health.js';
 import { findAvailablePort } from '../lib/port-utils.js';
 import { bindingCodeManager } from '../lib/binding-code-manager.js';
-import { generateDeviceId } from '../lib/device-id.js';
+import { generateDeviceId, getLocalIpAddress } from '../lib/device-id.js';
+import { tempBindingManager } from '../lib/temp-binding-manager.js';
+import { tunnelManager } from '../lib/tunnel-manager.js';
 import { createClient } from '@supabase/supabase-js';
+import { randomBytes } from 'crypto';
+import { actualPort } from '../commands/start.js';
 
 /**
  * 创建HTTP服务器
  */
 export function createServer(config: CLIConfig) {
   const app = new Hono();
+  const deviceSecret = config.deviceSecret || randomBytes(32).toString('base64url');
 
   // 全局中间件
   app.use('*', cors());
@@ -34,7 +39,59 @@ export function createServer(config: CLIConfig) {
       status: 'ok',
       timestamp: Date.now(),
       version: '0.1.0',
+      platform: process.platform,
+      hostname: os.hostname(),
     });
+  });
+
+  // 创建新的临时绑定码端点
+  app.post('/new-binding', async (c) => {
+    try {
+      const body = await c.req.json();
+      const { device_secret } = body;
+
+      // 验证 device_secret
+      if (!device_secret || device_secret !== deviceSecret) {
+        return c.json({ error: 'Invalid device_secret' }, 401);
+      }
+
+      // 生成新的临时绑定码
+      const tempCode = tempBindingManager.generateTempCode();
+
+      // 准备设备 URL 信息
+      const tunnelUrl = tunnelManager.getTunnelUrl();
+      const localIp = getLocalIpAddress();
+      const deviceUrls = {
+        cloudflare_url: tunnelUrl,
+        localhost_url: `http://localhost:${actualPort}`,
+        hostname_url: `http://${localIp}:${actualPort}`,
+      };
+
+      // 准备设备信息
+      const deviceId = generateDeviceId();
+      const deviceInfo = {
+        platform: process.platform,
+        hostname: os.hostname(),
+        deviceId,
+      };
+
+      // 建立 Realtime Channel 并发送设备 URL
+      await tempBindingManager.publishDeviceUrls(tempCode, deviceUrls, deviceInfo);
+
+      // 生成绑定 URL
+      const bindUrl = `${config.appUrl}/devices/bind?code=${tempCode}`;
+
+      return c.json({
+        success: true,
+        temp_code: tempCode,
+        bind_url: bindUrl,
+        device_urls: deviceUrls,
+        expires_in: 3600, // 1小时后过期（可配置）
+      });
+    } catch (error) {
+      console.error('New binding endpoint error:', error);
+      return c.json({ error: 'Failed to create new binding' }, 500);
+    }
   });
 
   // 设备绑定端点（新的绑定流程）
@@ -91,9 +148,10 @@ export function createServer(config: CLIConfig) {
   app.post('/setting', async (c) => {
     try {
       const body = await c.req.json();
-      const { binding_code, device_id, device_name, user_id, platform, hostname } = body;
+      const { binding_code, device_id, device_name, user_id, platform, hostname, temp_code } = body;
       const rest = { ...body };
       delete rest.binding_code;
+      delete rest.temp_code;
 
       // 验证必需字段
       if (!binding_code) {
@@ -114,6 +172,15 @@ export function createServer(config: CLIConfig) {
           arch: os.arch(),
         },
       });
+
+      // 如果提供了 temp_code，标记为已使用并清理 Channel
+      if (temp_code && tempBindingManager.isValidTempCode(temp_code)) {
+        tempBindingManager.markAsUsed(temp_code);
+        // 延迟清理 Channel，给 Web 端一些时间完成操作
+        setTimeout(async () => {
+          await tempBindingManager.cleanupTempCode(temp_code);
+        }, 5000); // 5秒后清理
+      }
 
       return c.json({
         success: true,

@@ -4,6 +4,7 @@
  *
  * 临时绑定码仅存在于 CLI 运行时内存中，不持久化到数据库
  * 用于建立 Realtime Channel 和完成设备绑定
+ * 支持多个临时绑定码同时存在，每个绑定码对应一个独立的 Channel
  */
 
 import { randomBytes } from 'crypto';
@@ -24,14 +25,23 @@ export interface DeviceInfo {
 }
 
 /**
+ * 临时绑定信息
+ */
+interface TempBindingInfo {
+  tempCode: string;
+  channel: RealtimeChannel;
+  deviceUrls: DeviceUrls;
+  deviceInfo: DeviceInfo;
+  createdAt: Date;
+  isUsed: boolean;
+}
+
+/**
  * 临时绑定码管理器类
  */
 export class TempBindingManager {
   private supabase: SupabaseClient | null = null;
-  private tempCode: string | null = null;
-  private channel: RealtimeChannel | null = null;
-  private deviceUrls: DeviceUrls | null = null;
-  private deviceInfo: DeviceInfo | null = null;
+  private bindings: Map<string, TempBindingInfo> = new Map();
 
   /**
    * 初始化 Supabase 客户端
@@ -44,21 +54,43 @@ export class TempBindingManager {
    * 生成临时绑定码（8位随机字符串，仅存在于内存中）
    */
   generateTempCode(): string {
-    this.tempCode = randomBytes(4).toString('hex'); // 8位十六进制
-    return this.tempCode;
+    const tempCode = randomBytes(4).toString('hex'); // 8位十六进制
+    return tempCode;
   }
 
   /**
-   * 获取当前临时绑定码
+   * 获取所有活跃的临时绑定码
    */
-  getTempCode(): string | null {
-    return this.tempCode;
+  getActiveTempCodes(): string[] {
+    return Array.from(this.bindings.keys()).filter(
+      (code) => !this.bindings.get(code)?.isUsed
+    );
+  }
+
+  /**
+   * 检查临时绑定码是否存在且未使用
+   */
+  isValidTempCode(tempCode: string): boolean {
+    const binding = this.bindings.get(tempCode);
+    return binding !== undefined && !binding.isUsed;
+  }
+
+  /**
+   * 标记临时绑定码为已使用（绑定完成后调用）
+   */
+  markAsUsed(tempCode: string): void {
+    const binding = this.bindings.get(tempCode);
+    if (binding) {
+      binding.isUsed = true;
+      formatter.info(`Temp code ${tempCode} marked as used`);
+    }
   }
 
   /**
    * 建立 Realtime Channel 并发送设备 URL
    */
   async publishDeviceUrls(
+    tempCode: string,
     deviceUrls: DeviceUrls,
     deviceInfo: DeviceInfo
   ): Promise<void> {
@@ -66,45 +98,44 @@ export class TempBindingManager {
       throw new Error('Supabase client not initialized');
     }
 
-    if (!this.tempCode) {
-      throw new Error('Temp code not generated');
-    }
-
-    // 保存设备信息,用于响应请求
-    this.deviceUrls = deviceUrls;
-    this.deviceInfo = deviceInfo;
-
     try {
       // 建立 Realtime Channel
-      this.channel = this.supabase.channel(`binding:${this.tempCode}`);
+      const channel = this.supabase.channel(`binding:${tempCode}`);
+
+      // 保存绑定信息
+      const bindingInfo: TempBindingInfo = {
+        tempCode,
+        channel,
+        deviceUrls,
+        deviceInfo,
+        createdAt: new Date(),
+        isUsed: false,
+      };
 
       // 监听 Web 端的 URL 请求
-      this.channel.on('broadcast', { event: 'request_urls' }, async (payload) => {
-        formatter.info('Received URL request from Web, resending device URLs...');
-        await this.sendDeviceUrls();
+      channel.on('broadcast', { event: 'request_urls' }, async () => {
+        formatter.info(`Received URL request for temp code ${tempCode}, resending device URLs...`);
+        await this.sendDeviceUrls(tempCode);
       });
 
       // 订阅 Channel
       await new Promise<void>((resolve, reject) => {
-        if (!this.channel) {
-          reject(new Error('Channel not created'));
-          return;
-        }
-
-        this.channel
-          .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-              resolve();
-            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              reject(new Error(`Channel subscription failed: ${status}`));
-            }
-          });
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            resolve();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            reject(new Error(`Channel subscription failed: ${status}`));
+          }
+        });
       });
 
-      // 首次发送设备 URL 到 Channel
-      await this.sendDeviceUrls();
+      // 保存到 Map
+      this.bindings.set(tempCode, bindingInfo);
 
-      formatter.success(`Realtime Channel established: binding:${this.tempCode}`);
+      // 首次发送设备 URL 到 Channel
+      await this.sendDeviceUrls(tempCode);
+
+      formatter.success(`Realtime Channel established: binding:${tempCode}`);
       formatter.success('Device URLs published to channel');
       formatter.info('Listening for URL requests from Web...');
     } catch (error) {
@@ -115,40 +146,55 @@ export class TempBindingManager {
   }
 
   /**
-   * 发送设备 URL 到 Channel
+   * 发送设备 URL 到指定的 Channel
    */
-  private async sendDeviceUrls(): Promise<void> {
-    if (!this.channel || !this.deviceUrls || !this.deviceInfo) {
+  private async sendDeviceUrls(tempCode: string): Promise<void> {
+    const binding = this.bindings.get(tempCode);
+    if (!binding) {
       return;
     }
 
-    await this.channel.send({
+    await binding.channel.send({
       type: 'broadcast',
       event: 'device_urls',
       payload: {
-        device_urls: this.deviceUrls,
-        device_info: this.deviceInfo,
+        device_urls: binding.deviceUrls,
+        device_info: binding.deviceInfo,
         timestamp: Date.now(),
       },
     });
   }
 
   /**
-   * 清理 Channel（绑定完成后调用）
+   * 清理指定的临时绑定码和 Channel
+   */
+  async cleanupTempCode(tempCode: string): Promise<void> {
+    const binding = this.bindings.get(tempCode);
+    if (!binding) {
+      return;
+    }
+
+    if (this.supabase) {
+      try {
+        await this.supabase.removeChannel(binding.channel);
+        formatter.info(`Realtime Channel closed for temp code: ${tempCode}`);
+      } catch (error) {
+        formatter.warning(`Failed to close Realtime Channel for temp code: ${tempCode}`);
+      }
+    }
+
+    this.bindings.delete(tempCode);
+  }
+
+  /**
+   * 清理所有 Channel（进程退出时调用）
    */
   async cleanup(): Promise<void> {
-    if (this.channel && this.supabase) {
-      try {
-        await this.supabase.removeChannel(this.channel);
-        formatter.info('Realtime Channel closed');
-      } catch (error) {
-        formatter.warning('Failed to close Realtime Channel');
-      }
-      this.channel = null;
+    const tempCodes = Array.from(this.bindings.keys());
+    for (const tempCode of tempCodes) {
+      await this.cleanupTempCode(tempCode);
     }
-    this.tempCode = null;
-    this.deviceUrls = null;
-    this.deviceInfo = null;
+    formatter.info('All Realtime Channels closed');
   }
 
   /**
@@ -160,6 +206,16 @@ export class TempBindingManager {
       hostname: os.hostname(),
       deviceId,
     };
+  }
+
+  /**
+   * 获取绑定信息统计
+   */
+  getStats(): { total: number; active: number; used: number } {
+    const total = this.bindings.size;
+    const used = Array.from(this.bindings.values()).filter((b) => b.isUsed).length;
+    const active = total - used;
+    return { total, active, used };
   }
 }
 

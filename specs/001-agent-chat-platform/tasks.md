@@ -227,27 +227,27 @@ Based on plan.md monorepo structure:
 
 ### Database Schema for Devices
 
-- [ ] T105 [US3] Create `devices` table migration in `supabase/migrations/20250124000015_devices.sql` (id, device_id, device_name, platform, hostname, created_at, last_seen_at)
-- [ ] T106 [US3] Create `device_bindings` table migration in `supabase/migrations/20250124000016_device_bindings.sql` (id, device_id, user_id, binding_name, device_url, binding_code, status, config, created_at, updated_at, expires_at)
-- [ ] T107 [US3] Create `mcp_services` table migration in `supabase/migrations/20250124000017_mcp_services.sql` (id, binding_id, service_name, command, args, env, status, created_at, updated_at)
-- [ ] T108 [US3] Add RLS policies for devices, device_bindings, and mcp_services tables
-- [ ] T109 [US3] Add indexes for device lookups, binding queries, and MCP service queries
+- [x] T105 [US3] Create `devices` table migration in `supabase/migrations/20250124000015_devices.sql` (id, device_id, device_name, platform, hostname, created_at, last_seen_at)
+- [x] T106 [US3] Create `device_bindings` table migration in `supabase/migrations/20250124000016_device_bindings.sql` (id, device_id, user_id, binding_name, device_url, binding_code, status, config, created_at, updated_at, expires_at)
+- [x] T107 [US3] Create `mcp_services` table migration in `supabase/migrations/20250124000017_mcp_services.sql` (id, binding_id, service_name, command, args, env, status, created_at, updated_at)
+- [x] T108 [US3] Add RLS policies for devices, device_bindings, and mcp_services tables
+- [x] T109 [US3] Add indexes for device lookups, binding queries, and MCP service queries
 
 ### CLI Core Infrastructure
 
-- [ ] T110 [P] [US3] Create CLI entry point and command parser in `apps/cli/src/index.ts` using commander.js
-- [ ] T111 [P] [US3] Create temp binding code manager in `apps/cli/src/lib/temp-binding-manager.ts` (生成临时绑定码（运行时内存）, 创建 Realtime Channel, 发送设备 URL)
-- [ ] T112 [P] [US3] Create binding code manager in `apps/cli/src/lib/binding-code-manager.ts` (生成和管理正式绑定码)
-- [ ] T113 [P] [US3] Create CLI config manager in `apps/cli/src/lib/config.ts` (支持命令行参数: ignore_open_bind_url, app_url, supabase_url, supabase_anon_key)
-- [ ] T114 [P] [US3] Create CLI output formatter and logger in `apps/cli/src/lib/formatter.ts`
-- [ ] T115 [P] [US3] Create device ID generator in `apps/cli/src/lib/device-id.ts` (基于硬件信息生成唯一设备 ID)
+- [x] T110 [P] [US3] Create CLI entry point and command parser in `apps/cli/src/index.ts` using commander.js
+- [x] T111 [P] [US3] Create temp binding code manager in `apps/cli/src/lib/temp-binding-manager.ts` (生成临时绑定码（运行时内存）, 创建 Realtime Channel, 发送设备 URL)
+- [x] T112 [P] [US3] Create binding code manager in `apps/cli/src/lib/binding-code-manager.ts` (生成和管理正式绑定码)
+- [x] T113 [P] [US3] Create CLI config manager in `apps/cli/src/lib/config.ts` (支持命令行参数: ignore_open_bind_url, app_url, supabase_url, supabase_anon_key)
+- [x] T114 [P] [US3] Create CLI output formatter and logger in `apps/cli/src/lib/formatter.ts`
+- [x] T115 [P] [US3] Create device ID generator in `apps/cli/src/lib/device-id.ts` (基于硬件信息生成唯一设备 ID)
 
 ### Device Service HTTP Server (Hono)
 
-- [ ] T116 [P] [US3] Create HTTP server foundation using Hono in `apps/cli/src/server/index.ts`
-- [ ] T117 [P] [US3] Implement /health endpoint in `apps/cli/src/server/routes/health.ts`
-- [ ] T118 [P] [US3] Implement /bind endpoint in `apps/cli/src/server/routes/bind.ts` (接收绑定请求, 生成正式绑定码, 返回给 Mango)
-- [ ] T119 [P] [US3] Implement /setting endpoint in `apps/cli/src/server/routes/setting.ts` (GET/POST 配置管理)
+- [x] T116 [P] [US3] Create HTTP server foundation using Hono in `apps/cli/src/server/index.ts`
+- [x] T117 [P] [US3] Implement /health endpoint in `apps/cli/src/server/routes/health.ts`
+- [x] T118 [P] [US3] Implement /bind endpoint in `apps/cli/src/server/routes/bind.ts` (接收绑定请求, 生成正式绑定码, 返回给 Mango)
+- [x] T119 [P] [US3] Implement /setting endpoint in `apps/cli/src/server/routes/setting.ts` (GET/POST 配置管理)
 - [ ] T120 [US3] Implement /mcp endpoint in `apps/cli/src/server/routes/mcp.ts` (streamable HTTP MCP 服务代理, 需要 binding_code 认证)
 - [ ] T121 [US3] Implement /acp endpoint in `apps/cli/src/server/routes/acp.ts` (ACP 协议服务代理, 需要 binding_code 认证)
 - [ ] T122 [US3] Add binding_code authentication middleware in `apps/cli/src/server/middleware/auth.ts`
@@ -268,16 +268,16 @@ Based on plan.md monorepo structure:
 
 ### Device Binding Flow (Web)
 
-- [ ] T131 [P] [US3] Create device binding page in `apps/web/src/app/devices/bind/page.tsx` (输入临时绑定码, 订阅 Realtime Channel, 获取设备 URL, 进行 health check)
-- [ ] T132 [P] [US3] Create device binding API route in `apps/web/src/app/api/devices/bind/route.ts` (通过设备 URL 发送绑定请求, 记录绑定关系)
-- [ ] T133 [P] [US3] Create device list API route in `apps/web/src/app/api/devices/route.ts` (GET 用户的设备绑定列表)
-- [ ] T134 [US3] Create device management page in `apps/web/src/app/settings/devices/page.tsx` (显示绑定的设备, 在线状态, 解绑操作)
-- [ ] T135 [US3] Implement Realtime Channel subscription hook in `apps/web/src/hooks/useDeviceBinding.ts` (订阅 binding:${tempCode} channel)
+- [x] T131 [P] [US3] Create device binding page in `apps/web/src/app/devices/bind/page.tsx` (输入临时绑定码, 订阅 Realtime Channel, 获取设备 URL, 进行 health check)
+- [x] T132 [P] [US3] Create device binding API route in `apps/web/src/app/api/devices/bind/route.ts` (通过设备 URL 发送绑定请求, 记录绑定关系)
+- [x] T133 [P] [US3] Create device list API route in `apps/web/src/app/api/devices/route.ts` (GET 用户的设备绑定列表)
+- [x] T134 [US3] Create device management page in `apps/web/src/app/settings/devices/page.tsx` (显示绑定的设备, 在线状态, 解绑操作)
+- [x] T135 [US3] Implement Realtime Channel subscription hook in `apps/web/src/hooks/useDeviceBinding.ts` (订阅 binding:${tempCode} channel)
 
 ### Device URL Update Mechanism
 
-- [ ] T136 [US3] Create Supabase Edge Function for device URL update in `supabase/functions/update-device-url/index.ts` (验证 binding_code, 更新 device_url)
-- [ ] T137 [US3] Implement device URL change detection and update logic in CLI (监听 tunnel URL 变化, 调用 Edge Function 更新)
+- [x] T136 [US3] Create Supabase Edge Function for device URL update in `supabase/functions/update-device-url/index.ts` (验证 binding_code, 更新 device_url)
+- [x] T137 [US3] Implement device URL change detection and update logic in CLI (监听 tunnel URL 变化, 调用 Edge Function 更新)
 
 ### CLI Startup Flow
 

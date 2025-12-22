@@ -93,7 +93,7 @@ export default function DeviceBindPage() {
         platform: device_info.platform,
         hostname: device_info.hostname,
         binding_name: bindingName || `${deviceInfo?.platform} Device`,
-        device_url: deviceUrl,
+        device_url: deviceUrls, // 存储完整的 device_urls 对象
         binding_code: binding_code,
         status: 'active',
       });
@@ -117,6 +117,7 @@ export default function DeviceBindPage() {
             user_id: user.id,
             platform: device_info.platform,
             hostname: device_info.hostname,
+            temp_code: tempCode, // 传递临时绑定码，用于标记为已使用并清理 Channel
           }),
         });
 

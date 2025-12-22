@@ -7,6 +7,7 @@ import { mcpConnector } from './connectors/mcp-connector.js';
 import { acpConnector } from './connectors/acp-connector.js';
 import { serviceHealthChecker } from './service-health.js';
 import { formatter } from './formatter.js';
+import { urlUpdateManager } from './url-update-manager.js';
 import type { MCPServiceConfig } from '../types/mcp-config.js';
 
 /**
@@ -15,9 +16,43 @@ import type { MCPServiceConfig } from '../types/mcp-config.js';
 export class ServiceInitializer {
   /**
    * 初始化所有服务
+   * @param mcpServices MCP服务配置列表
+   * @param bindingCodes 绑定码列表（用于验证绑定状态）
    */
-  async initializeServices(mcpServices: MCPServiceConfig[]): Promise<void> {
+  async initializeServices(
+    mcpServices: MCPServiceConfig[],
+    bindingCodes?: string[]
+  ): Promise<void> {
     formatter.info('Initializing MCP/ACP services...');
+
+    // 检查绑定状态
+    if (bindingCodes && bindingCodes.length > 0) {
+      const hasInvalidBinding = bindingCodes.some(
+        (code) => !urlUpdateManager.isBindingValid(code)
+      );
+
+      if (hasInvalidBinding) {
+        formatter.error('Device binding is invalid - services will not be started');
+        formatter.warning(
+          'Please check your network connection and restart the CLI to retry binding validation'
+        );
+        formatter.newline();
+
+        // 显示详细的绑定状态
+        bindingCodes.forEach((code) => {
+          const status = urlUpdateManager.getBindingStatus(code);
+          if (status && !status.isValid) {
+            formatter.labeled('Binding Code', code.substring(0, 20) + '...');
+            formatter.labeled('Status', 'Invalid');
+            formatter.labeled('Reason', status.failureReason || 'Unknown');
+            formatter.labeled('Failed Attempts', status.retryCount.toString());
+            formatter.newline();
+          }
+        });
+
+        return;
+      }
+    }
 
     // 初始化MCP服务
     if (mcpServices.length > 0) {

@@ -11,10 +11,14 @@ import { tunnelManager } from '../lib/tunnel-manager.js';
 import { serviceInitializer } from '../lib/service-initializer.js';
 import { tempBindingManager } from '../lib/temp-binding-manager.js';
 import { bindingCodeManager } from '../lib/binding-code-manager.js';
+import { urlUpdateManager } from '../lib/url-update-manager.js';
 import { generateDeviceId, getDeviceInfoSummary, getLocalIpAddress } from '../lib/device-id.js';
 import open from 'open';
 import os from 'os';
 import type { StartCommandOptions } from '../types/index.js';
+import { deviceSecretManager } from '../lib/device-secret.js';
+
+export let actualPort: number;
 
 /**
  * 启动设备服务
@@ -28,6 +32,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     let config;
     try {
       config = await configManager.loadConfig(options);
+      config.deviceSecret = deviceSecretManager.getOrCreateSecret(config.deviceSecret);
       spinner.succeed('Configuration loaded');
     } catch (error) {
       spinner.fail('Configuration error');
@@ -45,19 +50,17 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     formatter.dim(`Platform: ${deviceInfo.platform} (${deviceInfo.arch})`);
     formatter.dim(`Hostname: ${deviceInfo.hostname}`);
 
-    // 2.5 检查是否已有正式绑定码
+    // 2.5 初始化 URL 更新管理器
+    urlUpdateManager.initialize(config.supabaseUrl);
+
+    // 2.6 检查是否已有正式绑定码
     const existingConfig = bindingCodeManager.readConfig();
-    const hasBindingCode = existingConfig !== null;
+    const bindingCodes: string[] = Object.keys(existingConfig || {});
+    const hasBindingCode = bindingCodes.length > 0;
 
     if (hasBindingCode) {
-      Object.keys(existingConfig).forEach((key) => {
-        const config = existingConfig[key];
-        formatter.newline();
-        formatter.success('Device is already bound');
-        formatter.labeled('Binding Code', config!.bindingCode.substring(0, 20) + '...');
-        formatter.labeled('Device Name', config!.deviceName);
-        formatter.labeled('Bound At', new Date(config!.boundAt).toLocaleString());
-      });
+      formatter.newline();
+      formatter.success('Device is already bound');
       // 更新最后使用时间
       bindingCodeManager.updateLastUsedAt();
     }
@@ -65,7 +68,6 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     // 3. 启动 HTTP 服务
     formatter.newline();
     const serverSpinner = formatter.spinner('Starting HTTP server...');
-    let actualPort: number;
     try {
       actualPort = await startServer(config);
       if (actualPort !== config.port) {
@@ -84,10 +86,13 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
       }
       process.exit(1);
     }
+    // 初始化临时绑定管理器
+    tempBindingManager.initialize(config.supabaseUrl, config.supabaseAnonKey);
 
     // 4. 创建 Cloudflare Tunnel
     formatter.newline();
     let tunnelUrl: string | null = null;
+    const localIp = getLocalIpAddress();
 
     const cloudflaredInstalled = await tunnelManager.checkCloudflared();
     if (!cloudflaredInstalled) {
@@ -106,6 +111,38 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
         tunnelUrl = await tunnelManager.createTunnel(config.port);
         tunnelSpinner.succeed('Cloudflare Tunnel created');
         formatter.labeled('  - Cloudflare URL', tunnelUrl);
+
+        // 设置 URL 变化监听（仅在已绑定时）
+        if (tunnelUrl) {
+          tunnelManager.onUrlChange(async (newTunnelUrl) => {
+            formatter.newline();
+            formatter.info('Tunnel URL changed, updating device bindings...');
+
+            // 准备新的设备 URL 信息
+            const newDeviceUrls = {
+              cloudflare_url: newTunnelUrl,
+              localhost_url: `http://localhost:${actualPort}`,
+              hostname_url: `http://${localIp}:${actualPort}`,
+            };
+
+            const existingConfig = bindingCodeManager.readConfig();
+            const bindingCodes: string[] = Object.keys(existingConfig || {});
+
+            // 更新所有绑定的 device_url
+            for (const bindingCode of bindingCodes) {
+              urlUpdateManager
+                .updateDeviceUrlWithRetry(bindingCode, deviceInfo.deviceId, newDeviceUrls)
+                .then((result) => {
+                  if (!result.success) {
+                    formatter.error(
+                      `Failed to update device URLs for binding ${bindingCode.substring(0, 10)}...`
+                    );
+                    formatter.warning('This binding will be marked as invalid');
+                  }
+                });
+            }
+          });
+        }
       } catch (error) {
         tunnelSpinner.fail('Failed to create tunnel');
         if (error instanceof Error) {
@@ -115,7 +152,41 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
       }
     }
 
-    // 5. 生成临时绑定码（仅在未绑定时）
+    // 5. 初始 URL 更新（如果已绑定）
+    const updateUrl = async () => {
+      formatter.newline();
+      const updateSpinner = formatter.spinner('Updating device URLs in database...');
+      let allUpdatesSucceeded = true;
+
+      // 准备设备 URL 信息
+      const deviceUrls = {
+        cloudflare_url: tunnelUrl,
+        localhost_url: `http://localhost:${actualPort}`,
+        hostname_url: `http://${localIp}:${actualPort}`,
+      };
+
+      for (const bindingCode of bindingCodes) {
+        const result = await urlUpdateManager.updateDeviceUrlWithRetry(
+          bindingCode,
+          deviceInfo.deviceId,
+          deviceUrls
+        );
+
+        if (!result.success) {
+          allUpdatesSucceeded = false;
+          updateSpinner.fail(`Failed to update device URLs: ${result.error}`);
+          formatter.warning(`Binding ${bindingCode.substring(0, 10)}... marked as invalid`);
+        }
+      }
+
+      if (allUpdatesSucceeded) {
+        updateSpinner.succeed('Device URLs updated successfully');
+      }
+    };
+
+    updateUrl();
+
+    // 6. 生成临时绑定码（仅在未绑定时）
     let tempCode: string | null = null;
     if (!hasBindingCode) {
       formatter.newline();
@@ -125,8 +196,6 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
       // 6. 初始化 Supabase 客户端并建立 Realtime Channel
       const channelSpinner = formatter.spinner('Establishing Realtime Channel...');
       try {
-        tempBindingManager.initialize(config.supabaseUrl, config.supabaseAnonKey);
-
         // 准备设备 URL 信息
         const localIp = getLocalIpAddress();
         const deviceUrls = {
@@ -142,8 +211,8 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
           deviceId: deviceInfo.deviceId,
         };
 
-        // 发送设备 URL 到 Channel
-        await tempBindingManager.publishDeviceUrls(deviceUrls, deviceInfoPayload);
+        // 发送设备 URL 到 Channel（使用新的 API）
+        await tempBindingManager.publishDeviceUrls(tempCode, deviceUrls, deviceInfoPayload);
         channelSpinner.succeed(`Realtime Channel established: binding:${tempCode}`);
         formatter.success('Device URLs published to channel');
       } catch (error) {
@@ -155,11 +224,23 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
       }
     }
 
-    // 7. 初始化 MCP/ACP 服务
+    // 7. 显示 Device Secret（用于创建新的绑定）
+    formatter.newline();
+    if (config.deviceSecret) {
+      formatter.dim('Use this secret to create new bindings via /new-binding endpoint');
+    } else {
+      formatter.warning('Device Secret not configured');
+      formatter.dim('Set --device-secret parameter to enable /new-binding endpoint');
+    }
+
+    // 8. 初始化 MCP/ACP 服务
     formatter.newline();
     const serviceSpinner = formatter.spinner('Initializing MCP/ACP services...');
     try {
-      await serviceInitializer.initializeServices(config.mcpServices || []);
+      await serviceInitializer.initializeServices(
+        config.mcpServices || [],
+        bindingCodes.length > 0 ? bindingCodes : undefined
+      );
       serviceSpinner.succeed('MCP/ACP services initialized');
     } catch (error) {
       serviceSpinner.fail('Failed to initialize services');
@@ -169,12 +250,11 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
       formatter.info('Continuing without MCP/ACP services...');
     }
 
-    // 8. 显示绑定信息
+    // 9. 显示绑定信息
     formatter.newline();
     formatter.success('Device service is ready!');
     formatter.newline();
 
-    const localIp = getLocalIpAddress();
     if (tunnelUrl) {
       formatter.labeled('Cloudflare URL', tunnelUrl);
     }
@@ -190,7 +270,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     formatter.newline();
     formatter.dim('Press Ctrl+C to stop the service');
 
-    // 9. 自动打开浏览器（仅在未绑定且未禁用时）
+    // 10. 自动打开浏览器（仅在未绑定且未禁用时）
     if (!hasBindingCode && !options.ignoreOpenBindUrl && tempCode) {
       formatter.newline();
       const bindUrl = `${config.appUrl}/devices/bind?code=${tempCode}`;
@@ -227,6 +307,7 @@ async function cleanup(): Promise<void> {
   await serviceInitializer.cleanup();
   await tempBindingManager.cleanup();
   tunnelManager.cleanup();
+  urlUpdateManager.cleanup();
 }
 
 // 处理进程退出信号

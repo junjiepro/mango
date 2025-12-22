@@ -7,11 +7,21 @@ import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
+// 设备 URL 对象 Schema
+const deviceUrlsSchema = z.object({
+  cloudflare_url: z.string().url('Invalid cloudflare URL').nullable(),
+  localhost_url: z.string().url('Invalid localhost URL').nullable(),
+  hostname_url: z.string().url('Invalid hostname URL').nullable(),
+}).refine(
+  (data) => data.cloudflare_url || data.localhost_url || data.hostname_url,
+  { message: 'At least one URL must be provided' }
+);
+
 // 绑定请求验证 Schema
 const bindRequestSchema = z.object({
   device_secret: z.string().min(1, 'Device secret is required'),
   binding_name: z.string().optional(),
-  tunnel_url: z.string().url('Invalid tunnel URL'),
+  device_urls: deviceUrlsSchema,
 });
 
 /**
@@ -43,32 +53,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { device_secret, binding_name, tunnel_url } = validation.data;
+    const { device_secret, binding_name, device_urls } = validation.data;
 
     let healthData;
     // 验证 device_secret 并获取设备信息
-    // 通过 tunnel_url 调用设备的 /health 端点验证
-    try {
-      const healthResponse = await fetch(`${tunnel_url}/health`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+    // 尝试通过任一可用 URL 调用设备的 /health 端点验证
+    const urlsToTry = [
+      device_urls.cloudflare_url,
+      device_urls.hostname_url,
+      device_urls.localhost_url,
+    ].filter(Boolean) as string[];
 
-      if (!healthResponse.ok) {
-        return NextResponse.json(
-          { error: 'Device is not reachable or not responding' },
-          { status: 400 }
-        );
+    let lastError: Error | null = null;
+    let healthCheckSucceeded = false;
+
+    for (const url of urlsToTry) {
+      try {
+        const healthResponse = await fetch(`${url}/health`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: AbortSignal.timeout(5000), // 5秒超时
+        });
+
+        if (healthResponse.ok) {
+          healthData = await healthResponse.json();
+          console.log('Device health check succeeded:', healthData);
+          healthCheckSucceeded = true;
+          break;
+        }
+      } catch (error) {
+        console.error(`Failed to reach device at ${url}:`, error);
+        lastError = error as Error;
       }
+    }
 
-      healthData = await healthResponse.json();
-      console.log('Device health check:', healthData);
-    } catch (error) {
-      console.error('Failed to reach device:', error);
+    if (!healthCheckSucceeded) {
+      console.error('All health check attempts failed:', lastError);
       return NextResponse.json(
-        { error: 'Failed to connect to device. Please check the tunnel URL.' },
+        { error: 'Failed to connect to device. Please check that the device is running and accessible.' },
         { status: 400 }
       );
     }
@@ -89,7 +113,7 @@ export async function POST(request: NextRequest) {
       const { data: updatedBinding, error: updateError } = await supabase
         .from('device_bindings')
         .update({
-          device_url: tunnel_url,
+          device_url: device_urls,
           device_name: binding_name || `Device ${deviceId.substring(0, 8)}`,
           platform: healthData?.platform || 'linux',
           hostname: healthData?.hostname,
@@ -125,7 +149,7 @@ export async function POST(request: NextRequest) {
         platform: healthData?.platform || 'linux',
         hostname: healthData?.hostname,
         binding_name: binding_name || `Device ${deviceId.substring(0, 8)}`,
-        device_url: tunnel_url,
+        device_url: device_urls,
         binding_code: bindingCode,
         status: 'active',
       })

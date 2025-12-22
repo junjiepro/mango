@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Loader2, Plus, Trash2, Circle, ExternalLink, RefreshCw } from 'lucide-react';
 import { AppHeader } from '@/components/layouts/AppHeader';
+import { DeviceUrls } from '@/hooks/useDeviceBinding';
 
 // 新的合并表结构 - device_bindings 包含所有设备和绑定信息
 interface DeviceBinding {
@@ -32,7 +33,7 @@ interface DeviceBinding {
   platform: string;
   hostname: string;
   binding_name: string;
-  device_url: string;
+  device_url: DeviceUrls;
   binding_code: string;
   status: 'active' | 'inactive' | 'expired';
   created_at: string;
@@ -165,12 +166,7 @@ export default function DeviceManagementPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
+            <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isRefreshing}>
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
             <Button onClick={() => router.push('/devices/bind')}>
@@ -180,135 +176,132 @@ export default function DeviceManagementPage() {
           </div>
         </div>
 
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      {devices.length === 0 ? (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <div className="text-muted-foreground">
-                <p className="text-lg font-medium">No devices connected</p>
-                <p className="text-sm mt-2">
-                  Start the Mango CLI tool on your local machine and bind it to your account
-                </p>
+        {devices.length === 0 ? (
+          <Card>
+            <CardContent className="py-12">
+              <div className="text-center space-y-4">
+                <div className="text-muted-foreground">
+                  <p className="text-lg font-medium">No devices connected</p>
+                  <p className="text-sm mt-2">
+                    Start the Mango CLI tool on your local machine and bind it to your account
+                  </p>
+                </div>
+                <Button onClick={() => router.push('/devices/bind')}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Bind Your First Device
+                </Button>
               </div>
-              <Button onClick={() => router.push('/devices/bind')}>
-                <Plus className="mr-2 h-4 w-4" />
-                Bind Your First Device
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {devices.map((binding) => (
-            <Card key={binding.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="flex items-center gap-2">
-                      {binding.binding_name}
-                      {getStatusBadge(binding)}
-                    </CardTitle>
-                    <CardDescription>
-                      Platform: {binding.platform} • Bound on{' '}
-                      {formatDate(binding.created_at)}
-                    </CardDescription>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteClick(binding.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Device ID</p>
-                    <p className="font-mono text-xs mt-1">
-                      {binding.device_id.substring(0, 16)}...
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Hostname</p>
-                    <p className="mt-1">{binding.hostname || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Last Seen</p>
-                    <p className="mt-1">{formatDate(binding.last_seen_at)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Status</p>
-                    <p className="mt-1 capitalize">{binding.status}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Device URL</p>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-xs bg-muted px-3 py-2 rounded">
-                      {binding.device_url}
-                    </code>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {devices.map((binding) => (
+              <Card key={binding.id}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <CardTitle className="flex items-center gap-2">
+                        {binding.binding_name}
+                        {getStatusBadge(binding)}
+                      </CardTitle>
+                      <CardDescription>
+                        Platform: {binding.platform} • Bound on {formatDate(binding.created_at)}
+                      </CardDescription>
+                    </div>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => window.open(binding.device_url, '_blank')}
+                      onClick={() => handleDeleteClick(binding.id)}
+                      className="text-destructive hover:text-destructive"
                     >
-                      <ExternalLink className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Device ID</p>
+                      <p className="font-mono text-xs mt-1">
+                        {binding.device_id.substring(0, 16)}...
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Hostname</p>
+                      <p className="mt-1">{binding.hostname || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Last Seen</p>
+                      <p className="mt-1">{formatDate(binding.last_seen_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Status</p>
+                      <p className="mt-1 capitalize">{binding.status}</p>
+                    </div>
+                  </div>
 
-                {binding.status === 'active' && binding.is_online === false && (
-                  <Alert>
-                    <AlertDescription className="text-sm">
-                      This device appears to be offline. Make sure the Mango CLI tool is
-                      running and the device URL is accessible.
-                    </AlertDescription>
-                  </Alert>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Device URL</p>
+                    <div className="flex items-center gap-2">
+                      {Object.entries(binding.device_url).map(
+                        ([key, value]) =>
+                          value && (
+                            <code key={key} className="flex-1 text-xs bg-muted px-3 py-2 rounded">
+                              {value}
+                            </code>
+                          )
+                      )}
+                    </div>
+                  </div>
+
+                  {binding.status === 'active' && binding.is_online === false && (
+                    <Alert>
+                      <AlertDescription className="text-sm">
+                        This device appears to be offline. Make sure the Mango CLI tool is running
+                        and the device URL is accessible.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unbind Device</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to unbind this device? This will remove all associated MCP
+                service configurations. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Unbinding...
+                  </>
+                ) : (
+                  'Unbind Device'
                 )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unbind Device</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to unbind this device? This will remove all associated
-              MCP service configurations. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Unbinding...
-                </>
-              ) : (
-                'Unbind Device'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

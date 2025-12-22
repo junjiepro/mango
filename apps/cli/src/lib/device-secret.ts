@@ -8,6 +8,7 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir, hostname } from 'os';
 import type { DeviceInfo } from '../types/index.js';
+import { formatter } from './formatter.js';
 
 export class DeviceSecretManager {
   private configDir: string;
@@ -23,20 +24,17 @@ export class DeviceSecretManager {
 
   /**
    * 获取或创建设备密钥
+   * @param customSecret 用户指定的自定义密钥（可选）
    */
-  getOrCreateSecret(): string {
-    if (existsSync(this.secretPath)) {
-      return readFileSync(this.secretPath, 'utf-8').trim();
+  getOrCreateSecret(customSecret?: string): string {
+    if (customSecret) {
+      return customSecret;
     }
 
     // 生成 256 位随机密钥
     const secret = randomBytes(32).toString('base64url');
-
-    // 确保配置目录存在
-    this.ensureConfigDir();
-
-    // 安全存储（仅当前用户可读）
-    writeFileSync(this.secretPath, secret, { mode: 0o600 });
+    formatter.newline();
+    formatter.labeled('Device Secret generated', secret);
 
     return secret;
   }
@@ -76,9 +74,9 @@ export class DeviceSecretManager {
   /**
    * 获取设备信息
    */
-  getDeviceInfo(): DeviceInfo {
+  getDeviceInfo(customSecret?: string): DeviceInfo {
     const deviceId = this.generateDeviceId();
-    const deviceSecret = this.getOrCreateSecret();
+    const deviceSecret = this.getOrCreateSecret(customSecret);
     const platform = this.getPlatform();
 
     return {
