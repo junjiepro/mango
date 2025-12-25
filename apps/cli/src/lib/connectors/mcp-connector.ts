@@ -5,13 +5,8 @@
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import type {
-  MCPServiceConfig,
-  MCPTool,
-  MCPResource,
-  MCPToolResult,
-  MCPResourceContent,
-} from '../../types/mcp-config.js';
+import type { MCPServiceConfig } from '../../types/mcp-config.js';
+import { MCPAggregator } from '../mcp-aggregator.js';
 
 /**
  * MCP连接器类
@@ -19,34 +14,63 @@ import type {
 export class MCPConnector {
   private clients: Map<string, Client> = new Map();
   private configs: Map<string, MCPServiceConfig> = new Map();
+  private bindingCode2AggregatorMap: Map<string, MCPAggregator> = new Map();
+  private bindingCodeIds: Map<string, string> = new Map();
+  private idCounter = 0;
+
+  /**
+   * 获取 MCP 聚合器
+   */
+  getAggregator(bindingCode: string): MCPAggregator | undefined {
+    return this.bindingCode2AggregatorMap.get(bindingCode);
+  }
+
+  /**
+   * 获取 MCP 客户端
+   */
+  getClient(configId: string): Client | undefined {
+    return this.clients.get(configId);
+  }
 
   /**
    * 添加MCP服务
    */
-  async addService(config: MCPServiceConfig): Promise<void> {
+  async addService(bindingCode: string, config: MCPServiceConfig): Promise<void> {
     try {
+      // 获取 bindingCode 对应的 id
+      let bindingCodeId = this.bindingCodeIds.get(bindingCode);
+      if (!bindingCodeId) {
+        this.idCounter++;
+        bindingCodeId = this.idCounter.toString();
+        this.bindingCodeIds.set(bindingCode, bindingCodeId);
+      }
+
+      // 获取 bindingCode 对应的 aggregator
+      let aggregator = this.bindingCode2AggregatorMap.get(bindingCode);
+      if (!aggregator) {
+        aggregator = new MCPAggregator();
+        this.bindingCode2AggregatorMap.set(bindingCode, aggregator);
+      }
+
+      // 生成 configId
+      const configId = `${bindingCodeId}-${config.name}`;
+
+      // 如果存在则先删除
+      if (this.clients.has(configId)) {
+        await this.removeService(bindingCode, config.name);
+      }
+
       // 创建 MCP 客户端
-      const client = new Client(
-        {
-          name: 'mango-device-service',
-          version: '1.0.0',
-        },
-        {
-          capabilities: {
-            tools: {},
-            resources: {},
-          },
-        }
-      );
+      const client = new Client({
+        name: `mango-device-service-${configId}`,
+        version: '1.0.0',
+      });
 
       // 创建 stdio 传输层
       const transport = new StdioClientTransport({
         command: config.command,
         args: config.args,
         env: {
-          ...(Object.fromEntries(
-            Object.entries(process.env).filter(([_, v]) => v !== undefined)
-          ) as Record<string, string>),
           ...config.env,
         },
       });
@@ -55,10 +79,15 @@ export class MCPConnector {
       await client.connect(transport);
 
       // 保存客户端和配置
-      this.clients.set(config.name, client);
-      this.configs.set(config.name, config);
+      this.clients.set(configId, client);
+      this.configs.set(configId, config);
 
-      console.log(`MCP service "${config.name}" connected`);
+      // 注册客户端
+      aggregator.registerClient(configId, config.name, client);
+
+      console.log(
+        `Binding code "${bindingCode.substring(0, 20)}..." MCP service "${config.name}" connected`
+      );
     } catch (error) {
       console.error(`Failed to connect to MCP service "${config.name}":`, error);
       throw error;
@@ -68,99 +97,69 @@ export class MCPConnector {
   /**
    * 删除MCP服务
    */
-  async removeService(name: string): Promise<void> {
-    const client = this.clients.get(name);
+  async removeService(bindingCode: string, name: string): Promise<void> {
+    const configId = `${this.bindingCodeIds.get(bindingCode)}-${name}`;
+    const client = this.clients.get(configId);
+    const aggregator = this.bindingCode2AggregatorMap.get(bindingCode);
     if (client) {
       await client.close();
-      this.clients.delete(name);
-      this.configs.delete(name);
-      console.log(`MCP service "${name}" disconnected`);
+      this.clients.delete(configId);
+      this.configs.delete(configId);
+      console.log(
+        `Binding code "${bindingCode.substring(0, 20)}..." MCP service "${name}" disconnected`
+      );
     }
+    aggregator?.unregisterClient(configId);
   }
 
   /**
    * 列出所有工具
    */
-  async listTools(serviceName: string): Promise<MCPTool[]> {
-    const client = this.clients.get(serviceName);
+  async listTools(bindingCode: string, serviceName: string) {
+    const configId = `${this.bindingCodeIds.get(bindingCode)}-${serviceName}`;
+    const client = this.clients.get(configId);
     if (!client) {
       throw new Error(`Service "${serviceName}" not found`);
     }
 
     const result = await client.listTools();
-    return result.tools as MCPTool[];
-  }
-
-  /**
-   * 调用工具
-   */
-  async callTool(
-    serviceName: string,
-    toolName: string,
-    args: Record<string, unknown>
-  ): Promise<MCPToolResult> {
-    const client = this.clients.get(serviceName);
-    if (!client) {
-      throw new Error(`Service "${serviceName}" not found`);
-    }
-
-    try {
-      const result = await client.callTool({
-        name: toolName,
-        arguments: args,
-      });
-      return result as MCPToolResult;
-    } catch (error) {
-      console.error(`Tool call failed: ${serviceName}/${toolName}`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * 列出所有资源
-   */
-  async listResources(serviceName: string): Promise<MCPResource[]> {
-    const client = this.clients.get(serviceName);
-    if (!client) {
-      throw new Error(`Service "${serviceName}" not found`);
-    }
-
-    const result = await client.listResources();
-    return result.resources as MCPResource[];
-  }
-
-  /**
-   * 读取资源
-   */
-  async readResource(serviceName: string, uri: string): Promise<MCPResourceContent> {
-    const client = this.clients.get(serviceName);
-    if (!client) {
-      throw new Error(`Service "${serviceName}" not found`);
-    }
-
-    const result = await client.readResource({ uri });
-    return result.contents[0] as MCPResourceContent;
+    return result;
   }
 
   /**
    * 获取所有服务配置
    */
-  getServices(): MCPServiceConfig[] {
-    return Array.from(this.configs.values());
+  getAllServices(): [string, MCPServiceConfig][] {
+    return Array.from(this.configs.entries());
+  }
+
+  /**
+   * 获取所有服务配置
+   */
+  getServices(bindingCode: string): MCPServiceConfig[] {
+    const codeId = this.bindingCodeIds.get(bindingCode);
+    if (!codeId) return [];
+    return Array.from(this.configs.entries())
+      .filter(([key]) => key.startsWith(`${codeId}-`))
+      .map(([_, config]) => config);
   }
 
   /**
    * 获取特定服务配置
    */
-  getService(serviceName: string): MCPServiceConfig | undefined {
-    return this.configs.get(serviceName);
+  getService(bindingCode: string, serviceName: string): MCPServiceConfig | undefined {
+    const codeId = this.bindingCodeIds.get(bindingCode);
+    if (!codeId) return undefined;
+    return this.configs.get(`${codeId}-${serviceName}`);
   }
 
   /**
    * 检查服务是否已连接
    */
-  isConnected(serviceName: string): boolean {
-    return this.clients.has(serviceName);
+  isConnected(bindingCode: string, serviceName: string): boolean {
+    const codeId = this.bindingCodeIds.get(bindingCode);
+    if (!codeId) return false;
+    return this.clients.has(`${codeId}-${serviceName}`);
   }
 
   /**

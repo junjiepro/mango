@@ -248,9 +248,8 @@ Based on plan.md monorepo structure:
 - [x] T117 [P] [US3] Implement /health endpoint in `apps/cli/src/server/routes/health.ts`
 - [x] T118 [P] [US3] Implement /bind endpoint in `apps/cli/src/server/routes/bind.ts` (接收绑定请求, 生成正式绑定码, 返回给 Mango)
 - [x] T119 [P] [US3] Implement /setting endpoint in `apps/cli/src/server/routes/setting.ts` (GET/POST 配置管理)
-- [ ] T120 [US3] Implement /mcp endpoint in `apps/cli/src/server/routes/mcp.ts` (streamable HTTP MCP 服务代理, 需要 binding_code 认证)
+- [x] T120 [US3] Implement /mcp endpoint in `apps/cli/src/server/routes/mcp.ts` (streamable HTTP MCP 服务代理, 需要 binding_code 认证)
 - [ ] T121 [US3] Implement /acp endpoint in `apps/cli/src/server/routes/acp.ts` (ACP 协议服务代理, 需要 binding_code 认证)
-- [ ] T122 [US3] Add binding_code authentication middleware in `apps/cli/src/server/middleware/auth.ts`
 
 ### Cloudflare Tunnel Integration
 
@@ -260,11 +259,11 @@ Based on plan.md monorepo structure:
 
 ### MCP/ACP Service Configuration
 
-- [ ] T126 [P] [US3] Create MCP service config schema in `apps/cli/src/types/mcp-config.ts`
+- [x] T126 [P] [US3] Create MCP service config schema in `apps/cli/src/types/mcp-config.ts`
 - [ ] T127 [P] [US3] Create ACP service config schema in `apps/cli/src/types/acp-config.ts`
-- [ ] T128 [P] [US3] Implement local MCP service connector in `apps/cli/src/lib/connectors/mcp-connector.ts` (支持 stdio transport)
+- [x] T128 [P] [US3] Implement local MCP service connector in `apps/cli/src/lib/connectors/mcp-connector.ts` (支持 stdio transport)
 - [ ] T129 [P] [US3] Implement local ACP service connector in `apps/cli/src/lib/connectors/acp-connector.ts`
-- [ ] T130 [US3] Create service health check and status monitoring in `apps/cli/src/lib/health-check.ts`
+- [x] T130 [US3] Create service health check and status monitoring in `apps/cli/src/lib/health-check.ts`
 
 ### Device Binding Flow (Web)
 
@@ -281,9 +280,9 @@ Based on plan.md monorepo structure:
 
 ### CLI Startup Flow
 
-- [ ] T138 [US3] Implement CLI startup command in `apps/cli/src/commands/start.ts` (生成临时绑定码（内存）, 启动 HTTP 服务, 创建 tunnel, 建立 Realtime Channel, 发送设备 URL, 打开绑定页面)
-- [ ] T139 [US3] Add browser auto-open logic for binding page with temp code (支持 --ignore-open-bind-url 参数)
-- [ ] T140 [US3] Add graceful shutdown handling for device service (清理 Realtime Channel, 关闭 tunnel)
+- [x] T138 [US3] Implement CLI startup command in `apps/cli/src/commands/start.ts` (生成临时绑定码（内存）, 启动 HTTP 服务, 创建 tunnel, 建立 Realtime Channel, 发送设备 URL, 打开绑定页面)
+- [x] T139 [US3] Add browser auto-open logic for binding page with temp code (支持 --ignore-open-bind-url 参数)
+- [x] T140 [US3] Add graceful shutdown handling for device service (清理 Realtime Channel, 关闭 tunnel)
 
 ### Agent Integration with Device Services
 

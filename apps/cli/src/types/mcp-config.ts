@@ -3,6 +3,7 @@
  */
 
 import { z } from 'zod';
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 /**
  * MCP服务配置Schema
@@ -17,47 +18,8 @@ export const mcpServiceConfigSchema = z.object({
 
 export type MCPServiceConfig = z.infer<typeof mcpServiceConfigSchema>;
 
-/**
- * MCP工具定义
- */
-export interface MCPTool {
+export interface ServerClient {
+  id: string;
   name: string;
-  description?: string;
-  inputSchema: {
-    type: string;
-    properties?: Record<string, unknown>;
-    required?: string[];
-  };
-}
-
-/**
- * MCP资源定义
- */
-export interface MCPResource {
-  uri: string;
-  name: string;
-  description?: string;
-  mimeType?: string;
-}
-
-/**
- * MCP工具调用结果
- */
-export interface MCPToolResult {
-  content: Array<{
-    type: string;
-    text?: string;
-    data?: unknown;
-  }>;
-  isError?: boolean;
-}
-
-/**
- * MCP资源内容
- */
-export interface MCPResourceContent {
-  uri: string;
-  mimeType?: string;
-  text?: string;
-  blob?: string;
+  client: Client;
 }

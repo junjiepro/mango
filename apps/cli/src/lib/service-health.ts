@@ -50,22 +50,22 @@ export class ServiceHealthChecker {
    */
   private async checkAllServices(): Promise<void> {
     // 检查MCP服务
-    const mcpServices = mcpConnector.getServices();
-    for (const service of mcpServices) {
-      await this.checkMCPService(service.name);
+    const mcpServices = mcpConnector.getAllServices();
+    for (const [key, service] of mcpServices) {
+      await this.checkMCPServiceWithConfigId(key, service.name);
     }
 
     // 检查ACP服务
     const acpServices = acpConnector.getServices();
     for (const service of acpServices) {
-      await this.checkACPService(service.name);
+      await this.checkACPService('', service.name);
     }
   }
 
   /**
    * 检查单个MCP服务
    */
-  private async checkMCPService(serviceName: string): Promise<void> {
+  private async checkMCPServiceWithConfigId(configId: string, serviceName: string): Promise<void> {
     const status: ServiceHealthStatus = {
       name: serviceName,
       type: 'mcp',
@@ -74,12 +74,13 @@ export class ServiceHealthChecker {
     };
 
     try {
-      if (!mcpConnector.isConnected(serviceName)) {
+      const client = mcpConnector.getClient(configId);
+      if (!client) {
         status.status = 'unhealthy';
         status.error = 'Service not connected';
       } else {
         // 尝试列出工具来验证连接
-        await mcpConnector.listTools(serviceName);
+        await client.listTools();
         status.status = 'healthy';
       }
     } catch (error) {
@@ -87,13 +88,42 @@ export class ServiceHealthChecker {
       status.error = error instanceof Error ? error.message : 'Unknown error';
     }
 
-    this.healthStatus.set(serviceName, status);
+    this.healthStatus.set(configId, status);
+  }
+
+  /**
+   * 检查单个MCP服务
+   */
+  private async checkMCPService(bindingCode: string, serviceName: string): Promise<void> {
+    const status: ServiceHealthStatus = {
+      name: serviceName,
+      type: 'mcp',
+      status: 'unknown',
+      lastCheck: Date.now(),
+    };
+
+    try {
+      if (!mcpConnector.isConnected(bindingCode, serviceName)) {
+        status.status = 'unhealthy';
+        status.error = 'Service not connected';
+      } else {
+        // 尝试列出工具来验证连接
+        await mcpConnector.listTools(bindingCode, serviceName);
+        status.status = 'healthy';
+      }
+    } catch (error) {
+      status.status = 'unhealthy';
+      status.error = error instanceof Error ? error.message : 'Unknown error';
+    }
+
+    const key = `${bindingCode}-${serviceName}`;
+    this.healthStatus.set(key, status);
   }
 
   /**
    * 检查单个ACP服务
    */
-  private async checkACPService(serviceName: string): Promise<void> {
+  private async checkACPService(bindingCode: string, serviceName: string): Promise<void> {
     const status: ServiceHealthStatus = {
       name: serviceName,
       type: 'acp',
@@ -114,34 +144,42 @@ export class ServiceHealthChecker {
       status.error = error instanceof Error ? error.message : 'Unknown error';
     }
 
-    this.healthStatus.set(serviceName, status);
+    const key = `${bindingCode}-${serviceName}`;
+    this.healthStatus.set(key, status);
   }
 
   /**
    * 获取所有服务的健康状态
    */
-  getAllStatus(): ServiceHealthStatus[] {
-    return Array.from(this.healthStatus.values());
+  getAllStatus(bindingCode: string): ServiceHealthStatus[] {
+    const services = mcpConnector.getServices(bindingCode);
+    return services
+      .map((service) => this.getServiceStatus(bindingCode, service.name))
+      .filter((s) => s !== undefined);
   }
 
   /**
    * 获取特定服务的健康状态
    */
-  getServiceStatus(serviceName: string): ServiceHealthStatus | undefined {
-    return this.healthStatus.get(serviceName);
+  getServiceStatus(bindingCode: string, serviceName: string): ServiceHealthStatus | undefined {
+    return this.healthStatus.get(`${bindingCode}-${serviceName}`);
   }
 
   /**
    * 手动触发单个服务检查
    */
-  async checkService(serviceName: string, type: 'mcp' | 'acp'): Promise<ServiceHealthStatus> {
+  async checkService(
+    bindingCode: string,
+    serviceName: string,
+    type: 'mcp' | 'acp'
+  ): Promise<ServiceHealthStatus> {
     if (type === 'mcp') {
-      await this.checkMCPService(serviceName);
+      await this.checkMCPService(bindingCode, serviceName);
     } else {
-      await this.checkACPService(serviceName);
+      await this.checkACPService(bindingCode, serviceName);
     }
 
-    const status = this.healthStatus.get(serviceName);
+    const status = this.healthStatus.get(`${bindingCode}-${serviceName}`);
     if (!status) {
       throw new Error(`Service "${serviceName}" not found`);
     }

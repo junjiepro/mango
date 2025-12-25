@@ -4,7 +4,7 @@
  * 新的绑定流程：临时绑定码 + Realtime Channel + 正式绑定码
  */
 
-import { Hono } from 'hono';
+import { Hono, Context } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { serve } from '@hono/node-server';
@@ -14,13 +14,54 @@ import { mcpConnector } from '../lib/connectors/mcp-connector.js';
 import { acpConnector } from '../lib/connectors/acp-connector.js';
 import { serviceHealthChecker } from '../lib/service-health.js';
 import { findAvailablePort } from '../lib/port-utils.js';
-import { bindingCodeManager } from '../lib/binding-code-manager.js';
+import { bindingCodeManager, BindingConfig } from '../lib/binding-code-manager.js';
 import { generateDeviceId, getLocalIpAddress } from '../lib/device-id.js';
 import { tempBindingManager } from '../lib/temp-binding-manager.js';
 import { tunnelManager } from '../lib/tunnel-manager.js';
-import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'crypto';
 import { actualPort } from '../commands/start.js';
+
+const getBindingCodeAndCheckFromHeader = (
+  c: Context
+): [string, BindingConfig | undefined, Response | undefined] => {
+  // 从请求头获取 binding code
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return [
+      '',
+      undefined,
+      c.json(
+        {
+          jsonrpc: '2.0',
+          error: { code: -32000, message: 'Missing authorization header' },
+          id: null,
+        },
+        { status: 401 }
+      ),
+    ];
+  }
+
+  const bindingCode = authHeader.replace('Bearer ', '');
+
+  // 验证 binding code
+  const config = bindingCodeManager.readConfig();
+  const codeConfig = config?.[bindingCode];
+
+  return [
+    bindingCode,
+    codeConfig,
+    !codeConfig
+      ? c.json(
+          {
+            jsonrpc: '2.0',
+            error: { code: -32000, message: 'Invalid binding code' },
+            id: null,
+          },
+          { status: 401 }
+        )
+      : undefined,
+  ];
+};
 
 /**
  * 创建HTTP服务器
@@ -138,9 +179,15 @@ export function createServer(config: CLIConfig) {
 
   // 配置管理端点（GET）
   app.get('/setting', async (c) => {
-    // TODO: 实现配置读取逻辑
+    const [_, targetConfig, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+
+    if (errorResponse) {
+      return errorResponse;
+    }
+
     return c.json({
-      message: 'Configuration management is in progress',
+      success: true,
+      config: targetConfig,
     });
   });
 
@@ -148,7 +195,16 @@ export function createServer(config: CLIConfig) {
   app.post('/setting', async (c) => {
     try {
       const body = await c.req.json();
-      const { binding_code, device_id, device_name, user_id, platform, hostname, temp_code } = body;
+      const {
+        binding_code,
+        device_id,
+        device_name,
+        user_id,
+        platform,
+        hostname,
+        temp_code,
+        mcp_services,
+      } = body;
       const rest = { ...body };
       delete rest.binding_code;
       delete rest.temp_code;
@@ -171,6 +227,7 @@ export function createServer(config: CLIConfig) {
           hostname: hostname || os.hostname(),
           arch: os.arch(),
         },
+        mcpServices: mcp_services,
       });
 
       // 如果提供了 temp_code，标记为已使用并清理 Channel
@@ -195,7 +252,13 @@ export function createServer(config: CLIConfig) {
   // 服务健康检查端点
   app.get('/health/services', async (c) => {
     try {
-      const healthStatus = serviceHealthChecker.getAllStatus();
+      const [bindingCode, _, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+
+      if (errorResponse) {
+        return errorResponse;
+      }
+
+      const healthStatus = serviceHealthChecker.getAllStatus(bindingCode);
       return c.json({
         services: healthStatus,
         timestamp: Date.now(),
@@ -210,7 +273,13 @@ export function createServer(config: CLIConfig) {
   app.get('/health/services/:service', async (c) => {
     const { service } = c.req.param();
     try {
-      const status = serviceHealthChecker.getServiceStatus(service);
+      const [bindingCode, _, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+
+      if (errorResponse) {
+        return errorResponse;
+      }
+
+      const status = serviceHealthChecker.getServiceStatus(bindingCode, service);
       if (!status) {
         return c.json({ error: `Service "${service}" not found` }, 404);
       }
@@ -224,7 +293,13 @@ export function createServer(config: CLIConfig) {
   // MCP服务列表端点
   app.get('/mcp/services', async (c) => {
     try {
-      const services = mcpConnector.getServices();
+      const [bindingCode, _, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+
+      if (errorResponse) {
+        return errorResponse;
+      }
+
+      const services = mcpConnector.getServices(bindingCode);
       return c.json({
         services: services.map((s) => ({
           name: s.name,
@@ -238,79 +313,66 @@ export function createServer(config: CLIConfig) {
     }
   });
 
-  // MCP工具列表端点
-  app.get('/mcp/:service/tools', async (c) => {
-    const { service } = c.req.param();
+  // MCP服务重新加载端点（需要认证）
+  app.post('/mcp/reload', async (c) => {
     try {
-      if (!mcpConnector.isConnected(service)) {
-        return c.json({ error: `Service "${service}" not found or not connected` }, 404);
+      const body = await c.req.json();
+      const { action, service } = body;
+
+      if (!action) {
+        return c.json({ error: 'Action is required' }, 400);
       }
-      const tools = await mcpConnector.listTools(service);
+
       return c.json({
-        service,
-        tools,
+        success: true,
+        message: `MCP service ${action} completed successfully`,
       });
     } catch (error) {
-      console.error(`Failed to list tools for service "${service}":`, error);
-      return c.json({ error: 'Failed to list tools' }, 500);
+      console.error('MCP reload endpoint error:', error);
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : 'Failed to reload MCP services',
+        },
+        500
+      );
     }
   });
 
-  // MCP工具调用端点
-  app.post('/mcp/:service/tools/:tool', async (c) => {
-    const { service, tool } = c.req.param();
+  // MCP 服务端点
+  app.all('/mcp', async (c) => {
     try {
-      if (!mcpConnector.isConnected(service)) {
-        return c.json({ error: `Service "${service}" not found or not connected` }, 404);
-      }
-      const args = await c.req.json();
-      const result = await mcpConnector.callTool(service, tool, args);
-      return c.json({
-        service,
-        tool,
-        result,
-      });
-    } catch (error) {
-      console.error(`Failed to call tool "${tool}" on service "${service}":`, error);
-      return c.json({ error: 'Tool invocation failed' }, 500);
-    }
-  });
+      const [bindingCode, _, errorResponse] = getBindingCodeAndCheckFromHeader(c);
 
-  // MCP资源列表端点
-  app.get('/mcp/:service/resources', async (c) => {
-    const { service } = c.req.param();
-    try {
-      if (!mcpConnector.isConnected(service)) {
-        return c.json({ error: `Service "${service}" not found or not connected` }, 404);
+      if (errorResponse) {
+        return errorResponse;
       }
-      const resources = await mcpConnector.listResources(service);
-      return c.json({
-        service,
-        resources,
-      });
-    } catch (error) {
-      console.error(`Failed to list resources for service "${service}":`, error);
-      return c.json({ error: 'Failed to list resources' }, 500);
-    }
-  });
 
-  // MCP资源读取端点
-  app.get('/mcp/:service/resources/*', async (c) => {
-    const { service } = c.req.param();
-    const uri = c.req.path.replace(`/mcp/${service}/resources/`, '');
-    try {
-      if (!mcpConnector.isConnected(service)) {
-        return c.json({ error: `Service "${service}" not found or not connected` }, 404);
+      const aggregator = mcpConnector.getAggregator(bindingCode);
+      if (!aggregator) {
+        return c.json(
+          {
+            jsonrpc: '2.0',
+            error: { code: -32000, message: 'Missing MCP aggregator' },
+            id: null,
+          },
+          { status: 401 }
+        );
       }
-      const content = await mcpConnector.readResource(service, uri);
-      return c.json({
-        service,
-        uri,
-        content,
-      });
+
+      // Get the aggregator's transport
+      const transport = await aggregator.getConnectedTransport();
+
+      return transport.handleRequest(c);
     } catch (error) {
-      console.error(`Failed to read resource "${uri}" from service "${service}":`, error);
-      return c.json({ error: 'Failed to read resource' }, 500);
+      console.error('MCP streamable endpoint error:', error);
+      return c.json(
+        {
+          jsonrpc: '2.0',
+          error: { code: -32603, message: 'Internal server error' },
+          id: null,
+        },
+        { status: 500 }
+      );
     }
   });
 

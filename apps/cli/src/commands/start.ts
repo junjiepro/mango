@@ -237,10 +237,13 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     formatter.newline();
     const serviceSpinner = formatter.spinner('Initializing MCP/ACP services...');
     try {
-      await serviceInitializer.initializeServices(
-        config.mcpServices || [],
-        bindingCodes.length > 0 ? bindingCodes : undefined
-      );
+      for (const code of bindingCodes) {
+        const servers = existingConfig?.[code]?.mcpServices || {};
+        if (Object.keys(servers).length > 0) {
+          await serviceInitializer.initializeServices(Object.values(servers), code);
+        }
+      }
+
       serviceSpinner.succeed('MCP/ACP services initialized');
     } catch (error) {
       serviceSpinner.fail('Failed to initialize services');

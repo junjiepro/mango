@@ -10,6 +10,8 @@ import { randomBytes } from 'crypto';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
+import type { MCPServiceConfig } from '../types/mcp-config.js';
+import { mcpConnector } from './connectors/mcp-connector.js';
 
 /**
  * 绑定码配置对象
@@ -33,6 +35,8 @@ export interface BindingConfig {
     hostname: string;
     arch: string;
   };
+  /** MCP 服务配置列表 */
+  mcpServices?: Record<string, MCPServiceConfig>;
 }
 
 /**
@@ -118,6 +122,38 @@ export class BindingCodeManager {
       writeFileSync(this.bindingConfigPath, configJson, { mode: 0o600 });
 
       this.bindingCodes.delete(bindingCode);
+
+      // 对 MCP 服务进行更新
+      if (config.mcpServices) {
+        const nextMcpServices = config.mcpServices;
+        const prevMcpServices = prevConfig[bindingCode]?.mcpServices || {};
+
+        const updatedMcpServices: MCPServiceConfig[] = [];
+        const removedMcpServices: MCPServiceConfig[] = [];
+
+        // TODO: 比较 mcpServices 和 prevConfig[bindingCode].mcpServices，找出新增和删除的服务
+        Object.keys(nextMcpServices).forEach((key) => {
+          if (!prevMcpServices[key]) {
+            updatedMcpServices.push(nextMcpServices[key]);
+          } else if (
+            JSON.stringify(nextMcpServices[key]) !== JSON.stringify(prevMcpServices[key])
+          ) {
+            updatedMcpServices.push(nextMcpServices[key]);
+          }
+        });
+        Object.keys(prevMcpServices).forEach((key) => {
+          if (!nextMcpServices[key]) {
+            removedMcpServices.push(prevMcpServices[key]);
+          }
+        });
+
+        removedMcpServices.forEach((service) => {
+          mcpConnector.removeService(bindingCode, service.name);
+        });
+        updatedMcpServices.forEach((service) => {
+          mcpConnector.addService(bindingCode, service);
+        });
+      }
     } else {
       throw new Error(
         `Cannot update binding code: ${bindingCode} not found in active codes or existing config`
@@ -167,8 +203,7 @@ export class BindingCodeManager {
 
     const lastUsedAt = new Date().toISOString();
     Object.values(config).forEach((value) => {
-      value.lastUsedAt = lastUsedAt;
-      this.saveConfig(value.bindingCode, value);
+      this.saveConfig(value.bindingCode, { lastUsedAt });
     });
 
     return true;
@@ -202,6 +237,34 @@ export class BindingCodeManager {
    */
   getBindingCodePath(): string {
     return this.bindingConfigPath;
+  }
+
+  /**
+   * 获取指定 binding code 的 MCP 服务配置
+   */
+  getMCPServices(bindingCode: string): Record<string, MCPServiceConfig> {
+    const config = this.readConfig();
+    if (!config || !config[bindingCode]) {
+      return {};
+    }
+    return config[bindingCode].mcpServices || {};
+  }
+
+  /**
+   * 更新指定 binding code 的 MCP 服务配置
+   */
+  updateMCPServices(bindingCode: string, services: Record<string, MCPServiceConfig>): void {
+    const config = this.readConfig();
+    if (!config || !config[bindingCode]) {
+      throw new Error(`Binding code not found: ${bindingCode}`);
+    }
+
+    config[bindingCode].mcpServices = services;
+    config[bindingCode].lastUsedAt = new Date().toISOString();
+
+    this.ensureConfigDir();
+    const configJson = JSON.stringify(config, null, 2);
+    writeFileSync(this.bindingConfigPath, configJson, { mode: 0o600 });
   }
 }
 

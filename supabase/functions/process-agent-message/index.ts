@@ -177,121 +177,334 @@ Deno.serve(async (req) => {
 
 /**
  * Initialize MCP client and load tools using Vercel AI SDK
+ * 支持从用户设备加载 MCP 工具
  */
 async function initializeMCPTools(
   supabase: any,
   channel: any,
-  messageId: string
+  messageId: string,
+  userId: string
 ): Promise<Record<string, any>> {
+  const tools: Record<string, any> = {};
+
+  // 1. 加载全局 MCP 服务器的工具（如果配置了）
   const mcpServerUrl = Deno.env.get('MCP_SERVER_URL');
   const mcpApiKey = Deno.env.get('MCP_SERVER_API_KEY') || '';
 
-  // 如果没有配置 MCP 服务器，返回空工具集
-  if (!mcpServerUrl) {
-    console.log('MCP_SERVER_URL not configured, skipping MCP tools initialization');
-    return {};
-  }
+  if (mcpServerUrl) {
+    try {
+      console.log(`Connecting to global MCP server: ${mcpServerUrl}`);
 
-  try {
-    console.log(`Connecting to MCP server: ${mcpServerUrl}`);
-
-    // 创建 MCP 客户端
-    const mcpClient = await createMCPClient({
-      transport: {
-        type: 'http',
-        url: mcpServerUrl,
-        headers: mcpApiKey ? { Authorization: `Bearer ${mcpApiKey}` } : undefined,
-      },
-    });
-
-    // 获取所有可用工具
-    const mcpTools = await mcpClient.listTools();
-    console.log(
-      `Loaded ${mcpTools.length} MCP tools:`,
-      mcpTools.map((t: any) => t.name)
-    );
-
-    // 转换 MCP 工具为 Vercel AI SDK 工具格式
-    const tools: Record<string, any> = {};
-
-    for (const mcpTool of mcpTools) {
-      const toolName = mcpTool.name;
-
-      tools[toolName] = tool({
-        description: mcpTool.description || `MCP tool: ${toolName}`,
-        parameters: mcpTool.inputSchema || z.object({}),
-        execute: async (args: any) => {
-          try {
-            console.log(`Executing MCP tool: ${toolName}`, args);
-
-            // 发送工具调用开始事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_start',
-              payload: {
-                messageId,
-                tool: toolName,
-                args,
-              },
-            });
-
-            // 调用 MCP 工具
-            const result = await mcpClient.callTool(toolName, args);
-
-            // 提取结果文本
-            let resultText = '';
-            if (result.content && Array.isArray(result.content)) {
-              resultText = result.content
-                .filter((c: any) => c.type === 'text')
-                .map((c: any) => c.text)
-                .join('\n');
-            } else if (typeof result === 'string') {
-              resultText = result;
-            } else {
-              resultText = JSON.stringify(result);
-            }
-
-            console.log(`MCP tool ${toolName} result:`, resultText.substring(0, 200));
-
-            // 发送工具调用成功事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: toolName,
-                status: 'success',
-                result: resultText,
-              },
-            });
-
-            return resultText;
-          } catch (error) {
-            console.error(`MCP tool ${toolName} execution error:`, error);
-
-            // 发送工具调用失败事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: toolName,
-                status: 'error',
-                error: error instanceof Error ? error.message : '未知错误',
-              },
-            });
-
-            return `❌ 工具执行失败: ${error instanceof Error ? error.message : '未知错误'}`;
-          }
+      const mcpClient = await createMCPClient({
+        transport: {
+          type: 'http',
+          url: mcpServerUrl,
+          headers: mcpApiKey ? { Authorization: `Bearer ${mcpApiKey}` } : undefined,
         },
       });
+
+      const mcpTools = await mcpClient.listTools();
+      console.log(
+        `Loaded ${mcpTools.length} global MCP tools:`,
+        mcpTools.map((t: any) => t.name)
+      );
+
+      for (const mcpTool of mcpTools) {
+        const toolName = `global_${mcpTool.name}`;
+        tools[toolName] = createMCPToolWrapper(mcpClient, mcpTool, toolName, channel, messageId);
+      }
+    } catch (error) {
+      console.error('Failed to load global MCP tools:', error);
+    }
+  }
+
+  // 2. 加载用户设备的 MCP 工具（从设备实时获取）
+  try {
+    console.log(`Loading MCP tools from user devices for user: ${userId}`);
+
+    // 获取用户的所有活跃设备绑定
+    const { data: bindings, error: bindingsError } = await supabase
+      .from('device_bindings')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active');
+
+    if (bindingsError) {
+      console.error('Failed to fetch device bindings:', bindingsError);
+      return tools;
     }
 
-    return tools;
+    if (!bindings || bindings.length === 0) {
+      console.log('No active device bindings found for user');
+      return tools;
+    }
+
+    console.log(`Found ${bindings.length} active device bindings`);
+
+    // 获取每个设备的 MCP 服务和工具
+    for (const binding of bindings) {
+      if (!binding.device_url) {
+        console.log(`Skipping binding ${binding.id}: no device URL`);
+        continue;
+      }
+
+      try {
+        // 从设备获取 MCP 服务列表
+        const servicesController = new AbortController();
+        const servicesTimeoutId = setTimeout(() => servicesController.abort(), 5000);
+
+        const servicesResponse = await fetch(`${binding.device_url}/mcp/services`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${binding.binding_code}`,
+          },
+          signal: servicesController.signal,
+        });
+
+        clearTimeout(servicesTimeoutId);
+
+        if (!servicesResponse.ok) {
+          console.error(
+            `Failed to fetch services from device ${binding.device_name}: HTTP ${servicesResponse.status}`
+          );
+          continue;
+        }
+
+        const servicesData = await servicesResponse.json();
+        const services = servicesData.services || [];
+
+        console.log(`Found ${services.length} MCP services for device ${binding.device_name}`);
+
+        // 为每个服务获取工具列表
+        for (const service of services) {
+          try {
+            const toolsController = new AbortController();
+            const toolsTimeoutId = setTimeout(() => toolsController.abort(), 5000);
+
+            const toolsResponse = await fetch(
+              `${binding.device_url}/mcp/${service.name}/tools`,
+              {
+                method: 'GET',
+                headers: {
+                  Authorization: `Bearer ${binding.binding_code}`,
+                },
+                signal: toolsController.signal,
+              }
+            );
+
+            clearTimeout(toolsTimeoutId);
+
+            if (!toolsResponse.ok) {
+              console.error(
+                `Failed to fetch tools from ${service.name}: HTTP ${toolsResponse.status}`
+              );
+              continue;
+            }
+
+            const toolsData = await toolsResponse.json();
+            const serviceTools = toolsData.tools || [];
+
+            console.log(
+              `Loaded ${serviceTools.length} tools from ${service.name}:`,
+              serviceTools.map((t: any) => t.name)
+            );
+
+            // 为每个工具创建包装器
+            for (const mcpTool of serviceTools) {
+              const toolName = `${binding.device_name}_${service.name}_${mcpTool.name}`;
+              tools[toolName] = createDeviceMCPToolWrapper(
+                binding,
+                service,
+                mcpTool,
+                toolName,
+                channel,
+                messageId
+              );
+            }
+          } catch (error) {
+            console.error(`Failed to load tools from ${service.name}:`, error);
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to communicate with device ${binding.device_name}:`, error);
+      }
+    }
+
+    console.log(`Total MCP tools loaded: ${Object.keys(tools).length}`);
   } catch (error) {
-    console.error('Failed to initialize MCP tools:', error);
-    return {};
+    console.error('Failed to load device MCP tools:', error);
   }
+
+  return tools;
+}
+
+/**
+ * 创建全局 MCP 工具包装器
+ */
+function createMCPToolWrapper(
+  mcpClient: any,
+  mcpTool: any,
+  toolName: string,
+  channel: any,
+  messageId: string
+) {
+  return tool({
+    description: mcpTool.description || `MCP tool: ${toolName}`,
+    parameters: mcpTool.inputSchema || z.object({}),
+    execute: async (args: any) => {
+      try {
+        console.log(`Executing MCP tool: ${toolName}`, args);
+
+        await channel.send({
+          type: 'broadcast',
+          event: 'tool_call_start',
+          payload: { messageId, tool: toolName, args },
+        });
+
+        const result = await mcpClient.callTool(mcpTool.name, args);
+
+        let resultText = '';
+        if (result.content && Array.isArray(result.content)) {
+          resultText = result.content
+            .filter((c: any) => c.type === 'text')
+            .map((c: any) => c.text)
+            .join('\n');
+        } else if (typeof result === 'string') {
+          resultText = result;
+        } else {
+          resultText = JSON.stringify(result);
+        }
+
+        await channel.send({
+          type: 'broadcast',
+          event: 'tool_call_result',
+          payload: { messageId, tool: toolName, status: 'success', result: resultText },
+        });
+
+        return resultText;
+      } catch (error) {
+        console.error(`MCP tool ${toolName} execution error:`, error);
+
+        await channel.send({
+          type: 'broadcast',
+          event: 'tool_call_result',
+          payload: {
+            messageId,
+            tool: toolName,
+            status: 'error',
+            error: error instanceof Error ? error.message : '未知错误',
+          },
+        });
+
+        return `❌ 工具执行失败: ${error instanceof Error ? error.message : '未知错误'}`;
+      }
+    },
+  });
+}
+
+/**
+ * 创建设备 MCP 工具包装器
+ */
+function createDeviceMCPToolWrapper(
+  binding: any,
+  service: any,
+  mcpTool: any,
+  toolName: string,
+  channel: any,
+  messageId: string
+) {
+  return tool({
+    description:
+      `[设备: ${binding.device_name}] [服务: ${service.name}] ` +
+      (mcpTool.description || `MCP tool: ${mcpTool.name}`),
+    parameters: mcpTool.inputSchema || z.object({}),
+    execute: async (args: any) => {
+      try {
+        console.log(`Executing device MCP tool: ${toolName}`, args);
+
+        await channel.send({
+          type: 'broadcast',
+          event: 'tool_call_start',
+          payload: {
+            messageId,
+            tool: toolName,
+            args,
+            device: binding.device_name,
+            service: service.name,
+          },
+        });
+
+        // 调用设备的 MCP 工具
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+        const response = await fetch(
+          `${binding.device_url}/mcp/${service.name}/tools/${mcpTool.name}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${binding.binding_code}`,
+            },
+            body: JSON.stringify(args),
+            signal: controller.signal,
+          }
+        );
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        let resultText = '';
+        if (result.result && result.result.content && Array.isArray(result.result.content)) {
+          resultText = result.result.content
+            .filter((c: any) => c.type === 'text')
+            .map((c: any) => c.text)
+            .join('\n');
+        } else if (typeof result.result === 'string') {
+          resultText = result.result;
+        } else {
+          resultText = JSON.stringify(result.result || result);
+        }
+
+        await channel.send({
+          type: 'broadcast',
+          event: 'tool_call_result',
+          payload: {
+            messageId,
+            tool: toolName,
+            status: 'success',
+            result: resultText,
+            device: binding.device_name,
+            service: service.name,
+          },
+        });
+
+        return resultText;
+      } catch (error) {
+        console.error(`Device MCP tool ${toolName} execution error:`, error);
+
+        await channel.send({
+          type: 'broadcast',
+          event: 'tool_call_result',
+          payload: {
+            messageId,
+            tool: toolName,
+            status: 'error',
+            error: error instanceof Error ? error.message : '未知错误',
+            device: binding.device_name,
+            service: service.name,
+          },
+        });
+
+        return `❌ 工具执行失败: ${error instanceof Error ? error.message : '未知错误'}`;
+      }
+    },
+  });
 }
 
 interface AttachmentWithPath {
@@ -538,9 +751,9 @@ async function streamAgentResponse(
     // 流式处理内容块（支持文本和多模态内容）
     const generatedFiles: AttachmentWithPath[] = [];
 
-    // 初始化 MCP 工具
+    // 初始化 MCP 工具（包括用户设备的工具）
     console.log('Initializing MCP tools...');
-    const mcpTools = await initializeMCPTools(supabase, channel, messageId);
+    const mcpTools = await initializeMCPTools(supabase, channel, messageId, userId);
     console.log(`Loaded ${Object.keys(mcpTools).length} MCP tools`);
 
     // 检查用户消息是否包含 MiniApp 调用请求
