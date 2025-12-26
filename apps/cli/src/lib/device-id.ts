@@ -46,25 +46,88 @@ export function getLocalIpAddress(): string {
 }
 
 /**
+ * 检查 MAC 地址是否为虚拟网卡
+ * 基于常见虚拟化软件的 MAC 地址前缀
+ */
+function isVirtualMac(mac: string): boolean {
+  const virtualPrefixes = [
+    '00:05:69', // VMware
+    '00:0c:29', // VMware
+    '00:1c:14', // VMware
+    '00:50:56', // VMware
+    '08:00:27', // VirtualBox
+    '0a:00:27', // VirtualBox
+    '00:15:5d', // Hyper-V
+    '00:16:3e', // Xen
+    '52:54:00', // QEMU/KVM
+    '02:00:00', // Docker
+  ];
+
+  const macPrefix = mac.substring(0, 8).toLowerCase();
+  return virtualPrefixes.some((prefix) => macPrefix.startsWith(prefix.toLowerCase()));
+}
+
+/**
  * 获取 MAC 地址
+ * 优先获取物理网卡的 MAC 地址，跳过虚拟网卡
  */
 function getMacAddress(): string {
   const networkInterfaces = os.networkInterfaces();
+  const validMacs: Array<{ name: string; mac: string; priority: number }> = [];
 
   for (const name of Object.keys(networkInterfaces)) {
     const interfaces = networkInterfaces[name];
     if (!interfaces) continue;
 
+    const lowerName = name.toLowerCase();
+
+    // 跳过虚拟网卡和 VPN（按名称）
+    if (
+      lowerName.includes('virtual') ||
+      lowerName.includes('vmware') ||
+      lowerName.includes('vbox') ||
+      lowerName.includes('docker') ||
+      lowerName.includes('veth') ||
+      lowerName.includes('hyper-v') ||
+      lowerName.includes('wsl') ||
+      lowerName.includes('tailscale') ||
+      lowerName.includes('loopback')
+    ) {
+      continue;
+    }
+
     for (const iface of interfaces) {
-      // 跳过内部和虚拟接口
+      // 跳过内部接口和无效 MAC
       if (iface.internal || !iface.mac || iface.mac === '00:00:00:00:00:00') {
         continue;
       }
-      return iface.mac;
+
+      // 跳过虚拟网卡（按 MAC 地址前缀）
+      if (isVirtualMac(iface.mac)) {
+        continue;
+      }
+
+      // 计算优先级：物理网卡 > 其他
+      let priority = 0;
+      if (lowerName.includes('eth') || lowerName.includes('以太网')) {
+        priority = 100; // 有线网卡最高优先级
+      } else if (lowerName.includes('wlan') || lowerName.includes('wi-fi') || lowerName.includes('无线')) {
+        priority = 90; // 无线网卡次优先级
+      }
+
+      validMacs.push({ name, mac: iface.mac, priority });
     }
   }
 
-  return 'unknown-mac';
+  // 按优先级排序，优先级相同则按 MAC 地址字典序排序（确保稳定性）
+  validMacs.sort((a, b) => {
+    if (b.priority !== a.priority) {
+      return b.priority - a.priority;
+    }
+    return a.mac.localeCompare(b.mac);
+  });
+
+  return validMacs.length > 0 ? validMacs[0].mac : 'unknown-mac';
 }
 
 /**
@@ -77,14 +140,14 @@ function getMachineId(): string {
     if (platform === 'win32') {
       // Windows: 使用 wmic 获取主板序列号
       const output = execSync('wmic csproduct get uuid', { encoding: 'utf-8' });
-      const lines = output.split('\n').filter(line => line.trim());
+      const lines = output.split('\n').filter((line) => line.trim());
       if (lines.length > 1) {
         return lines[1].trim();
       }
     } else if (platform === 'darwin') {
       // macOS: 使用硬件 UUID
       const output = execSync('ioreg -rd1 -c IOPlatformExpertDevice | grep IOPlatformUUID', {
-        encoding: 'utf-8'
+        encoding: 'utf-8',
       });
       const match = output.match(/"IOPlatformUUID"\s*=\s*"([^"]+)"/);
       if (match && match[1]) {
@@ -94,14 +157,14 @@ function getMachineId(): string {
       // Linux: 尝试读取 machine-id
       try {
         const output = execSync('cat /etc/machine-id || cat /var/lib/dbus/machine-id', {
-          encoding: 'utf-8'
+          encoding: 'utf-8',
         });
         return output.trim();
       } catch {
         // 如果失败，尝试使用 DMI UUID
         try {
           const output = execSync('cat /sys/class/dmi/id/product_uuid', {
-            encoding: 'utf-8'
+            encoding: 'utf-8',
           });
           return output.trim();
         } catch {
