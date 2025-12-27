@@ -103,7 +103,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // 解析请求体
     const body = await request.json();
-    const { content, contentType, attachments, replyToMessageId, miniAppData } = body;
+    const { content, contentType, attachments, replyToMessageId, miniAppData, deviceId } = body;
 
     // 验证必填字段
     if (!content || content.trim().length === 0) {
@@ -179,6 +179,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           conversationId,
           messageId: message.id,
           userId: user.id,
+          deviceId: deviceId || null,
         }),
       }).catch((error) => {
         logger.error('Failed to trigger agent response', { error });

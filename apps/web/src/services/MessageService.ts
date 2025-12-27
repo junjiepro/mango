@@ -28,6 +28,7 @@ export class MessageService {
     attachments?: any[];
     miniAppData?: { miniAppId: string; installationId: string };
     replyToMessageId?: string;
+    deviceId?: string;
   }): Promise<Message> {
     const {
       data: { user },
@@ -49,6 +50,7 @@ export class MessageService {
         attachments: data.attachments,
         miniAppData: data.miniAppData,
         replyToMessageId: data.replyToMessageId,
+        deviceId: data.deviceId,
       }),
     });
 

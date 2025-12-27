@@ -214,6 +214,8 @@ export function createServer(config: CLIConfig) {
         return c.json({ error: 'Missing required field: binding_code' }, 400);
       }
 
+      console.log('Received binding configuration:', rest, binding_code);
+
       // 保存完整的绑定配置
       bindingCodeManager.saveConfig(binding_code, rest, {
         bindingCode: binding_code,

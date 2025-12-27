@@ -17,11 +17,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MiniAppWindow } from '@/components/miniapp/MiniAppWindow';
 import { MiniAppQuickAccess } from '@/components/conversation/MiniAppQuickAccess';
-import { Package } from 'lucide-react';
+import { Package, Laptop } from 'lucide-react';
 import type { Database } from '@/types/database.types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
 type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row'];
+type DeviceBinding = Database['public']['Tables']['device_bindings']['Row'];
 
 /**
  * 对话详情内容组件
@@ -48,6 +56,28 @@ function ConversationDetailContent() {
   const [installations, setInstallations] = useState<any[]>([]);
   const [loadingInstallations, setLoadingInstallations] = useState(false);
   const [showQuickAccess, setShowQuickAccess] = useState(true);
+  const [devices, setDevices] = useState<DeviceBinding[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [loadingDevices, setLoadingDevices] = useState(false);
+
+  // 加载设备列表
+  const loadDevices = async () => {
+    setLoadingDevices(true);
+    try {
+      const response = await fetch('/api/devices');
+      const result = await response.json();
+
+      if (response.ok && result.devices) {
+        setDevices(result.devices || []);
+      } else {
+        console.error('Failed to load devices:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to load devices:', error);
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
 
   // 加载已安装的 MiniApp
   const loadInstallations = async () => {
@@ -86,8 +116,18 @@ function ConversationDetailContent() {
     setSelectedMiniApp({ miniApp, installation });
   };
 
+  // 包装 sendMessage 以传递 deviceId
+  const handleSendMessage = async (
+    content: string,
+    attachments?: any[],
+    miniAppData?: { miniAppId: string; installationId: string }
+  ) => {
+    return sendMessage(content, attachments, miniAppData, selectedDeviceId || undefined);
+  };
+
   React.useEffect(() => {
     loadInstallations();
+    loadDevices();
   }, []);
 
   if (error) {
@@ -131,6 +171,40 @@ function ConversationDetailContent() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* 设备选择器 */}
+            <Select value={selectedDeviceId || 'none'} onValueChange={(value) => setSelectedDeviceId(value === 'none' ? '' : value)}>
+              <SelectTrigger className="w-[180px] h-9">
+                <SelectValue placeholder="选择设备">
+                  {selectedDeviceId ? (
+                    <div className="flex items-center gap-2">
+                      <Laptop className="h-4 w-4" />
+                      <span className="truncate">
+                        {devices.find((d) => d.id === selectedDeviceId)?.binding_name || '设备'}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">无设备</span>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">
+                  <span className="text-muted-foreground">不使用设备</span>
+                </SelectItem>
+                {devices.map((device) => (
+                  <SelectItem key={device.id} value={device.id}>
+                    <div className="flex items-center gap-2">
+                      <Laptop className="h-4 w-4" />
+                      <span>{device.binding_name}</span>
+                      {device.status === 'active' && (
+                        <span className="text-xs text-green-600">●</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             {/* MiniApp 按钮 */}
             <Button
               variant="outline"
@@ -176,7 +250,7 @@ function ConversationDetailContent() {
           <div className="bg-background p-4">
             <div className="container mx-auto max-w-4xl">
               <MessageInput
-                onSendMessage={sendMessage}
+                onSendMessage={handleSendMessage}
                 placeholder="输入消息... (Ctrl+Enter 发送)"
               />
               {/* MiniApp 快速访问栏 */}

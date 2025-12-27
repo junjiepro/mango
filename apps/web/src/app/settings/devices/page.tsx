@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Trash2, Circle, ExternalLink, RefreshCw } from 'lucide-react';
+import { Loader2, Plus, Trash2, Circle, ExternalLink, RefreshCw, Settings } from 'lucide-react';
 import { AppHeader } from '@/components/layouts/AppHeader';
 import { DeviceUrls } from '@/hooks/useDeviceBinding';
 
@@ -214,14 +214,25 @@ export default function DeviceManagementPage() {
                         Platform: {binding.platform} • Bound on {formatDate(binding.created_at)}
                       </CardDescription>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteClick(binding.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => router.push(`/devices/${binding.id}`)}
+                        title="View Details"
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteClick(binding.id)}
+                        className="text-destructive hover:text-destructive"
+                        title="Unbind Device"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">

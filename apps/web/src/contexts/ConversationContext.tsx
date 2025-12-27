@@ -39,7 +39,8 @@ interface ConversationContextType {
   sendMessage: (
     content: string,
     attachments?: any[],
-    miniAppData?: { miniAppId: string; installationId: string }
+    miniAppData?: { miniAppId: string; installationId: string },
+    deviceId?: string
   ) => Promise<Message>;
   loadMoreMessages: () => Promise<void>;
   hasMoreMessages: boolean;
@@ -354,7 +355,8 @@ export function ConversationProvider({ children, conversationId }: ConversationP
     async (
       content: string,
       attachments?: any[],
-      miniAppData?: { miniAppId: string; installationId: string }
+      miniAppData?: { miniAppId: string; installationId: string },
+      deviceId?: string
     ): Promise<Message> => {
       if (!conversationId) {
         throw new Error('No conversation selected');
@@ -366,6 +368,7 @@ export function ConversationProvider({ children, conversationId }: ConversationP
           content,
           attachments,
           miniAppData,
+          deviceId,
         });
 
         // 乐观更新 (实时订阅会处理最终状态)
