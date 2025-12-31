@@ -2,13 +2,15 @@
 
 import { Command } from 'commander';
 import { startDeviceService } from './commands/start.js';
+import { showHelp } from './commands/help.js';
+import { showVersion } from './commands/version.js';
+import { showStatus } from './commands/status.js';
 import { formatter } from './lib/formatter.js';
 import { configManager } from './lib/config.js';
-import { deviceSecretManager } from './lib/device-secret.js';
 
 const program = new Command();
 
-program.name('mango').description('Mango CLI - 智能Agent对话平台命令行工具').version('0.1.0');
+program.name('mango-cli').description('Mango CLI - 智能Agent对话平台命令行工具').version('0.1.0');
 
 // Start command - 启动设备服务
 program
@@ -68,33 +70,15 @@ program
   .command('status')
   .description('查看设备服务状态')
   .action(() => {
-    formatter.title('Device Service Status');
+    showStatus();
+  });
 
-    try {
-      const deviceInfo = deviceSecretManager.getDeviceInfo();
-      const config = configManager.readConfig();
-
-      formatter.keyValue({
-        'Device ID': deviceInfo.deviceId.substring(0, 40) + '...',
-        Platform: deviceInfo.platform,
-        'Config Dir': deviceSecretManager.getConfigDir(),
-      });
-
-      if (config) {
-        formatter.newline();
-        formatter.labeled('App URL', config.appUrl || 'Not configured');
-        formatter.labeled('Port', config.port?.toString() || 'Not configured');
-      }
-
-      formatter.newline();
-      const services = configManager.loadMCPServices();
-      formatter.labeled('MCP Services', services.length.toString());
-    } catch (error) {
-      formatter.error('Failed to get device status');
-      if (error instanceof Error) {
-        formatter.error(error.message);
-      }
-    }
+// Version command - 显示版本信息
+program
+  .command('version')
+  .description('显示版本信息')
+  .action(() => {
+    showVersion();
   });
 
 // Help command - 显示帮助信息
@@ -102,7 +86,7 @@ program
   .command('help')
   .description('显示帮助信息')
   .action(() => {
-    program.help();
+    showHelp();
   });
 
 // 错误处理

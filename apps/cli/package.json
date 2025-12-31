@@ -4,14 +4,16 @@
   "private": true,
   "type": "module",
   "bin": {
-    "mango": "./dist/index.js"
+    "mango-cli": "./dist/index.js"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsup src/index.ts --format esm --dts",
+    "build:standalone": "tsup src/index.ts --format esm --minify --clean",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "package": "pnpm build:standalone && node scripts/package.js"
   },
   "dependencies": {
     "@hono/mcp": "^0.2.2",

@@ -378,12 +378,38 @@ export function createServer(config: CLIConfig) {
     }
   });
 
-  // ACP端点（预留）
-  app.post('/acp', async (c) => {
-    // TODO: 实现ACP协议支持
-    return c.json({
-      message: 'ACP protocol support is in progress',
-    });
+  // ACP端点（ACP协议服务代理，需要认证）
+  app.all('/acp', async (c) => {
+    try {
+      const [bindingCode, _, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+
+      if (errorResponse) {
+        return errorResponse;
+      }
+
+      // 获取ACP服务列表
+      const services = acpConnector.getServices();
+
+      // 返回服务列表（即使为空也返回 200）
+      return c.json({
+        message: services.length === 0
+          ? 'No ACP services configured. Please configure ACP services first.'
+          : 'ACP protocol support is in progress',
+        available_services: services.map((s) => ({
+          name: s.name,
+          description: s.description,
+        })),
+        note: 'Full ACP protocol implementation will be added once the protocol specification is finalized',
+      });
+    } catch (error) {
+      console.error('ACP endpoint error:', error);
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : 'Internal server error',
+        },
+        { status: 500 }
+      );
+    }
   });
 
   // 404处理

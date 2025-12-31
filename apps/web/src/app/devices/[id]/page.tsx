@@ -26,6 +26,7 @@ import { AppHeader } from '@/components/layouts/AppHeader';
 import { DeviceStatus } from '@/components/device/DeviceStatus';
 import { DeviceConfigEditor } from '@/components/device/DeviceConfigEditor';
 import { MCPDebugger } from '@/components/device/MCPDebugger';
+import { ACPDebugger } from '@/components/device/ACPDebugger';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DeviceUrls } from '@/hooks/useDeviceBinding';
 
@@ -216,10 +217,11 @@ export default function DeviceDetailPage({ params }: { params: { id: string } })
 
         {/* Tabs for different sections */}
         <Tabs defaultValue="status" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="status">状态监控</TabsTrigger>
             <TabsTrigger value="config">配置管理</TabsTrigger>
-            <TabsTrigger value="debug">MCP 调试</TabsTrigger>
+            <TabsTrigger value="mcp-debug">MCP 调试</TabsTrigger>
+            <TabsTrigger value="acp-debug">ACP 调试</TabsTrigger>
           </TabsList>
 
           <TabsContent value="status" className="space-y-6">
@@ -243,8 +245,16 @@ export default function DeviceDetailPage({ params }: { params: { id: string } })
             />
           </TabsContent>
 
-          <TabsContent value="debug">
+          <TabsContent value="mcp-debug">
             <MCPDebugger
+              deviceId={deviceId}
+              bindingCode={device.binding_code}
+              onlineUrls={device.online_urls}
+            />
+          </TabsContent>
+
+          <TabsContent value="acp-debug">
+            <ACPDebugger
               deviceId={deviceId}
               bindingCode={device.binding_code}
               onlineUrls={device.online_urls}

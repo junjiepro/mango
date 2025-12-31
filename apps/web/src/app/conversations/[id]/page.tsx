@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { DeviceCache } from '@/lib/deviceCache';
 
 type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
 type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row'];
@@ -69,6 +70,16 @@ function ConversationDetailContent() {
 
       if (response.ok && result.devices) {
         setDevices(result.devices || []);
+
+        // 初始化设备选择:优先使用会话保存的设备,其次使用缓存的默认设备
+        if (currentConversation?.device_id) {
+          setSelectedDeviceId(currentConversation.device_id);
+        } else {
+          const cachedDeviceId = DeviceCache.getDefaultDeviceId();
+          if (cachedDeviceId) {
+            setSelectedDeviceId(cachedDeviceId);
+          }
+        }
       } else {
         console.error('Failed to load devices:', result.error);
       }
@@ -76,6 +87,34 @@ function ConversationDetailContent() {
       console.error('Failed to load devices:', error);
     } finally {
       setLoadingDevices(false);
+    }
+  };
+
+  // 处理设备选择变化
+  const handleDeviceChange = async (deviceId: string) => {
+    const actualDeviceId = deviceId === 'none' ? '' : deviceId;
+    setSelectedDeviceId(actualDeviceId);
+
+    // 保存到本地缓存
+    DeviceCache.setDefaultDeviceId(actualDeviceId);
+
+    // 保存到数据库
+    if (currentConversation?.id) {
+      try {
+        const response = await fetch(`/api/conversations/${currentConversation.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            device_id: actualDeviceId || null,
+          }),
+        });
+
+        if (!response.ok) {
+          console.error('Failed to save device selection to conversation');
+        }
+      } catch (error) {
+        console.error('Failed to save device selection:', error);
+      }
     }
   };
 
@@ -172,7 +211,7 @@ function ConversationDetailContent() {
 
           <div className="flex items-center gap-2">
             {/* 设备选择器 */}
-            <Select value={selectedDeviceId || 'none'} onValueChange={(value) => setSelectedDeviceId(value === 'none' ? '' : value)}>
+            <Select value={selectedDeviceId || 'none'} onValueChange={handleDeviceChange}>
               <SelectTrigger className="w-[180px] h-9">
                 <SelectValue placeholder="选择设备">
                   {selectedDeviceId ? (

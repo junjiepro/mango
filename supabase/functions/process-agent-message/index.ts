@@ -236,81 +236,144 @@ async function initializeMCPTools(
     }
   }
 
-  // 2. 加载用户设备的 MCP 工具（从设备实时获取）
+  // 2. 加载指定的用户设备的 MCP 工具（从设备实时获取）
   try {
-    if (deviceId) {
-      console.log(
-        `Loading MCP tools from user devices for user: ${userId}, Filtering to specific device: ${deviceId}`
-      );
+    if (!deviceId) {
+      console.log(`No device ID specified, skipping device MCP tool loading`);
+      return tools;
+    }
+    console.log(
+      `Loading MCP tools from user devices for user: ${userId}${deviceId ? `, Filtering to specific device: ${deviceId}` : ''}`
+    );
 
-      // 获取用户的活跃设备绑定（如果指定了 deviceId，则只加载该设备）
-      const query = supabase
-        .from('device_bindings')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('id', deviceId)
-        .eq('status', 'active');
+    // 获取用户的活跃设备绑定
+    const query = supabase
+      .from('device_bindings')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', deviceId)
+      .eq('status', 'active');
 
-      const { data: bindings, error: bindingsError } = await query;
+    const { data: bindings, error: bindingsError } = await query;
 
-      if (bindingsError) {
-        console.error('Failed to fetch device bindings:', bindingsError);
-        return tools;
+    if (bindingsError) {
+      console.error('Failed to fetch device bindings:', bindingsError);
+      return tools;
+    }
+
+    if (!bindings || bindings.length === 0) {
+      console.log('No active device bindings found for user');
+      return tools;
+    }
+
+    console.log(`Found ${bindings.length} active device bindings`);
+
+    // 为每个设备创建 MCP 客户端并加载工具
+    for (const binding of bindings) {
+      if (!binding.device_url) {
+        console.log(`Skipping binding ${binding.id}: no device URL`);
+        continue;
       }
 
-      if (!bindings || bindings.length === 0) {
-        console.log('No active device bindings found for user');
-        return tools;
+      const url =
+        binding.device_url.cloudflare_url ||
+        binding.device_url.hostname_url ||
+        binding.device_url.localhost_url ||
+        '';
+      if (!url) {
+        console.log(`Skipping binding ${binding.id}: no device URL`);
+        continue;
       }
 
-      console.log(`Found ${bindings.length} active device bindings`);
+      try {
+        // 先进行设备健康检查
+        console.log(`Checking device health for ${binding.device_name} at ${url}/health`);
+        const healthCheckResponse = await fetch(`${url}/health`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000), // 5秒超时
+        });
 
-      // 为每个设备创建 MCP 客户端并加载工具
-      for (const binding of bindings) {
-        if (!binding.device_url) {
-          console.log(`Skipping binding ${binding.id}: no device URL`);
-          continue;
-        }
-
-        const url =
-          binding.device_url.cloudflare_url ||
-          binding.device_url.hostname_url ||
-          binding.device_url.localhost_url ||
-          '';
-        if (!url) {
-          console.log(`Skipping binding ${binding.id}: no device URL`);
-          continue;
-        }
-
-        try {
-          console.log(`Connecting to device ${binding.device_name} at ${url}/mcp`);
-
-          // 使用 MCP SDK 连接到设备的聚合 MCP 端点
-          deviceMcpClient = await createMCPClient({
-            transport: {
-              type: 'http',
-              url: `${url}/mcp`,
-              headers: {
-                Authorization: `Bearer ${binding.binding_code}`,
-              },
+        if (!healthCheckResponse.ok) {
+          console.error(
+            `Device ${binding.device_name} health check failed: ${healthCheckResponse.status}`
+          );
+          // 发送设备离线通知到 Realtime Channel
+          await channel.send({
+            type: 'broadcast',
+            event: 'device_status',
+            payload: {
+              messageId,
+              deviceId: binding.id,
+              deviceName: binding.device_name,
+              status: 'offline',
+              error: `Health check failed with status ${healthCheckResponse.status}`,
             },
           });
-
-          // 获取设备的所有 MCP 工具
-          const deviceTools = await deviceMcpClient.tools();
-          console.log(
-            `Loaded ${Object.keys(deviceTools).length} tools from device ${binding.device_name}`
-          );
-
-          // 为每个工具创建包装器
-          for (const [name, deviceTool] of Object.entries(deviceTools)) {
-            const toolName = `${binding.device_name}_${name}`;
-            // deviceTool 已经是 Vercel AI SDK 格式的工具，直接使用
-            tools[toolName] = deviceTool;
-          }
-        } catch (error) {
-          console.error(`Failed to communicate with device ${binding.device_name}:`, error);
+          continue;
         }
+
+        console.log(`Device ${binding.device_name} is online, connecting to MCP endpoint`);
+
+        // 使用 MCP SDK 连接到设备的聚合 MCP 端点
+        deviceMcpClient = await createMCPClient({
+          transport: {
+            type: 'http',
+            url: `${url}/mcp`,
+            headers: {
+              Authorization: `Bearer ${binding.binding_code}`,
+            },
+          },
+        });
+
+        // 获取设备的所有 MCP 工具
+        const deviceTools = await deviceMcpClient.tools();
+        console.log(
+          `Loaded ${Object.keys(deviceTools).length} tools from device ${binding.device_name}`
+        );
+
+        // 为每个工具创建包装器
+        for (const [name, deviceTool] of Object.entries(deviceTools)) {
+          const toolName = `${binding.device_name}_${name}`;
+          // deviceTool 已经是 Vercel AI SDK 格式的工具，直接使用
+          tools[toolName] = deviceTool;
+        }
+      } catch (error) {
+        console.error(`Failed to communicate with device ${binding.device_name}:`, error);
+
+        // 判断错误类型并发送详细的设备状态通知
+        let errorMessage = 'Unknown error';
+        let errorType = 'connection_error';
+
+        if (error instanceof Error) {
+          errorMessage = error.message;
+
+          // 判断错误类型
+          if (error.name === 'AbortError' || errorMessage.includes('timeout')) {
+            errorType = 'timeout';
+            errorMessage = 'Device connection timeout (5s)';
+          } else if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
+            errorType = 'network_error';
+            errorMessage = 'Network error - device may be offline';
+          } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
+            errorType = 'auth_error';
+            errorMessage = 'Authentication failed - invalid binding code';
+          }
+        }
+
+        // 发送设备离线/错误通知到 Realtime Channel
+        await channel.send({
+          type: 'broadcast',
+          event: 'device_status',
+          payload: {
+            messageId,
+            deviceId: binding.id,
+            deviceName: binding.device_name,
+            status: 'error',
+            errorType,
+            error: errorMessage,
+            timestamp: new Date().toISOString(),
+          },
+        });
       }
     }
 
@@ -1445,9 +1508,10 @@ ${updatedFieldsList}
                 args: call.args,
                 isMcpTool,
                 // 如果是设备 MCP 工具,提取设备名称
-                deviceName: isMcpTool && !call.toolName.startsWith('global_')
-                  ? call.toolName.split('_')[0]
-                  : undefined,
+                deviceName:
+                  isMcpTool && !call.toolName.startsWith('global_')
+                    ? call.toolName.split('_')[0]
+                    : undefined,
               },
             });
           }
@@ -1511,9 +1575,10 @@ ${updatedFieldsList}
                 error: errorMessage,
                 isMcpTool,
                 // 如果是设备 MCP 工具,提取设备名称
-                deviceName: isMcpTool && !result.toolName.startsWith('global_')
-                  ? result.toolName.split('_')[0]
-                  : undefined,
+                deviceName:
+                  isMcpTool && !result.toolName.startsWith('global_')
+                    ? result.toolName.split('_')[0]
+                    : undefined,
               },
             });
           }

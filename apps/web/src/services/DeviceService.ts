@@ -8,9 +8,9 @@ import { createClient } from '@/lib/supabase/client';
 export interface DeviceBinding {
   id: string;
   binding_name: string;
-  tunnel_url: string;
+  device_url: string;
   status: 'active' | 'inactive' | 'expired';
-  binding_token: string;
+  binding_code: string;
 }
 
 export interface MCPService {
@@ -71,7 +71,7 @@ export class DeviceServiceClient {
 
     const { data, error } = await this.supabase
       .from('device_bindings')
-      .select('id, binding_name, tunnel_url, status, binding_token')
+      .select('id, binding_name, device_url, status, binding_code')
       .eq('user_id', user.id)
       .eq('status', 'active');
 
@@ -85,12 +85,12 @@ export class DeviceServiceClient {
   /**
    * 检查设备健康状态
    */
-  async checkDeviceHealth(tunnelUrl: string): Promise<DeviceHealthStatus> {
+  async checkDeviceHealth(deviceUrl: string): Promise<DeviceHealthStatus> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      const response = await fetch(`${tunnelUrl}/health`, {
+      const response = await fetch(`${deviceUrl}/health`, {
         method: 'GET',
         signal: controller.signal,
       });
@@ -111,14 +111,15 @@ export class DeviceServiceClient {
   }
 
   /**
-   * 列出设备上的所有 MCP 服务
+   * 列出设备上的所有 MCP 服务（需要 binding_code 认证）
    */
-  async listMCPServices(tunnelUrl: string): Promise<MCPService[]> {
+  async listMCPServices(deviceUrl: string, bindingCode: string): Promise<MCPService[]> {
     try {
-      const response = await fetch(`${tunnelUrl}/mcp/services`, {
+      const response = await fetch(`${deviceUrl}/mcp/services`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${bindingCode}`,
         },
       });
 
@@ -136,46 +137,31 @@ export class DeviceServiceClient {
   }
 
   /**
-   * 列出指定 MCP 服务的所有工具
-   */
-  async listMCPTools(tunnelUrl: string, serviceName: string): Promise<MCPTool[]> {
-    try {
-      const response = await fetch(`${tunnelUrl}/mcp/${serviceName}/tools`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to list tools: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data.tools || [];
-    } catch (error) {
-      throw new Error(
-        `Failed to list tools: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-
-  /**
-   * 调用 MCP 工具
+   * 通过 MCP 聚合端点调用工具（需要 binding_code 认证）
+   * 使用 MCP 协议的 tools/call 方法
    */
   async callMCPTool(
-    tunnelUrl: string,
-    serviceName: string,
+    deviceUrl: string,
+    bindingCode: string,
     toolName: string,
     args: Record<string, unknown>
   ): Promise<MCPToolResult> {
     try {
-      const response = await fetch(`${tunnelUrl}/mcp/${serviceName}/tools/${toolName}`, {
+      const response = await fetch(`${deviceUrl}/mcp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${bindingCode}`,
         },
-        body: JSON.stringify(args),
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method: 'tools/call',
+          params: {
+            name: toolName,
+            arguments: args,
+          },
+        }),
       });
 
       if (!response.ok) {
@@ -183,6 +169,11 @@ export class DeviceServiceClient {
       }
 
       const data = await response.json();
+
+      if (data.error) {
+        throw new Error(`Tool error: ${data.error.message}`);
+      }
+
       return data.result;
     } catch (error) {
       throw new Error(
@@ -192,15 +183,61 @@ export class DeviceServiceClient {
   }
 
   /**
-   * 列出指定 MCP 服务的所有资源
+   * 列出所有可用的 MCP 工具（需要 binding_code 认证）
+   * 使用 MCP 协议的 tools/list 方法
    */
-  async listMCPResources(tunnelUrl: string, serviceName: string): Promise<MCPResource[]> {
+  async listMCPTools(deviceUrl: string, bindingCode: string): Promise<MCPTool[]> {
     try {
-      const response = await fetch(`${tunnelUrl}/mcp/${serviceName}/resources`, {
-        method: 'GET',
+      const response = await fetch(`${deviceUrl}/mcp`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${bindingCode}`,
         },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method: 'tools/list',
+          params: {},
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to list tools: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(`List tools error: ${data.error.message}`);
+      }
+
+      return data.result?.tools || [];
+    } catch (error) {
+      throw new Error(
+        `Failed to list tools: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * 列出所有可用的 MCP 资源（需要 binding_code 认证）
+   * 使用 MCP 协议的 resources/list 方法
+   */
+  async listMCPResources(deviceUrl: string, bindingCode: string): Promise<MCPResource[]> {
+    try {
+      const response = await fetch(`${deviceUrl}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${bindingCode}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method: 'resources/list',
+          params: {},
+        }),
       });
 
       if (!response.ok) {
@@ -208,7 +245,12 @@ export class DeviceServiceClient {
       }
 
       const data = await response.json();
-      return data.resources || [];
+
+      if (data.error) {
+        throw new Error(`List resources error: ${data.error.message}`);
+      }
+
+      return data.result?.resources || [];
     } catch (error) {
       throw new Error(
         `Failed to list resources: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -217,30 +259,42 @@ export class DeviceServiceClient {
   }
 
   /**
-   * 读取 MCP 资源
+   * 读取 MCP 资源（需要 binding_code 认证）
+   * 使用 MCP 协议的 resources/read 方法
    */
   async readMCPResource(
-    tunnelUrl: string,
-    serviceName: string,
+    deviceUrl: string,
+    bindingCode: string,
     resourceUri: string
   ): Promise<unknown> {
     try {
-      const response = await fetch(
-        `${tunnelUrl}/mcp/${serviceName}/resources/${encodeURIComponent(resourceUri)}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
+      const response = await fetch(`${deviceUrl}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${bindingCode}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method: 'resources/read',
+          params: {
+            uri: resourceUri,
           },
-        }
-      );
+        }),
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to read resource: ${response.status}`);
       }
 
       const data = await response.json();
-      return data.content;
+
+      if (data.error) {
+        throw new Error(`Read resource error: ${data.error.message}`);
+      }
+
+      return data.result?.contents || [];
     } catch (error) {
       throw new Error(
         `Failed to read resource: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -255,8 +309,8 @@ export class DeviceServiceClient {
     Array<{
       deviceId: string;
       deviceName: string;
-      tunnelUrl: string;
-      serviceName: string;
+      deviceUrl: string;
+      bindingCode: string;
       tools: MCPTool[];
     }>
   > {
@@ -264,39 +318,26 @@ export class DeviceServiceClient {
     const allTools: Array<{
       deviceId: string;
       deviceName: string;
-      tunnelUrl: string;
-      serviceName: string;
+      deviceUrl: string;
+      bindingCode: string;
       tools: MCPTool[];
     }> = [];
 
     for (const device of devices) {
       try {
         // 检查设备是否在线
-        await this.checkDeviceHealth(device.tunnel_url);
+        await this.checkDeviceHealth(device.device_url);
 
-        // 获取设备上的所有 MCP 服务
-        const services = await this.listMCPServices(device.tunnel_url);
+        // 获取设备上的所有工具（通过 MCP 聚合端点）
+        const tools = await this.listMCPTools(device.device_url, device.binding_code);
 
-        // 获取每个服务的工具
-        for (const service of services) {
-          if (service.status === 'active') {
-            try {
-              const tools = await this.listMCPTools(device.tunnel_url, service.name);
-              allTools.push({
-                deviceId: device.id,
-                deviceName: device.binding_name,
-                tunnelUrl: device.tunnel_url,
-                serviceName: service.name,
-                tools,
-              });
-            } catch (error) {
-              console.error(
-                `Failed to list tools for service ${service.name} on device ${device.binding_name}:`,
-                error
-              );
-            }
-          }
-        }
+        allTools.push({
+          deviceId: device.id,
+          deviceName: device.binding_name,
+          deviceUrl: device.device_url,
+          bindingCode: device.binding_code,
+          tools,
+        });
       } catch (error) {
         console.error(`Device ${device.binding_name} is offline or unreachable:`, error);
       }

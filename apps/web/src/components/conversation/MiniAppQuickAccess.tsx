@@ -53,7 +53,6 @@ export function MiniAppQuickAccess({
         installationMap.set(install.id, install);
       });
     }
-    console.log(installationMap, installations);
 
     messages.forEach((message) => {
       const metadata = message.metadata as any;

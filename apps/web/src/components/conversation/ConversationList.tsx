@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { logger } from '@mango/shared/utils'
 import type { Database } from '@/types/database.types'
+import { DeviceCache } from '@/lib/deviceCache'
 
 type Conversation = Database['public']['Tables']['conversations']['Row']
 
@@ -57,8 +58,12 @@ export function ConversationList({
 
   const handleCreateConversation = async () => {
     try {
+      // 从缓存获取默认设备ID
+      const defaultDeviceId = DeviceCache.getDefaultDeviceId()
+
       const newConversation = await conversationService.createConversation({
         title: '新对话',
+        device_id: defaultDeviceId || undefined,
       })
       setConversations((prev) => [newConversation, ...prev])
       onSelectConversation?.(newConversation)

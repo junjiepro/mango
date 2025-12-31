@@ -25,6 +25,7 @@ export class ConversationService {
     title: string
     description?: string
     context?: Record<string, any>
+    device_id?: string
   }): Promise<Conversation> {
     const { data: { user } } = await this.supabase.auth.getUser()
 
@@ -43,6 +44,7 @@ export class ConversationService {
         system_prompt: null,
       },
       status: 'active',
+      device_id: data.device_id || null,
     }
 
     const { data: conversation, error } = await this.supabase

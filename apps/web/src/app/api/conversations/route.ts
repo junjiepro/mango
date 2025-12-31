@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     // 解析请求体
     const body = await request.json()
-    const { title, description, context } = body
+    const { title, description, context, device_id } = body
 
     // 验证必填字段
     if (!title || title.trim().length === 0) {
@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
           system_prompt: null,
         },
         status: 'active',
+        device_id: device_id || null,
       })
       .select()
       .single()
