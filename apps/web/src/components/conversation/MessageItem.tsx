@@ -34,10 +34,13 @@ type MiniAppInstallation = Database['public']['Tables']['mini_app_installations'
 
 interface ToolCall {
   tool: string;
+  toolCallId?: string;
   status: 'pending' | 'running' | 'success' | 'error';
   args?: any;
   result?: any;
   error?: string;
+  isMcpTool?: boolean;
+  deviceName?: string;
 }
 
 interface MiniAppInvocation {
@@ -255,12 +258,44 @@ export function MessageItem({
   );
 
   // 获取工具调用的显示名称
-  const getToolDisplayName = (toolName: string) => {
-    const toolNames: Record<string, string> = {
+  const getToolDisplayName = (toolCall: ToolCall) => {
+    const { tool: toolName, isMcpTool, deviceName } = toolCall;
+
+    // 内置工具的显示名称映射
+    const builtInToolNames: Record<string, string> = {
       generating_image: '图片生成',
       reading_taged_file: '读取标记文件',
+      invoke_miniapp: '调用小应用',
+      create_miniapp: '创建小应用',
+      update_miniapp: '更新小应用',
     };
-    return toolNames[toolName] || toolName;
+
+    // 如果是内置工具,返回映射的名称
+    if (builtInToolNames[toolName]) {
+      return builtInToolNames[toolName];
+    }
+
+    // 如果是 MCP 工具
+    if (isMcpTool) {
+      // 移除前缀 (global_ 或 设备名_)
+      let displayName = toolName;
+      if (toolName.startsWith('global_')) {
+        displayName = toolName.replace('global_', '');
+      } else if (deviceName && toolName.startsWith(`${deviceName}_`)) {
+        displayName = toolName.replace(`${deviceName}_`, '');
+      }
+
+      // 格式化工具名称 (将下划线替换为空格,首字母大写)
+      displayName = displayName
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+
+      return displayName;
+    }
+
+    // 默认返回原始工具名称
+    return toolName;
   };
 
   // 获取工具调用的状态图标和文本
@@ -318,11 +353,13 @@ export function MessageItem({
           <div className="mb-3 space-y-2">
             {toolCalls.map((toolCall, index) => {
               const statusDisplay = getToolStatusDisplay(toolCall.status);
+              const displayName = getToolDisplayName(toolCall);
+
               return (
                 <div
-                  key={index}
+                  key={toolCall.toolCallId || index}
                   className={cn(
-                    'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm',
+                    'flex items-start gap-2 rounded-lg border px-3 py-2 text-sm',
                     toolCall.status === 'running' &&
                       'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950',
                     toolCall.status === 'success' &&
@@ -333,20 +370,45 @@ export function MessageItem({
                       'border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950'
                   )}
                 >
-                  <span className={cn('flex items-center', statusDisplay.color)}>
+                  <span className={cn('flex items-center mt-0.5', statusDisplay.color)}>
                     {statusDisplay.icon}
                   </span>
-                  <span className="font-medium">{getToolDisplayName(toolCall.tool)}</span>
-                  <span className={statusDisplay.color}>{statusDisplay.text}</span>
-                  {toolCall.args?.prompt && (
-                    <span className="text-xs text-muted-foreground">
-                      &quot;{toolCall.args.prompt.substring(0, 30)}
-                      {toolCall.args.prompt.length > 30 ? '...' : ''}&quot;
-                    </span>
-                  )}
-                  {toolCall.error && (
-                    <span className="text-xs text-red-600 dark:text-red-400">{toolCall.error}</span>
-                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">{displayName}</span>
+                      <span className={statusDisplay.color}>{statusDisplay.text}</span>
+
+                      {/* MCP 工具显示设备名称 */}
+                      {toolCall.isMcpTool && toolCall.deviceName && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                          {toolCall.deviceName}
+                        </span>
+                      )}
+
+                      {/* 全局 MCP 工具标识 */}
+                      {toolCall.isMcpTool && !toolCall.deviceName && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                          全局
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 显示工具参数 (如果有 prompt) */}
+                    {toolCall.args?.prompt && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        &quot;{toolCall.args.prompt.substring(0, 50)}
+                        {toolCall.args.prompt.length > 50 ? '...' : ''}&quot;
+                      </div>
+                    )}
+
+                    {/* 显示错误信息 */}
+                    {toolCall.error && (
+                      <div className="mt-1 text-xs text-red-600 dark:text-red-400">
+                        {toolCall.error}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}

@@ -20,10 +20,13 @@ interface StreamingMessage {
 
 interface ToolCall {
   tool: string;
+  toolCallId?: string;
   status: 'pending' | 'running' | 'success' | 'error';
   args?: any;
   result?: any;
   error?: string;
+  isMcpTool?: boolean;
+  deviceName?: string;
 }
 
 interface MessageChunkPayload {
@@ -49,15 +52,21 @@ interface MessageCompletePayload {
 interface ToolCallStartPayload {
   messageId: string;
   tool: string;
+  toolCallId?: string;
   args: any;
+  isMcpTool?: boolean;
+  deviceName?: string;
 }
 
 interface ToolCallResultPayload {
   messageId: string;
   tool: string;
+  toolCallId?: string;
   status: 'success' | 'error';
   result?: any;
   error?: string;
+  isMcpTool?: boolean;
+  deviceName?: string;
 }
 
 /**
@@ -112,7 +121,12 @@ export function useStreamingMessage(conversationId: string | null) {
       const existing = newMap.get(messageId);
       if (existing) {
         const toolCalls = existing.toolCalls || [];
-        const existingIndex = toolCalls.findIndex((tc) => tc.tool === toolCall.tool);
+        // 优先使用 toolCallId 匹配,否则使用 tool 名称匹配
+        const existingIndex = toolCalls.findIndex((tc) =>
+          toolCall.toolCallId
+            ? tc.toolCallId === toolCall.toolCallId
+            : tc.tool === toolCall.tool
+        );
 
         const updatedToolCalls =
           existingIndex >= 0
@@ -186,13 +200,18 @@ export function useStreamingMessage(conversationId: string | null) {
       logger.debug('Tool call started', {
         messageId: data.messageId,
         tool: data.tool,
-        args: data.args,
+        toolCallId: data.toolCallId,
+        isMcpTool: data.isMcpTool,
+        deviceName: data.deviceName,
       });
 
       updateToolCall(data.messageId, {
         tool: data.tool,
+        toolCallId: data.toolCallId,
         status: 'running',
         args: data.args,
+        isMcpTool: data.isMcpTool,
+        deviceName: data.deviceName,
       });
     });
 
@@ -202,25 +221,35 @@ export function useStreamingMessage(conversationId: string | null) {
       logger.debug('Tool call result', {
         messageId: data.messageId,
         tool: data.tool,
+        toolCallId: data.toolCallId,
         status: data.status,
+        isMcpTool: data.isMcpTool,
+        deviceName: data.deviceName,
       });
 
       updateToolCall(data.messageId, {
         tool: data.tool,
+        toolCallId: data.toolCallId,
         status: data.status,
         result: data.result,
         error: data.error,
+        isMcpTool: data.isMcpTool,
+        deviceName: data.deviceName,
       });
 
       // 如果是图片生成成功，自动添加到文件列表
-      if (data.status === 'success' && data.tool === 'generating_image' && data.result?.name) {
-        addFileToStreamingMessage(data.messageId, {
-          type: data.result.type,
-          url: data.result.url,
-          mediaType: data.result.type,
-          name: data.result.name || 'generated-image.png',
-          path: data.result.path,
-        });
+      if (data.status === 'success' && data.tool === 'generating_image' && data.result) {
+        // 从结果中提取文件信息
+        const resultData = typeof data.result === 'string' ? {} : data.result;
+        if (resultData.name && resultData.path) {
+          addFileToStreamingMessage(data.messageId, {
+            type: resultData.type || 'image/png',
+            url: resultData.url || '',
+            mediaType: resultData.type || 'image/png',
+            name: resultData.name,
+            path: resultData.path,
+          });
+        }
       }
     });
 

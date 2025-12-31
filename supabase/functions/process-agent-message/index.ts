@@ -7,7 +7,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js';
 import { createOpenAICompatible } from 'https://esm.sh/@ai-sdk/openai-compatible';
 import { gateway } from 'https://esm.sh/@ai-sdk/gateway';
-import { streamText, createProviderRegistry, tool, stepCountIs } from 'https://esm.sh/ai';
+import {
+  streamText,
+  createProviderRegistry,
+  tool,
+  stepCountIs,
+  ModelMessage,
+  Experimental_Agent as Agent,
+} from 'https://esm.sh/ai';
 import { experimental_createMCPClient as createMCPClient } from 'https://esm.sh/@ai-sdk/mcp';
 import { z } from 'https://esm.sh/zod@3.23.8';
 
@@ -187,7 +194,8 @@ async function initializeMCPTools(
   channel: any,
   messageId: string,
   userId: string,
-  deviceId?: string | null
+  deviceId?: string | null,
+  abortSignal?: AbortSignal
 ): Promise<Record<string, any>> {
   const tools: Record<string, any> = {};
 
@@ -195,11 +203,20 @@ async function initializeMCPTools(
   const mcpServerUrl = Deno.env.get('MCP_SERVER_URL');
   const mcpApiKey = Deno.env.get('MCP_SERVER_API_KEY') || '';
 
+  let mcpClient: any | null = null;
+  let deviceMcpClient: any | null = null;
+
+  if (abortSignal)
+    abortSignal.onabort = () => {
+      mcpClient?.close();
+      deviceMcpClient?.close();
+    };
+
   if (mcpServerUrl) {
     try {
       console.log(`Connecting to global MCP server: ${mcpServerUrl}`);
 
-      const mcpClient = await createMCPClient({
+      mcpClient = await createMCPClient({
         transport: {
           type: 'http',
           url: mcpServerUrl,
@@ -269,7 +286,7 @@ async function initializeMCPTools(
           console.log(`Connecting to device ${binding.device_name} at ${url}/mcp`);
 
           // 使用 MCP SDK 连接到设备的聚合 MCP 端点
-          const deviceMcpClient = await createMCPClient({
+          deviceMcpClient = await createMCPClient({
             transport: {
               type: 'http',
               url: `${url}/mcp`,
@@ -521,11 +538,13 @@ async function streamAgentResponse(
   let fullContent = '';
   let tokenCount = 0;
 
+  const abortController = new AbortController();
+
   try {
     // 构建消息历史，支持多模态内容
     const attachmentPathMap: Record<string, AttachmentWithPath> = {};
     const attachmentNameMap: Record<string, AttachmentWithPath> = {};
-    const messages = await Promise.all(
+    const messages: ModelMessage[] = await Promise.all(
       conversationHistory
         .filter((msg: any) => msg.sender_type === 'user' || msg.sender_type === 'agent')
         .map(async (msg: any, index: number, arr: any[]) => {
@@ -697,7 +716,14 @@ async function streamAgentResponse(
 
     // 初始化 MCP 工具（包括用户设备的工具）
     console.log('Initializing MCP tools...');
-    const mcpTools = await initializeMCPTools(supabase, channel, messageId, userId, deviceId);
+    const mcpTools = await initializeMCPTools(
+      supabase,
+      channel,
+      messageId,
+      userId,
+      deviceId,
+      abortController.signal
+    );
     console.log(`Loaded ${Object.keys(mcpTools).length} MCP tools`);
 
     // 检查用户消息是否包含 MiniApp 调用请求
@@ -793,17 +819,6 @@ async function streamAgentResponse(
 
           try {
             console.log('调用小应用:', { miniAppId, installationId, action, params });
-
-            // 发送工具调用开始事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_start',
-              payload: {
-                messageId,
-                tool: 'invoke_miniapp',
-                args: { miniAppId, installationId, action, params },
-              },
-            });
 
             // 获取 MiniApp 详情
             const { data: miniApp, error: miniAppError } = await supabase
@@ -988,23 +1003,6 @@ async function streamAgentResponse(
             // 增加调用次数
             await supabase.rpc('increment_miniapp_invocations', { miniapp_id: miniAppId });
 
-            // 发送成功事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: 'invoke_miniapp',
-                status: 'success',
-                result: {
-                  miniAppName: miniApp.display_name,
-                  action,
-                  result,
-                  executionTime,
-                },
-              },
-            });
-
             console.log(`小应用执行成功: ${miniApp.display_name} (${executionTime}ms)`);
 
             return `✅ 小应用 "${miniApp.display_name}" 执行成功\n操作: ${action}\n执行时间: ${executionTime}ms\n结果: ${JSON.stringify(result, null, 2)}`;
@@ -1038,19 +1036,6 @@ async function streamAgentResponse(
             } catch (logError) {
               console.error('记录审计日志失败:', logError);
             }
-
-            // 发送错误事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: 'invoke_miniapp',
-                status: 'error',
-                error: error instanceof Error ? error.message : '未知错误',
-                executionTime,
-              },
-            });
 
             return `❌ 小应用调用失败: ${error instanceof Error ? error.message : '未知错误'}`;
           }
@@ -1090,17 +1075,6 @@ async function streamAgentResponse(
 
           try {
             console.log('创建小应用:', { name, display_name });
-
-            // 发送工具调用开始事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_start',
-              payload: {
-                messageId,
-                tool: 'create_miniapp',
-                args: { name, display_name, description },
-              },
-            });
 
             // 验证名称格式
             if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
@@ -1190,23 +1164,6 @@ async function streamAgentResponse(
               },
             });
 
-            // 发送成功事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: 'create_miniapp',
-                status: 'success',
-                result: {
-                  miniAppId: miniApp.id,
-                  installationId: installation?.id,
-                  name: miniApp.name,
-                  display_name: miniApp.display_name,
-                },
-              },
-            });
-
             console.log(`小应用创建成功: ${miniApp.display_name} (${executionTime}ms)`);
 
             return `✅ 小应用 "${miniApp.display_name}" 创建成功!
@@ -1235,18 +1192,6 @@ ${installation ? `- 安装ID: ${installation.id}\n- 已自动安装并激活` : 
                 display_name,
                 execution_time_ms: executionTime,
                 success: false,
-                error: error instanceof Error ? error.message : '未知错误',
-              },
-            });
-
-            // 发送错误事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: 'create_miniapp',
-                status: 'error',
                 error: error instanceof Error ? error.message : '未知错误',
               },
             });
@@ -1281,17 +1226,6 @@ ${installation ? `- 安装ID: ${installation.id}\n- 已自动安装并激活` : 
 
           try {
             console.log('更新小应用:', { miniAppId, updates });
-
-            // 发送工具调用开始事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_start',
-              payload: {
-                messageId,
-                tool: 'update_miniapp',
-                args: { miniAppId, updates },
-              },
-            });
 
             // 验证小应用存在且属于当前用户
             const { data: existingApp, error: fetchError } = await supabase
@@ -1340,23 +1274,6 @@ ${installation ? `- 安装ID: ${installation.id}\n- 已自动安装并激活` : 
               },
             });
 
-            // 发送成功事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: 'update_miniapp',
-                status: 'success',
-                result: {
-                  miniAppId: updatedApp.id,
-                  name: updatedApp.name,
-                  display_name: updatedApp.display_name,
-                  updated_fields: Object.keys(updates),
-                },
-              },
-            });
-
             console.log(`小应用更新成功: ${updatedApp.display_name} (${executionTime}ms)`);
 
             const updatedFieldsList = Object.keys(updates)
@@ -1391,18 +1308,6 @@ ${updatedFieldsList}
               },
             });
 
-            // 发送错误事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: 'update_miniapp',
-                status: 'error',
-                error: error instanceof Error ? error.message : '未知错误',
-              },
-            });
-
             return `❌ 更新小应用失败: ${error instanceof Error ? error.message : '未知错误'}`;
           }
         },
@@ -1429,17 +1334,6 @@ ${updatedFieldsList}
               width: finalWidth,
               height: finalHeight,
               model: finalModel,
-            });
-
-            // 发送工具调用开始事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_start',
-              payload: {
-                messageId,
-                tool: 'generating_image',
-                args: { prompt, width: finalWidth, height: finalHeight, model: finalModel },
-              },
             });
 
             // 构建图片生成 URL
@@ -1487,43 +1381,10 @@ ${updatedFieldsList}
             };
             generatedFiles.push(generatedFile);
 
-            // 通过 Realtime Channel 发送图片生成成功事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: 'generating_image',
-                status: 'success',
-                result: {
-                  prompt,
-                  width: finalWidth,
-                  height: finalHeight,
-                  model: finalModel,
-                  name: filename,
-                  path: filePath,
-                  type: 'image/png',
-                },
-              },
-            });
-
-            return `✅ 图片已生成：${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}\n`;
+            return `✅ 图片已生成：${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}\n文件: ${filename}`;
           } catch (error) {
             console.error('图片生成工具执行失败:', error);
-
-            // 发送错误事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: 'generating_image',
-                status: 'error',
-                error: error instanceof Error ? error.message : '未知错误',
-              },
-            });
-
-            return `❌ 图片生成失败: ${error instanceof Error ? error.message : '未知错误'}`;
+            throw error; // 让 onStepFinish 统一处理错误
           }
         },
       }),
@@ -1537,80 +1398,132 @@ ${updatedFieldsList}
           const attachment = attachmentPathMap[path] || attachmentNameMap[path];
 
           if (!attachment) {
-            // 发送错误事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: 'reading_taged_file',
-                status: 'error',
-                error: '找不到该标记文件',
-              },
-            });
-
-            return `❌ 找不到该标记文件`;
+            throw new Error('找不到该标记文件');
           }
 
           try {
-            console.log('开始读取标记文件:', {
-              path,
-            });
-
-            // 发送工具调用开始事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_start',
-              payload: {
-                messageId,
-                tool: 'reading_taged_file',
-                args: { path },
-              },
-            });
-
+            console.log('开始读取标记文件:', { path });
             const result = await toFileContext(supabase, attachment);
-
-            // 通过 Realtime Channel 发送图片生成成功事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: 'reading_taged_file',
-                status: 'success',
-                result,
-              },
-            });
-
             return result;
           } catch (error) {
             console.error('读取标记文件工具执行失败:', error);
-
-            // 发送错误事件
-            await channel.send({
-              type: 'broadcast',
-              event: 'tool_call_result',
-              payload: {
-                messageId,
-                tool: 'reading_taged_file',
-                status: 'error',
-                error: error instanceof Error ? error.message : '未知错误',
-              },
-            });
-
-            return `❌ 图片生成失败: ${error instanceof Error ? error.message : '未知错误'}`;
+            throw error; // 让 onStepFinish 统一处理错误
           }
         },
       }),
     };
 
-    // 使用 Vercel AI SDK 流式生成回复
-    const result = streamText({
+    const mangoAgent = new Agent({
       model: registry.languageModel('pollinations:gemini'),
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      toolChoice: 'auto',
       tools: allTools,
       stopWhen: stepCountIs(5),
+      prepareStep: () => {
+        return {};
+      },
+      onStepFinish: async ({ toolCalls, toolResults }) => {
+        // 统一处理工具调用开始事件
+        if (toolCalls) {
+          for (const call of toolCalls) {
+            console.log('Tool call started:', {
+              toolName: call.toolName,
+              toolCallId: call.toolCallId,
+              args: call.args,
+            });
+
+            // 检测是否为 MCP 工具 (设备工具或全局工具)
+            const isMcpTool =
+              call.toolName.includes('_') &&
+              (call.toolName.startsWith('global_') || !call.toolName.startsWith('invoke_'));
+
+            await channel.send({
+              type: 'broadcast',
+              event: 'tool_call_start',
+              payload: {
+                messageId,
+                tool: call.toolName,
+                toolCallId: call.toolCallId,
+                args: call.args,
+                isMcpTool,
+                // 如果是设备 MCP 工具,提取设备名称
+                deviceName: isMcpTool && !call.toolName.startsWith('global_')
+                  ? call.toolName.split('_')[0]
+                  : undefined,
+              },
+            });
+          }
+        }
+
+        // 统一处理工具调用结果事件
+        if (toolResults) {
+          for (const result of toolResults) {
+            console.log('Tool call result:', {
+              toolName: result.toolName,
+              toolCallId: result.toolCallId,
+              success: !result.error,
+            });
+
+            // 检测是否为 MCP 工具
+            const isMcpTool =
+              result.toolName.includes('_') &&
+              (result.toolName.startsWith('global_') || !result.toolName.startsWith('invoke_'));
+
+            // 解析结果
+            let parsedResult: any = result.result;
+            let status: 'success' | 'error' = 'success';
+            let errorMessage: string | undefined;
+
+            // 检查是否有错误
+            if (result.error) {
+              status = 'error';
+              errorMessage = result.error.message || String(result.error);
+            }
+
+            // 对于特定工具,提取结构化结果
+            if (status === 'success') {
+              try {
+                // 如果结果是字符串,尝试解析 JSON
+                if (typeof parsedResult === 'string') {
+                  // 检查是否是成功/失败消息格式
+                  if (parsedResult.startsWith('✅') || parsedResult.startsWith('❌')) {
+                    // 保持原样
+                  } else {
+                    try {
+                      parsedResult = JSON.parse(parsedResult);
+                    } catch {
+                      // 不是 JSON,保持字符串
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error('Failed to parse tool result:', error);
+              }
+            }
+
+            await channel.send({
+              type: 'broadcast',
+              event: 'tool_call_result',
+              payload: {
+                messageId,
+                tool: result.toolName,
+                toolCallId: result.toolCallId,
+                status,
+                result: parsedResult,
+                error: errorMessage,
+                isMcpTool,
+                // 如果是设备 MCP 工具,提取设备名称
+                deviceName: isMcpTool && !result.toolName.startsWith('global_')
+                  ? result.toolName.split('_')[0]
+                  : undefined,
+              },
+            });
+          }
+        }
+      },
+    });
+
+    // 使用 Vercel AI SDK 流式生成回复
+    const result = mangoAgent.stream({
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
     });
 
     // 处理文本流
@@ -1729,5 +1642,7 @@ ${updatedFieldsList}
       .eq('id', messageId);
 
     throw error;
+  } finally {
+    abortController.abort();
   }
 }
