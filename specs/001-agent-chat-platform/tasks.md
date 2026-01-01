@@ -349,37 +349,85 @@ Based on plan.md monorepo structure:
 
 ---
 
-## Phase 7: User Story 5 - 多模态内容的适应性展示 (Priority: P5)
+## Phase 7: User Story 5 - 富交互界面与工作区 (Priority: P5)
 
-**Goal**: 根据内容类型和数量,自动选择合适展示方式
+**Goal**: Agent生成A2UI富交互组件,资源自动嗅探收集,工作区提供文件浏览(Monaco Editor+Git)和终端功能
 
-**Independent Test**: 发送单张图片、多张图片、混合文件,验证展示方式
+**Independent Test**: Agent生成表单→上传文件验证资源收集→展开工作区→查看设备文件→在终端执行命令→Monaco Editor显示Git状态
 
-### Adaptive Content Display
+### A2UI (Agent-to-UI) 组件
 
-- [ ] T147 [P] [US5] Create content analyzer utility in `apps/web/src/lib/content-analyzer.ts`
-- [ ] T148 [P] [US5] Create FileGrid component for multiple files in `apps/web/src/components/content/FileGrid.tsx`
-- [ ] T149 [P] [US5] Create FileTree component for directory structure in `apps/web/src/components/content/FileTree.tsx`
-- [ ] T150 [P] [US5] Create MediaGallery component for images in `apps/web/src/components/content/MediaGallery.tsx`
-- [ ] T151 [P] [US5] Create DocumentViewer component in `apps/web/src/components/content/DocumentViewer.tsx`
-- [ ] T152 [US5] Update MessageItem component to use adaptive display logic
+- [ ] T147 [P] [US5] Create A2UI types in `packages/shared/types/a2ui.types.ts`
+- [ ] T148 [P] [US5] Create A2UI parser in `apps/web/src/lib/a2ui-parser.ts`
+- [ ] T149 [P] [US5] Create A2UIRenderer component in `apps/web/src/components/a2ui/A2UIRenderer.tsx`
+- [ ] T150 [P] [US5] Create FormComponent in `apps/web/src/components/a2ui/components/FormComponent.tsx`
+- [ ] T151 [P] [US5] Create ChartComponent (Recharts) in `apps/web/src/components/a2ui/components/ChartComponent.tsx`
+- [ ] T152 [P] [US5] Create ButtonComponent in `apps/web/src/components/a2ui/components/ButtonComponent.tsx`
+- [ ] T153 [US5] Integrate A2UI into MessageItem component in `apps/web/src/components/chat/MessageItem.tsx`
 
-### Content Filtering & Search
+### 资源嗅探与管理
 
-- [ ] T153 [P] [US5] Create content filter UI in `apps/web/src/components/content/ContentFilter.tsx`
-- [ ] T154 [P] [US5] Create search bar for conversation content in `apps/web/src/components/conversation/SearchBar.tsx`
-- [ ] T155 [US5] Implement content search API route in `apps/web/src/app/api/search/route.ts`
-- [ ] T156 [US5] Add full-text search support using PostgreSQL GIN indexes
+- [ ] T154 [P] [US5] Create resource detector in `apps/web/src/lib/resource-detector.ts`
+- [ ] T155 [P] [US5] Create resource types in `packages/shared/types/resource.types.ts`
+- [ ] T156 [P] [US5] Create ResourcePanel component in `apps/web/src/components/resource/ResourcePanel.tsx`
+- [ ] T157 [P] [US5] Create ResourceItem component in `apps/web/src/components/resource/ResourceItem.tsx`
+- [ ] T158 [P] [US5] Create useResourceSniffer hook in `apps/web/src/hooks/useResourceSniffer.ts`
+- [ ] T159 [US5] Add resource panel to chat layout in `apps/web/src/components/chat/ChatArea.tsx`
 
-**Checkpoint**: User Story 5 complete - Content displays adaptively based on type and quantity
+### 工作区布局与状态
+
+- [ ] T160 [P] [US5] Create workspace types in `packages/shared/types/workspace.types.ts`
+- [ ] T161 [P] [US5] Create useWorkspaceLayout hook in `apps/web/src/hooks/useWorkspaceLayout.ts`
+- [ ] T162 [P] [US5] Create Workspace container in `apps/web/src/components/workspace/Workspace.tsx`
+- [ ] T163 [P] [US5] Create WorkspaceHeader in `apps/web/src/components/workspace/WorkspaceHeader.tsx`
+- [ ] T164 [US5] Integrate workspace with chat layout using react-resizable-panels
+
+### 工作区标签页
+
+- [ ] T165 [P] [US5] Create ResourceTab in `apps/web/src/components/workspace/tabs/ResourceTab.tsx`
+- [ ] T166 [P] [US5] Create DeviceTab in `apps/web/src/components/workspace/tabs/DeviceTab.tsx`
+- [ ] T167 [P] [US5] Create FileExplorerTab in `apps/web/src/components/workspace/tabs/FileExplorerTab.tsx`
+- [ ] T168 [P] [US5] Create TerminalTab in `apps/web/src/components/workspace/tabs/TerminalTab.tsx`
+- [ ] T169 [P] [US5] Create GitTab in `apps/web/src/components/workspace/tabs/GitTab.tsx`
+
+### Monaco Editor 文件浏览器
+
+- [ ] T170 [P] [US5] Install @monaco-editor/react and dependencies
+- [ ] T171 [P] [US5] Create FileExplorer component in `apps/web/src/components/workspace/FileExplorer.tsx`
+- [ ] T172 [P] [US5] Create FileTree component with virtual scrolling in `apps/web/src/components/workspace/FileTree.tsx`
+- [ ] T173 [P] [US5] Create useDeviceFiles hook in `apps/web/src/hooks/useDeviceFiles.ts`
+- [ ] T174 [US5] Implement file read/write API routes for device files
+
+### Git 集成
+
+- [ ] T175 [P] [US5] Install simple-git in device service
+- [ ] T176 [P] [US5] Create GitDecorator in `apps/web/src/components/workspace/GitDecorator.ts`
+- [ ] T177 [P] [US5] Create GitPanel component in `apps/web/src/components/workspace/GitPanel.tsx`
+- [ ] T178 [P] [US5] Create useGit hook in `apps/web/src/hooks/useGit.ts`
+- [ ] T179 [US5] Implement Git API routes in device service (/git/status, /git/diff, /git/add, /git/commit)
+
+### 终端集成
+
+- [ ] T180 [P] [US5] Install xterm.js and addons
+- [ ] T181 [P] [US5] Create Terminal component in `apps/web/src/components/workspace/Terminal.tsx`
+- [ ] T182 [P] [US5] Create useTerminal hook in `apps/web/src/hooks/useTerminal.ts`
+- [ ] T183 [US5] Implement WebSocket terminal proxy in backend
+- [ ] T184 [US5] Implement terminal API in device service
+
+### 数据库迁移
+
+- [ ] T185 [P] [US5] Create a2ui_components table migration in `supabase/migrations/`
+- [ ] T186 [P] [US5] Create resources table migration in `supabase/migrations/`
+- [ ] T187 [P] [US5] Create workspace_states table migration in `supabase/migrations/`
+- [ ] T188 [P] [US5] Create terminal_sessions table migration in `supabase/migrations/`
+- [ ] T189 [P] [US5] Create git_repositories table migration in `supabase/migrations/`
+- [ ] T190 [US5] Apply migrations using `supabase db push`
+
+**Checkpoint**: User Story 5 complete - A2UI components render, resources collected, workspace with Monaco Editor+Git and terminal functional
 
 ---
 
 ## Phase 8: User Story 6 - 多语言国际化支持 (Priority: P6)
-
-**Goal**: 支持中文和英文界面,Agent理解多语言用户输入
-
-**Independent Test**: 切换界面语言验证所有元素翻译,用不同语言与Agent对话
 
 ### i18n Infrastructure
 
@@ -601,7 +649,7 @@ With multiple developers:
 
 ---
 
-**Total Tasks**: 230
+**Total Tasks**: 274
 
 **Task Distribution by Story**:
 
@@ -609,11 +657,11 @@ With multiple developers:
 - Foundational: 31 tasks
 - User Story 1 (P1): 35 tasks
 - User Story 2 (P2): 28 tasks
-- User Story 3 (P3): 39 tasks (重新设计: 设备服务架构 + Cloudflare Tunnel + 设备绑定流程)
+- User Story 3 (P3): 39 tasks
 - User Story 4 (P4): 20 tasks
-- User Story 5 (P5): 10 tasks
+- User Story 5 (P5): 44 tasks (更新: A2UI + 资源嗅探 + 工作区 + Monaco Editor + Git + 终端)
 - User Story 6 (P6): 17 tasks
-- Polish: 40 tasks
+- Polish: 50 tasks
 
 **Parallel Opportunities**: ~140 tasks marked [P] can run concurrently within their phase
 
@@ -621,5 +669,6 @@ With multiple developers:
 
 ---
 
-**Generated**: 2025-12-17
+**Generated**: 2026-01-01 (Updated User Story 5)
+**Last Modified**: 2026-01-01
 **Based on**: spec.md, plan.md, research.md, data-model.md, contracts/

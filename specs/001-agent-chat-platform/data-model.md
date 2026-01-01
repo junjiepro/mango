@@ -1117,6 +1117,353 @@ CREATE POLICY "Users can delete their own MCP services"
 
 ---
 
+## 2.16 A2UI 组件 (a2ui_components) - User Story 5
+
+**描述**：Agent 生成的富交互界面组件
+
+**表结构**：
+
+```sql
+CREATE TABLE a2ui_components (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+
+  -- 组件信息
+  component_type VARCHAR(50) NOT NULL CHECK (
+    component_type IN ('form', 'input', 'select', 'button', 'chart', 'table', 'card', 'tabs', 'list', 'grid')
+  ),
+
+  -- 组件定义（JSON Schema）
+  schema JSONB NOT NULL, -- A2UI Schema 定义
+
+  -- 状态
+  status VARCHAR(20) DEFAULT 'active' CHECK (
+    status IN ('active', 'inactive', 'expired')
+  ),
+
+  -- 交互数据
+  interaction_data JSONB DEFAULT '{}', -- 用户交互产生的数据
+
+  -- 元数据
+  metadata JSONB DEFAULT '{
+    "render_count": 0,
+    "last_interaction_at": null
+  }',
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_a2ui_message ON a2ui_components(message_id);
+CREATE INDEX idx_a2ui_conversation ON a2ui_components(conversation_id);
+CREATE INDEX idx_a2ui_type ON a2ui_components(component_type);
+CREATE INDEX idx_a2ui_status ON a2ui_components(status) WHERE status = 'active';
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE a2ui_components ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view A2UI in own conversations"
+  ON a2ui_components FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM conversations
+      WHERE conversations.id = a2ui_components.conversation_id
+        AND conversations.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can update A2UI interaction data"
+  ON a2ui_components FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM conversations
+      WHERE conversations.id = a2ui_components.conversation_id
+        AND conversations.user_id = auth.uid()
+    )
+  );
+```
+
+---
+
+## 2.17 资源 (resources) - User Story 5
+
+**描述**：对话中检测到的资源（文件、链接、小应用等）
+
+**表结构**：
+
+```sql
+CREATE TABLE resources (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
+
+  -- 资源信息
+  resource_type VARCHAR(50) NOT NULL CHECK (
+    resource_type IN ('file', 'link', 'miniapp', 'code', 'image', 'video', 'audio')
+  ),
+  content TEXT NOT NULL, -- 资源内容（URL、文件路径等）
+
+  -- 元数据
+  metadata JSONB DEFAULT '{
+    "filename": null,
+    "domain": null,
+    "size": null,
+    "mime_type": null
+  }',
+
+  -- 位置信息
+  position JSONB, -- {start: number, end: number}
+
+  -- 状态
+  status VARCHAR(20) DEFAULT 'active' CHECK (
+    status IN ('active', 'archived', 'deleted')
+  ),
+
+  -- 访问统计
+  access_count INT DEFAULT 0,
+  last_accessed_at TIMESTAMPTZ,
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_resources_conversation ON resources(conversation_id, created_at DESC);
+CREATE INDEX idx_resources_message ON resources(message_id) WHERE message_id IS NOT NULL;
+CREATE INDEX idx_resources_type ON resources(resource_type);
+CREATE INDEX idx_resources_status ON resources(status) WHERE status = 'active';
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE resources ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view resources in own conversations"
+  ON resources FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM conversations
+      WHERE conversations.id = resources.conversation_id
+        AND conversations.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can manage resources in own conversations"
+  ON resources FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM conversations
+      WHERE conversations.id = resources.conversation_id
+        AND conversations.user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM conversations
+      WHERE conversations.id = resources.conversation_id
+        AND conversations.user_id = auth.uid()
+    )
+  );
+```
+
+---
+
+## 2.18 工作区状态 (workspace_states) - User Story 5
+
+**描述**：用户的工作区状态和配置
+
+**表结构**：
+
+```sql
+CREATE TABLE workspace_states (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+
+  -- 工作区配置
+  is_open BOOLEAN DEFAULT false,
+  active_tab VARCHAR(50) DEFAULT 'resources' CHECK (
+    active_tab IN ('resources', 'devices', 'files', 'terminal')
+  ),
+
+  -- 布局配置
+  layout JSONB DEFAULT '{
+    "split_ratio": 0.6,
+    "direction": "horizontal",
+    "breakpoint": "desktop"
+  }',
+
+  -- 标签页状态
+  tabs_state JSONB DEFAULT '{
+    "resources": {"filters": [], "sort": "created_at"},
+    "devices": {"selected_device_id": null},
+    "files": {"current_path": "/", "open_files": []},
+    "terminal": {"sessions": []}
+  }',
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- 约束
+  UNIQUE (user_id, conversation_id)
+);
+
+CREATE INDEX idx_workspace_user ON workspace_states(user_id);
+CREATE INDEX idx_workspace_conversation ON workspace_states(conversation_id) WHERE conversation_id IS NOT NULL;
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE workspace_states ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own workspace states"
+  ON workspace_states FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+```
+
+---
+
+## 2.19 终端会话 (terminal_sessions) - User Story 5
+
+**描述**：工作区中的终端会话
+
+**表结构**：
+
+```sql
+CREATE TABLE terminal_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  device_binding_id UUID NOT NULL REFERENCES device_bindings(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+
+  -- 会话信息
+  session_name VARCHAR(100),
+  shell_type VARCHAR(50) DEFAULT 'bash', -- bash, zsh, cmd, powershell
+
+  -- 状态
+  status VARCHAR(20) DEFAULT 'active' CHECK (
+    status IN ('active', 'inactive', 'closed')
+  ),
+
+  -- 会话配置
+  config JSONB DEFAULT '{
+    "cwd": "~",
+    "env": {},
+    "cols": 80,
+    "rows": 24
+  }',
+
+  -- 统计
+  stats JSONB DEFAULT '{
+    "command_count": 0,
+    "total_output_bytes": 0,
+    "duration_ms": 0
+  }',
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  last_activity_at TIMESTAMPTZ DEFAULT NOW(),
+  closed_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_terminal_user ON terminal_sessions(user_id, status);
+CREATE INDEX idx_terminal_device ON terminal_sessions(device_binding_id);
+CREATE INDEX idx_terminal_conversation ON terminal_sessions(conversation_id) WHERE conversation_id IS NOT NULL;
+CREATE INDEX idx_terminal_status ON terminal_sessions(status) WHERE status = 'active';
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE terminal_sessions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own terminal sessions"
+  ON terminal_sessions FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can manage own terminal sessions"
+  ON terminal_sessions FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+```
+
+---
+
+## 2.20 Git 仓库 (git_repositories) - User Story 5 Git 支持
+
+**描述**：设备上的 Git 仓库信息
+
+**表结构**：
+
+```sql
+CREATE TABLE git_repositories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  device_binding_id UUID NOT NULL REFERENCES device_bindings(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  -- 仓库信息
+  path TEXT NOT NULL, -- 仓库在设备上的路径
+  name VARCHAR(200) NOT NULL,
+
+  -- Git 配置
+  remote_url TEXT, -- 远程仓库 URL
+  default_branch VARCHAR(100) DEFAULT 'main',
+
+  -- 状态
+  status VARCHAR(20) DEFAULT 'active' CHECK (
+    status IN ('active', 'inactive', 'error')
+  ),
+
+  -- 统计信息
+  stats JSONB DEFAULT '{
+    "commit_count": 0,
+    "branch_count": 0,
+    "last_commit_at": null,
+    "last_sync_at": null
+  }',
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  last_accessed_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- 约束
+  UNIQUE (device_binding_id, path)
+);
+
+CREATE INDEX idx_git_repos_device ON git_repositories(device_binding_id);
+CREATE INDEX idx_git_repos_user ON git_repositories(user_id);
+CREATE INDEX idx_git_repos_status ON git_repositories(status) WHERE status = 'active';
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE git_repositories ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own git repositories"
+  ON git_repositories FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can manage own git repositories"
+  ON git_repositories FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+```
+
+---
+
 ## 3. 辅助表
 
 ### 3.1 通知 (notifications)

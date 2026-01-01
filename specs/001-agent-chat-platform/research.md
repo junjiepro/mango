@@ -1742,6 +1742,1251 @@ CREATE POLICY "Users can view their own MCP services"
 
 ---
 
-**研究完成日期**: 2025-11-24
-**下一步**: Phase 1 - 数据模型设计（data-model.md）
+---
 
+## 8. A2UI (Agent-to-UI) 技术研究 (User Story 5)
+
+### 8.1 A2UI 协议设计
+
+**决策:使用 JSON Schema 定义 UI 组件规范**
+
+**核心设计原则**:
+- **声明式**: Agent 描述"想要什么",而非"如何实现"
+- **类型安全**: 完整的 TypeScript 类型定义
+- **可扩展**: 支持自定义组件类型
+- **安全**: 前端控制渲染,避免执行任意代码
+
+**A2UI Schema 结构**:
+
+```typescript
+interface A2UIComponent {
+  id: string;                    // 组件唯一标识
+  type: ComponentType;           // 组件类型
+  props: Record<string, any>;    // 组件属性
+  children?: A2UIComponent[];    // 子组件
+  events?: EventHandler[];       // 事件处理器
+  validation?: ValidationRule[]; // 验证规则
+}
+
+type ComponentType =
+  | 'form'           // 表单容器
+  | 'input'          // 输入框
+  | 'select'         // 下拉选择
+  | 'button'         // 按钮
+  | 'chart'          // 图表
+  | 'table'          // 表格
+  | 'card'           // 卡片
+  | 'tabs'           // 标签页
+  | 'list'           // 列表
+  | 'grid';          // 网格布局
+
+interface EventHandler {
+  event: string;     // 事件名称 (onClick, onChange, onSubmit)
+  action: string;    // 动作类型 (submit, validate, navigate)
+  payload?: any;     // 事件数据
+}
+```
+
+**示例: Agent 生成表单**:
+
+```json
+{
+  "id": "user-feedback-form",
+  "type": "form",
+  "props": {
+    "title": "用户反馈",
+    "description": "请填写您的反馈信息"
+  },
+  "children": [
+    {
+      "id": "rating",
+      "type": "select",
+      "props": {
+        "label": "满意度",
+        "options": [
+          { "value": 5, "label": "非常满意" },
+          { "value": 4, "label": "满意" },
+          { "value": 3, "label": "一般" },
+          { "value": 2, "label": "不满意" },
+          { "value": 1, "label": "非常不满意" }
+        ],
+        "required": true
+      }
+    },
+    {
+      "id": "comment",
+      "type": "input",
+      "props": {
+        "label": "详细说明",
+        "placeholder": "请描述您的反馈...",
+        "multiline": true,
+        "rows": 4
+      }
+    },
+    {
+      "id": "submit-btn",
+      "type": "button",
+      "props": {
+        "label": "提交反馈",
+        "variant": "primary"
+      },
+      "events": [
+        {
+          "event": "onClick",
+          "action": "submit",
+          "payload": { "formId": "user-feedback-form" }
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 8.2 图表组件集成
+
+**决策: 使用 Recharts 作为主要图表库**
+
+**选择理由**:
+- **React 原生**: 基于 React 组件,与项目技术栈一致
+- **声明式 API**: 易于从 JSON 生成
+- **响应式**: 自动适配容器尺寸
+- **可定制**: 支持丰富的样式和交互
+- **轻量**: 相比 Chart.js 更轻量 (~100KB gzipped)
+
+**性能对比**:
+
+| 图表库 | 包大小 | React 集成 | 声明式 API | 动画性能 | 推荐度 |
+|--------|--------|-----------|-----------|---------|--------|
+| **Recharts** | 100KB | ✅ 原生 | ✅ 优秀 | 良好 | ⭐⭐⭐⭐⭐ |
+| Chart.js | 180KB | ⚠️ 需封装 | ❌ 命令式 | 优秀 | ⭐⭐⭐⭐ |
+| D3.js | 250KB+ | ⚠️ 需封装 | ❌ 命令式 | 优秀 | ⭐⭐⭐ |
+| Victory | 150KB | ✅ 原生 | ✅ 优秀 | 良好 | ⭐⭐⭐⭐ |
+
+**A2UI 图表示例**:
+
+```json
+{
+  "id": "sales-chart",
+  "type": "chart",
+  "props": {
+    "chartType": "line",
+    "title": "月度销售趋势",
+    "data": [
+      { "month": "1月", "sales": 4000, "target": 3500 },
+      { "month": "2月", "sales": 3000, "target": 3500 },
+      { "month": "3月", "sales": 5000, "target": 4000 }
+    ],
+    "xAxis": { "dataKey": "month" },
+    "yAxis": { "label": "销售额 (元)" },
+    "series": [
+      { "dataKey": "sales", "name": "实际销售", "color": "#8884d8" },
+      { "dataKey": "target", "name": "目标", "color": "#82ca9d" }
+    ],
+    "legend": true,
+    "tooltip": true,
+    "responsive": true
+  }
+}
+```
+
+### 8.3 A2UI 渲染器实现
+
+**核心架构**:
+
+```typescript
+// A2UIRenderer.tsx
+import React from 'react';
+import { FormComponent } from './components/FormComponent';
+import { ChartComponent } from './components/ChartComponent';
+import { ButtonComponent } from './components/ButtonComponent';
+// ... 其他组件
+
+const COMPONENT_MAP = {
+  form: FormComponent,
+  input: InputComponent,
+  select: SelectComponent,
+  button: ButtonComponent,
+  chart: ChartComponent,
+  table: TableComponent,
+  card: CardComponent,
+  tabs: TabsComponent,
+  list: ListComponent,
+  grid: GridComponent,
+};
+
+interface A2UIRendererProps {
+  schema: A2UIComponent;
+  onEvent?: (event: A2UIEvent) => void;
+}
+
+export function A2UIRenderer({ schema, onEvent }: A2UIRendererProps) {
+  const Component = COMPONENT_MAP[schema.type];
+
+  if (!Component) {
+    console.error(`Unknown component type: ${schema.type}`);
+    return null;
+  }
+
+  const handleEvent = (eventName: string, data: any) => {
+    const handler = schema.events?.find(e => e.event === eventName);
+    if (handler && onEvent) {
+      onEvent({
+        componentId: schema.id,
+        action: handler.action,
+        payload: { ...handler.payload, ...data }
+      });
+    }
+  };
+
+  return (
+    <Component
+      {...schema.props}
+      onEvent={handleEvent}
+    >
+      {schema.children?.map(child => (
+        <A2UIRenderer
+          key={child.id}
+          schema={child}
+          onEvent={onEvent}
+        />
+      ))}
+    </Component>
+  );
+}
+```
+
+**安全措施**:
+- ✅ 白名单组件类型,拒绝未知类型
+- ✅ Props 验证,防止注入攻击
+- ✅ 事件沙箱,限制可执行的动作
+- ✅ 数据大小限制,防止 DoS
+
+**结论**: A2UI 采用 JSON Schema + 动态渲染方案,使用 Recharts 作为图表库,确保安全性和灵活性。
+
+---
+
+## 9. Monaco Editor 集成研究 (User Story 5)
+
+### 9.1 Monaco Editor 技术选型
+
+**决策: 使用 @monaco-editor/react 封装**
+
+**选择理由**:
+- **官方支持**: 由 Monaco Editor 团队维护
+- **React 集成**: 提供 React 组件封装
+- **按需加载**: 支持懒加载,减少首屏体积
+- **完整功能**: 支持语法高亮、代码补全、Diff 视图等
+- **性能优化**: 内置虚拟滚动和增量渲染
+
+**性能对比**:
+
+| 编辑器 | 包大小 | 加载时间 | 功能完整度 | React 集成 | 推荐度 |
+|--------|--------|---------|-----------|-----------|--------|
+| **Monaco Editor** | 2.5MB | 1-2s | ⭐⭐⭐⭐⭐ | ✅ | ⭐⭐⭐⭐⭐ |
+| CodeMirror 6 | 800KB | 0.5s | ⭐⭐⭐⭐ | ⚠️ | ⭐⭐⭐⭐ |
+| Ace Editor | 1.2MB | 0.8s | ⭐⭐⭐⭐ | ⚠️ | ⭐⭐⭐ |
+
+### 9.2 文件浏览器实现
+
+**架构设计**:
+
+```typescript
+// FileExplorer.tsx
+import React, { useState, useEffect } from 'react';
+import Editor from '@monaco-editor/react';
+import { FileTree } from './FileTree';
+import { useDeviceFiles } from '@/hooks/useDeviceFiles';
+
+interface FileExplorerProps {
+  deviceId: string;
+  bindingCode: string;
+}
+
+export function FileExplorer({ deviceId, bindingCode }: FileExplorerProps) {
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState<string>('');
+  const [language, setLanguage] = useState<string>('plaintext');
+
+  const { fileTree, loading, error } = useDeviceFiles(deviceId, bindingCode);
+
+  const handleFileSelect = async (filePath: string) => {
+    setSelectedFile(filePath);
+
+    // 通过设备 API 读取文件内容
+    const response = await fetch(
+      `${deviceUrl}/files/read?path=${encodeURIComponent(filePath)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${bindingCode}`
+        }
+      }
+    );
+
+    const data = await response.json();
+    setFileContent(data.content);
+    setLanguage(detectLanguage(filePath));
+  };
+
+  const handleEditorChange = (value: string | undefined) => {
+    if (value !== undefined) {
+      setFileContent(value);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!selectedFile) return;
+
+    await fetch(
+      `${deviceUrl}/files/write?path=${encodeURIComponent(selectedFile)}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${bindingCode}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: fileContent })
+      }
+    );
+  };
+
+  return (
+    <div className="flex h-full">
+      {/* 文件树 */}
+      <div className="w-64 border-r overflow-auto">
+        <FileTree
+          tree={fileTree}
+          onSelect={handleFileSelect}
+          selectedPath={selectedFile}
+        />
+      </div>
+
+      {/* 编辑器 */}
+      <div className="flex-1 flex flex-col">
+        {selectedFile && (
+          <>
+            <div className="flex items-center justify-between p-2 border-b">
+              <span className="text-sm font-medium">{selectedFile}</span>
+              <button
+                onClick={handleSave}
+                className="px-3 py-1 bg-blue-500 text-white rounded"
+              >
+                保存
+              </button>
+            </div>
+            <Editor
+              height="100%"
+              language={language}
+              value={fileContent}
+              onChange={handleEditorChange}
+              theme="vs-dark"
+              options={{
+                minimap: { enabled: true },
+                fontSize: 14,
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 2,
+              }}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+### 9.3 性能优化策略
+
+**懒加载 Monaco Editor**:
+
+```typescript
+// 使用 React.lazy 懒加载
+const FileExplorer = React.lazy(() => import('./FileExplorer'));
+
+// 在工作区中使用
+<Suspense fallback={<LoadingSpinner />}>
+  <FileExplorer deviceId={deviceId} bindingCode={bindingCode} />
+</Suspense>
+```
+
+**虚拟文件树**:
+
+```typescript
+// 使用 react-window 实现虚拟滚动
+import { FixedSizeList } from 'react-window';
+
+function FileTree({ tree, onSelect }: FileTreeProps) {
+  const flattenedTree = useMemo(() => flattenTree(tree), [tree]);
+
+  return (
+    <FixedSizeList
+      height={600}
+      itemCount={flattenedTree.length}
+      itemSize={32}
+      width="100%"
+    >
+      {({ index, style }) => (
+        <div style={style}>
+          <FileTreeItem
+            item={flattenedTree[index]}
+            onSelect={onSelect}
+          />
+        </div>
+      )}
+    </FixedSizeList>
+  );
+}
+```
+
+**增量加载文件树**:
+
+```typescript
+// 仅加载当前目录,展开时再加载子目录
+async function loadDirectory(path: string) {
+  const response = await fetch(
+    `${deviceUrl}/files/list?path=${encodeURIComponent(path)}&depth=1`,
+    {
+      headers: { 'Authorization': `Bearer ${bindingCode}` }
+    }
+  );
+  return response.json();
+}
+```
+
+**结论**: 使用 Monaco Editor + 懒加载 + 虚拟滚动,确保大型文件系统的流畅体验。
+
+### 9.4 Git 集成方案
+
+**决策: 使用 isomorphic-git + Monaco Editor Diff Editor**
+
+**技术选型**:
+
+| Git 库 | 运行环境 | 包大小 | 功能完整度 | 推荐度 |
+|--------|---------|--------|-----------|--------|
+| **isomorphic-git** | Browser + Node.js | 200KB | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| simple-git | Node.js only | 50KB | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| nodegit | Node.js only | 5MB | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+
+**选择理由**:
+- ✅ 纯 JavaScript 实现，可在浏览器和 Node.js 运行
+- ✅ 支持常用 Git 操作（status, diff, commit, push, pull）
+- ✅ 与设备服务架构兼容（通过 HTTP API 代理）
+- ✅ 轻量级，性能良好
+
+**核心功能**:
+
+```typescript
+// Git 操作接口
+interface GitOperations {
+  // 仓库状态
+  status(path: string): Promise<GitStatus>;
+
+  // 文件差异
+  diff(path: string, file: string): Promise<GitDiff>;
+
+  // 提交历史
+  log(path: string, options?: LogOptions): Promise<GitCommit[]>;
+
+  // 分支管理
+  branches(path: string): Promise<GitBranch[]>;
+  currentBranch(path: string): Promise<string>;
+  checkout(path: string, branch: string): Promise<void>;
+  createBranch(path: string, name: string): Promise<void>;
+
+  // 暂存与提交
+  add(path: string, files: string[]): Promise<void>;
+  commit(path: string, message: string): Promise<string>;
+
+  // 远程操作
+  push(path: string, remote: string, branch: string): Promise<void>;
+  pull(path: string, remote: string, branch: string): Promise<void>;
+}
+```
+
+### 9.5 Monaco Editor Git 装饰器
+
+**实现方案**:
+
+```typescript
+// GitDecorator.ts
+import * as monaco from 'monaco-editor';
+
+interface GitFileStatus {
+  path: string;
+  status: 'modified' | 'added' | 'deleted' | 'untracked' | 'conflicted';
+  staged: boolean;
+}
+
+class GitDecorator {
+  private editor: monaco.editor.IStandaloneCodeEditor;
+  private decorations: string[] = [];
+
+  constructor(editor: monaco.editor.IStandaloneCodeEditor) {
+    this.editor = editor;
+  }
+
+  async updateDecorations(filePath: string, gitStatus: GitFileStatus) {
+    const model = this.editor.getModel();
+    if (!model) return;
+
+    // 获取文件差异
+    const diff = await this.getFileDiff(filePath);
+
+    const newDecorations: monaco.editor.IModelDeltaDecoration[] = [];
+
+    // 标记修改的行
+    diff.changes.forEach(change => {
+      if (change.type === 'insert') {
+        newDecorations.push({
+          range: new monaco.Range(change.lineNumber, 1, change.lineNumber, 1),
+          options: {
+            isWholeLine: true,
+            className: 'git-line-added',
+            glyphMarginClassName: 'git-glyph-added',
+            glyphMarginHoverMessage: { value: 'Added line' }
+          }
+        });
+      } else if (change.type === 'delete') {
+        newDecorations.push({
+          range: new monaco.Range(change.lineNumber, 1, change.lineNumber, 1),
+          options: {
+            isWholeLine: true,
+            className: 'git-line-deleted',
+            glyphMarginClassName: 'git-glyph-deleted',
+            glyphMarginHoverMessage: { value: 'Deleted line' }
+          }
+        });
+      } else if (change.type === 'modify') {
+        newDecorations.push({
+          range: new monaco.Range(change.lineNumber, 1, change.lineNumber, 1),
+          options: {
+            isWholeLine: true,
+            className: 'git-line-modified',
+            glyphMarginClassName: 'git-glyph-modified',
+            glyphMarginHoverMessage: { value: 'Modified line' }
+          }
+        });
+      }
+    });
+
+    // 应用装饰器
+    this.decorations = this.editor.deltaDecorations(
+      this.decorations,
+      newDecorations
+    );
+  }
+
+  private async getFileDiff(filePath: string): Promise<GitDiff> {
+    // 通过设备 API 获取文件差异
+    const response = await fetch(
+      `${deviceUrl}/git/diff?path=${encodeURIComponent(filePath)}`,
+      {
+        headers: { 'Authorization': `Bearer ${bindingCode}` }
+      }
+    );
+    return response.json();
+  }
+}
+```
+
+### 9.6 Git UI 组件设计
+
+**Source Control 面板**:
+
+```typescript
+// GitPanel.tsx
+import React, { useState, useEffect } from 'react';
+import { GitBranch, GitCommit, GitFileIcon } from '@/components/icons';
+
+interface GitPanelProps {
+  deviceId: string;
+  bindingCode: string;
+  repositoryPath: string;
+}
+
+export function GitPanel({ deviceId, bindingCode, repositoryPath }: GitPanelProps) {
+  const [status, setStatus] = useState<GitStatus | null>(null);
+  const [branches, setBranches] = useState<GitBranch[]>([]);
+  const [currentBranch, setCurrentBranch] = useState<string>('');
+  const [commitMessage, setCommitMessage] = useState('');
+
+  useEffect(() => {
+    loadGitStatus();
+    loadBranches();
+  }, [repositoryPath]);
+
+  const loadGitStatus = async () => {
+    const response = await fetch(
+      `${deviceUrl}/git/status?path=${encodeURIComponent(repositoryPath)}`,
+      { headers: { 'Authorization': `Bearer ${bindingCode}` } }
+    );
+    const data = await response.json();
+    setStatus(data);
+  };
+
+  const handleStageFile = async (file: string) => {
+    await fetch(`${deviceUrl}/git/add`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${bindingCode}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ path: repositoryPath, files: [file] })
+    });
+    loadGitStatus();
+  };
+
+  const handleCommit = async () => {
+    if (!commitMessage.trim()) return;
+
+    await fetch(`${deviceUrl}/git/commit`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${bindingCode}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        path: repositoryPath,
+        message: commitMessage
+      })
+    });
+
+    setCommitMessage('');
+    loadGitStatus();
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* 分支选择器 */}
+      <div className="p-2 border-b">
+        <select
+          value={currentBranch}
+          onChange={(e) => handleCheckout(e.target.value)}
+          className="w-full px-2 py-1 border rounded"
+        >
+          {branches.map(branch => (
+            <option key={branch.name} value={branch.name}>
+              {branch.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* 更改列表 */}
+      <div className="flex-1 overflow-auto">
+        <div className="p-2">
+          <h3 className="text-sm font-medium mb-2">Changes</h3>
+          {status?.modified.map(file => (
+            <div key={file} className="flex items-center gap-2 py-1">
+              <GitFileIcon status="modified" />
+              <span className="flex-1 text-sm">{file}</span>
+              <button
+                onClick={() => handleStageFile(file)}
+                className="text-xs px-2 py-1 bg-blue-500 text-white rounded"
+              >
+                Stage
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="p-2">
+          <h3 className="text-sm font-medium mb-2">Staged Changes</h3>
+          {status?.staged.map(file => (
+            <div key={file} className="flex items-center gap-2 py-1">
+              <GitFileIcon status="staged" />
+              <span className="text-sm">{file}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 提交区域 */}
+      <div className="p-2 border-t">
+        <textarea
+          value={commitMessage}
+          onChange={(e) => setCommitMessage(e.target.value)}
+          placeholder="Commit message"
+          className="w-full px-2 py-1 border rounded mb-2"
+          rows={3}
+        />
+        <button
+          onClick={handleCommit}
+          disabled={!commitMessage.trim() || !status?.staged.length}
+          className="w-full px-3 py-2 bg-green-500 text-white rounded disabled:opacity-50"
+        >
+          Commit
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+### 9.7 设备端 Git API 实现
+
+**使用 simple-git 在设备服务中实现**:
+
+```typescript
+// device-service/src/git/git-service.ts
+import simpleGit, { SimpleGit } from 'simple-git';
+import { Hono } from 'hono';
+
+const app = new Hono();
+
+// Git 状态
+app.get('/git/status', async (c) => {
+  const { path } = c.req.query();
+  const git: SimpleGit = simpleGit(path);
+
+  const status = await git.status();
+
+  return c.json({
+    current: status.current,
+    modified: status.modified,
+    created: status.created,
+    deleted: status.deleted,
+    renamed: status.renamed,
+    staged: status.staged,
+    conflicted: status.conflicted,
+    ahead: status.ahead,
+    behind: status.behind
+  });
+});
+
+// 文件差异
+app.get('/git/diff', async (c) => {
+  const { path, file } = c.req.query();
+  const git: SimpleGit = simpleGit(path);
+
+  const diff = await git.diff(['--', file]);
+
+  return c.json({ diff });
+});
+
+// 暂存文件
+app.post('/git/add', async (c) => {
+  const { path, files } = await c.req.json();
+  const git: SimpleGit = simpleGit(path);
+
+  await git.add(files);
+
+  return c.json({ success: true });
+});
+
+// 提交
+app.post('/git/commit', async (c) => {
+  const { path, message } = await c.req.json();
+  const git: SimpleGit = simpleGit(path);
+
+  const result = await git.commit(message);
+
+  return c.json({
+    commit: result.commit,
+    summary: result.summary
+  });
+});
+
+export default app;
+```
+
+**结论**: 使用 isomorphic-git（前端）+ simple-git（设备端）+ Monaco Editor Diff，提供完整的 Git 集成体验。
+
+---
+
+## 10. 资源嗅探技术研究 (User Story 5)
+
+### 10.1 资源检测策略
+
+**决策: 基于正则表达式 + 内容分析的混合检测**
+
+**检测目标**:
+- **文件**: 附件、图片、文档、代码文件
+- **链接**: HTTP/HTTPS URL、邮箱、电话
+- **小应用**: Agent 创建的 MiniApp 引用
+- **代码块**: Markdown 代码块、内联代码
+- **媒体**: 图片、视频、音频
+
+**检测器实现**:
+
+```typescript
+// resource-detector.ts
+interface DetectedResource {
+  id: string;
+  type: ResourceType;
+  content: string;
+  metadata: Record<string, any>;
+  position: { start: number; end: number };
+}
+
+type ResourceType = 'file' | 'link' | 'miniapp' | 'code' | 'image' | 'video' | 'audio';
+
+class ResourceDetector {
+  private detectors: Map<ResourceType, RegExp[]> = new Map([
+    ['link', [
+      /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi,
+      /www\.[^\s<>"{}|\\^`\[\]]+/gi,
+    ]],
+    ['file', [
+      /\[([^\]]+)\]\(file:\/\/([^\)]+)\)/gi,
+      /attachment:\/\/([a-zA-Z0-9-_]+)/gi,
+    ]],
+    ['miniapp', [
+      /miniapp:\/\/([a-zA-Z0-9-_]+)/gi,
+    ]],
+    ['image', [
+      /!\[([^\]]*)\]\(([^\)]+)\)/gi,
+      /\.(jpg|jpeg|png|gif|webp|svg)$/i,
+    ]],
+  ]);
+
+  detect(content: string): DetectedResource[] {
+    const resources: DetectedResource[] = [];
+
+    for (const [type, patterns] of this.detectors) {
+      for (const pattern of patterns) {
+        const matches = content.matchAll(pattern);
+        for (const match of matches) {
+          resources.push({
+            id: generateId(),
+            type,
+            content: match[0],
+            metadata: this.extractMetadata(type, match),
+            position: {
+              start: match.index!,
+              end: match.index! + match[0].length,
+            },
+          });
+        }
+      }
+    }
+
+    return this.deduplicateResources(resources);
+  }
+
+  private extractMetadata(type: ResourceType, match: RegExpMatchArray): Record<string, any> {
+    switch (type) {
+      case 'link':
+        return {
+          url: match[0],
+          domain: new URL(match[0]).hostname,
+        };
+      case 'file':
+        return {
+          filename: match[1] || 'unknown',
+          path: match[2],
+        };
+      case 'miniapp':
+        return {
+          appId: match[1],
+        };
+      case 'image':
+        return {
+          alt: match[1] || '',
+          src: match[2],
+        };
+      default:
+        return {};
+    }
+  }
+
+  private deduplicateResources(resources: DetectedResource[]): DetectedResource[] {
+    const seen = new Set<string>();
+    return resources.filter(resource => {
+      const key = `${resource.type}:${resource.content}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+}
+```
+
+### 10.2 实时嗅探 Hook
+
+**useResourceSniffer Hook**:
+
+```typescript
+// useResourceSniffer.ts
+import { useEffect, useState, useCallback } from 'react';
+import { ResourceDetector } from '@/lib/resource-detector';
+
+interface UseResourceSnifferOptions {
+  conversationId: string;
+  enabled?: boolean;
+}
+
+export function useResourceSniffer({ conversationId, enabled = true }: UseResourceSnifferOptions) {
+  const [resources, setResources] = useState<DetectedResource[]>([]);
+  const [detector] = useState(() => new ResourceDetector());
+
+  const sniffMessage = useCallback((message: Message) => {
+    if (!enabled) return;
+
+    const detected = detector.detect(message.content);
+
+    setResources(prev => {
+      const newResources = [...prev];
+      for (const resource of detected) {
+        // 避免重复添加
+        if (!newResources.some(r => r.content === resource.content && r.type === resource.type)) {
+          newResources.push({
+            ...resource,
+            messageId: message.id,
+            timestamp: message.created_at,
+          });
+        }
+      }
+      return newResources;
+    });
+
+    // 持久化到数据库
+    saveResourcesToDatabase(conversationId, detected);
+  }, [conversationId, detector, enabled]);
+
+  return {
+    resources,
+    sniffMessage,
+    clearResources: () => setResources([]),
+  };
+}
+```
+
+### 10.3 资源面板组件
+
+**ResourcePanel 实现**:
+
+```typescript
+// ResourcePanel.tsx
+import React, { useMemo } from 'react';
+import { FileIcon, LinkIcon, AppIcon, ImageIcon } from '@/components/icons';
+
+interface ResourcePanelProps {
+  resources: DetectedResource[];
+  onResourceClick: (resource: DetectedResource) => void;
+}
+
+export function ResourcePanel({ resources, onResourceClick }: ResourcePanelProps) {
+  const groupedResources = useMemo(() => {
+    return resources.reduce((acc, resource) => {
+      if (!acc[resource.type]) {
+        acc[resource.type] = [];
+      }
+      acc[resource.type].push(resource);
+      return acc;
+    }, {} as Record<ResourceType, DetectedResource[]>);
+  }, [resources]);
+
+  const resourceIcons = {
+    file: FileIcon,
+    link: LinkIcon,
+    miniapp: AppIcon,
+    image: ImageIcon,
+  };
+
+  return (
+    <div className="border-t bg-gray-50 p-2">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm font-medium text-gray-700">资源</span>
+        <span className="text-xs text-gray-500">({resources.length})</span>
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto">
+        {Object.entries(groupedResources).map(([type, items]) => {
+          const Icon = resourceIcons[type as ResourceType];
+          return (
+            <div key={type} className="flex gap-1">
+              {items.map(resource => (
+                <button
+                  key={resource.id}
+                  onClick={() => onResourceClick(resource)}
+                  className="flex items-center gap-1 px-2 py-1 bg-white border rounded hover:bg-gray-100 transition-colors"
+                  title={resource.content}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="text-xs truncate max-w-[100px]">
+                    {resource.metadata.filename || resource.metadata.domain || resource.content}
+                  </span>
+                </button>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+```
+
+**结论**: 资源嗅探采用正则表达式检测 + 实时 Hook + 分组展示,确保准确率和用户体验。
+
+---
+
+## 11. 工作区设计模式研究 (User Story 5)
+
+### 11.1 布局模式选择
+
+**决策: 可调整分割面板 (Resizable Split Panel)**
+
+**常见布局模式对比**:
+
+| 模式 | 优点 | 缺点 | 适用场景 | 推荐度 |
+|------|------|------|---------|--------|
+| **分割面板** | 灵活、空间利用高 | 实现复杂 | 开发工具、IDE | ⭐⭐⭐⭐⭐ |
+| 抽屉模式 | 简单、不占空间 | 遮挡内容 | 移动端、简单工具 | ⭐⭐⭐ |
+| 标签页切换 | 清晰、易实现 | 无法同时查看 | 设置页面 | ⭐⭐⭐ |
+| 浮动窗口 | 最灵活 | 管理复杂 | 高级用户 | ⭐⭐ |
+
+**选择理由**:
+- ✅ 用户可同时查看对话和工作区
+- ✅ 灵活调整比例适应不同任务
+- ✅ 符合 IDE 和开发工具的使用习惯
+- ✅ 支持响应式设计（小屏幕切换为全屏模式）
+
+### 11.2 响应式布局策略
+
+**断点设计**:
+
+```typescript
+const BREAKPOINTS = {
+  mobile: 0,      // 0-767px: 全屏模式
+  tablet: 768,    // 768-1023px: 垂直分割
+  desktop: 1024,  // 1024px+: 水平分割
+};
+
+// 布局配置
+const LAYOUT_CONFIG = {
+  mobile: {
+    mode: 'fullscreen',
+    workspacePosition: 'overlay',
+    defaultWorkspaceOpen: false,
+  },
+  tablet: {
+    mode: 'split',
+    direction: 'vertical',
+    defaultRatio: 0.5,
+    minChatHeight: 200,
+    minWorkspaceHeight: 300,
+  },
+  desktop: {
+    mode: 'split',
+    direction: 'horizontal',
+    defaultRatio: 0.6,
+    minChatWidth: 400,
+    minWorkspaceWidth: 300,
+  },
+};
+```
+
+**实现方案**:
+
+```typescript
+// useWorkspaceLayout.ts
+import { useState, useEffect } from 'react';
+
+export function useWorkspaceLayout() {
+  const [breakpoint, setBreakpoint] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
+  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
+  const [splitRatio, setSplitRatio] = useState(0.6);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width < BREAKPOINTS.tablet) {
+        setBreakpoint('mobile');
+      } else if (width < BREAKPOINTS.desktop) {
+        setBreakpoint('tablet');
+      } else {
+        setBreakpoint('desktop');
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const config = LAYOUT_CONFIG[breakpoint];
+
+  return {
+    breakpoint,
+    config,
+    isWorkspaceOpen,
+    setIsWorkspaceOpen,
+    splitRatio,
+    setSplitRatio,
+  };
+}
+```
+
+### 11.3 分割面板实现
+
+**使用 react-resizable-panels 库**:
+
+```typescript
+// Workspace.tsx
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+
+export function Workspace() {
+  const { breakpoint, config, isWorkspaceOpen } = useWorkspaceLayout();
+
+  if (breakpoint === 'mobile') {
+    return (
+      <div className="h-full">
+        {!isWorkspaceOpen ? (
+          <ChatArea />
+        ) : (
+          <WorkspaceArea onClose={() => setIsWorkspaceOpen(false)} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <PanelGroup direction={config.direction}>
+      <Panel defaultSize={config.defaultRatio * 100} minSize={30}>
+        <ChatArea />
+      </Panel>
+
+      {isWorkspaceOpen && (
+        <>
+          <PanelResizeHandle className="w-1 bg-gray-300 hover:bg-blue-500 transition-colors" />
+          <Panel minSize={20}>
+            <WorkspaceArea />
+          </Panel>
+        </>
+      )}
+    </PanelGroup>
+  );
+}
+```
+
+**结论**: 采用分割面板布局 + 响应式设计,确保不同设备上的良好体验。
+
+---
+
+## 12. 终端集成研究 (User Story 5)
+
+### 12.1 终端模拟器选择
+
+**决策: 使用 xterm.js + xterm-addon-fit**
+
+**技术对比**:
+
+| 终端库 | 包大小 | 功能完整度 | 性能 | 生态 | 推荐度 |
+|--------|--------|-----------|------|------|--------|
+| **xterm.js** | 200KB | ⭐⭐⭐⭐⭐ | 优秀 | 丰富 | ⭐⭐⭐⭐⭐ |
+| node-pty | 需后端 | ⭐⭐⭐⭐⭐ | 优秀 | 中等 | ⭐⭐⭐⭐ |
+| term.js | 50KB | ⭐⭐⭐ | 良好 | 较少 | ⭐⭐⭐ |
+
+**选择理由**:
+- ✅ VS Code 使用的终端库，成熟稳定
+- ✅ 完整的 ANSI 转义序列支持
+- ✅ 丰富的插件生态（fit、webgl、search 等）
+- ✅ 性能优秀，支持大量输出
+- ✅ 活跃维护，社区支持好
+
+### 12.2 WebSocket 通信架构
+
+**架构设计**:
+
+```
+Frontend (xterm.js)
+    ↓ WebSocket
+Backend (Next.js API Route)
+    ↓ HTTP/Bearer Auth
+Device Service
+    ↓ spawn/exec
+Local Shell (bash/zsh/cmd)
+```
+
+**实现方案**:
+
+```typescript
+// Terminal.tsx
+import { Terminal as XTerm } from 'xterm';
+import { FitAddon } from 'xterm-addon-fit';
+import { WebLinksAddon } from 'xterm-addon-web-links';
+import 'xterm/css/xterm.css';
+
+export function Terminal({ deviceId, bindingCode }: TerminalProps) {
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const xtermRef = useRef<XTerm | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    if (!terminalRef.current) return;
+
+    // 创建终端实例
+    const xterm = new XTerm({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      theme: {
+        background: '#1e1e1e',
+        foreground: '#d4d4d4',
+      },
+    });
+
+    const fitAddon = new FitAddon();
+    const webLinksAddon = new WebLinksAddon();
+
+    xterm.loadAddon(fitAddon);
+    xterm.loadAddon(webLinksAddon);
+    xterm.open(terminalRef.current);
+    fitAddon.fit();
+
+    xtermRef.current = xterm;
+
+    // 建立 WebSocket 连接
+    const ws = new WebSocket(
+      `${wsUrl}/terminal?device=${deviceId}&binding=${bindingCode}`
+    );
+
+    ws.onopen = () => {
+      xterm.writeln('Connected to device terminal');
+    };
+
+    ws.onmessage = (event) => {
+      xterm.write(event.data);
+    };
+
+    ws.onerror = () => {
+      xterm.writeln('\r\n\x1b[31mConnection error\x1b[0m');
+    };
+
+    ws.onclose = () => {
+      xterm.writeln('\r\n\x1b[33mConnection closed\x1b[0m');
+    };
+
+    // 监听用户输入
+    xterm.onData((data) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(data);
+      }
+    });
+
+    wsRef.current = ws;
+
+    // 窗口大小调整
+    const handleResize = () => fitAddon.fit();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      ws.close();
+      xterm.dispose();
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [deviceId, bindingCode]);
+
+  return <div ref={terminalRef} className="h-full w-full" />;
+}
+```
+
+**结论**: 使用 xterm.js + WebSocket 实现终端，确保性能和用户体验。
+
+---
+
+**研究完成日期**: 2025-11-24 (更新: 2026-01-01)
+**下一步**: Phase 1 - 数据模型设计（data-model.md）

@@ -1,211 +1,208 @@
-# Implementation Plan: CLI工具与设备服务 (User Story 3)
+# Implementation Plan: 富交互界面与工作区 (User Story 5)
 
-**Branch**: `001-agent-chat-platform` | **Date**: 2025-12-16 | **Spec**: [spec.md](./spec.md)
+**Branch**: `001-agent-chat-platform` | **Date**: 2026-01-01 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/001-agent-chat-platform/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
 ## Summary
 
-实现 CLI 工具和设备服务，允许技术用户在本地启动设备服务，通过 Cloudflare Tunnel 将本地 MCP/ACP 服务暴露给 Mango 平台。核心功能包括：
+本计划实现 User Story 5 的富交互界面与工作区功能，包括：
+1. **A2UI（Agent-to-UI）**: Agent能够生成富交互界面组件（表单、图表、按钮等），嵌入到对话消息中
+2. **资源嗅探**: 自动检测对话中出现的文件、链接、小应用等资源，收集到对话框下方的资源面板
+3. **工作区组件**: 提供可展开/收起的多标签页工作区，包含资源管理、设备监控、文件浏览器（Monaco Editor）、多终端操作等功能
+4. **响应式设计**: 支持对话区与工作区的尺寸调整，小屏幕设备采用全屏模式切换
 
-1. **CLI 工具**: 提供命令行工具，支持参数配置（app_url、supabase_url、device_secret 等），自动生成 device_secret
-2. **设备服务**: 启动本地 HTTP 服务，提供 /health、/mcp、/acp、/setting、/bind 端点
-3. **Cloudflare Tunnel**: 自动创建临时隧道，将本地服务暴露到公网
-4. **设备绑定**: 支持设备与用户的多对多绑定关系，每个绑定拥有独立配置和资源隔离
-5. **MCP/ACP 代理**: 设备服务代理访问本地配置的 MCP/ACP 服务，提供 streamable HTTP MCP 服务
-
-**技术方案**: 使用 TypeScript + Node.js/Deno 构建跨平台 CLI 工具，使用 Hono 框架构建轻量级设备服务，集成 Cloudflare Tunnel 和 MCP SDK，数据存储在 Supabase PostgreSQL 和本地文件系统。
+技术方案采用 React 组件化架构，使用 Next.js 14+ 框架，Monaco Editor 用于代码编辑，WebSocket 用于终端通信。
 
 ## Technical Context
 
-**Language/Version**: TypeScript 5.x (Node.js 20+ / Deno 2.x)
+**Language/Version**: TypeScript 5.x (Node.js 20+ / Deno 1.40+)
 **Primary Dependencies**:
-- CLI工具: Commander.js (命令行解析), @cloudflare/cloudflared (Tunnel创建)
-- 设备服务: Hono (轻量级HTTP框架，支持Node.js和Deno), @modelcontextprotocol/sdk (MCP协议实现)
-- Web端: Next.js 14+, React 18+, Supabase Client
-- 共享: Zod (参数验证), dotenv (环境变量管理)
+- Next.js 14+ (React 18+) - 全栈框架
+- React 18+ - UI 组件库
+- Monaco Editor - 代码编辑器
+- @monaco-editor/react - Monaco Editor React 封装
+- xterm.js - 终端模拟器
+- socket.io-client - WebSocket 客户端
+- Recharts / Chart.js - 数据可视化
+- TailwindCSS - 样式框架
+- shadcn/ui - UI 组件库
+- Supabase Client - 数据库客户端
 
-**Storage**:
-- Supabase PostgreSQL (设备信息、绑定关系、tunnel URL、配置数据)
-- 本地文件系统 (device_secret 持久化、MCP/ACP 服务配置)
-
-**Testing**: Vitest (单元测试), Playwright (E2E测试)
-
-**Target Platform**:
-- CLI工具: Windows/macOS/Linux (跨平台Node.js/Deno应用)
-- 设备服务: 本地运行的HTTP服务，通过Cloudflare Tunnel暴露
-- Web端: 现代浏览器 (Chrome/Firefox/Safari/Edge最近两个版本)
-
-**Project Type**: Web应用 + CLI工具 (混合架构)
-
+**Storage**: Supabase (PostgreSQL) - 存储资源元数据、工作区状态、终端会话记录
+**Testing**: Vitest + React Testing Library - 单元测试和组件测试
+**Target Platform**: Web (现代浏览器: Chrome, Firefox, Safari, Edge 最近两个主要版本)
+**Project Type**: Web Application (frontend + backend)
 **Performance Goals**:
-- CLI启动时间: <3秒
-- 设备服务启动: <5秒 (包含Tunnel创建)
-- MCP请求代理延迟: <100ms (p95)
-- Tunnel连接建立: <10秒
+- A2UI 组件渲染 <500ms
+- 工作区展开/收起动画 60fps
+- Monaco Editor 加载文件目录 <2s (1000 文件内)
+- 终端命令延迟 <200ms
+- 资源嗅探实时处理 <100ms
 
 **Constraints**:
-- 设备服务内存占用: <200MB
-- 支持离线配置管理 (本地配置文件)
-- Cloudflare Tunnel依赖: 需要cloudflared CLI工具
-- 安全性: device_secret必须安全存储，tunnel通信必须加密
+- 首屏加载 <2s
+- 交互响应 <100ms
+- API 响应 <500ms (p95)
+- 支持同时打开 5 个终端标签
+- 小屏幕设备 (<768px) 采用全屏模式
 
 **Scale/Scope**:
-- 支持单用户多设备绑定 (预期每用户1-5个设备)
-- 每个设备支持配置多个MCP/ACP服务 (预期5-20个)
-- 并发MCP请求: 每设备支持10个并发请求
+- 支持 1000+ 并发用户
+- 单会话资源数量 <1000
+- 设备文件系统 <10000 文件
+- 工作区标签页 <10 个
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-### Code Quality First ✅
+### I. Code Quality First ✅ PASS
 
-- **可读性**: CLI工具和设备服务将使用清晰的命名约定，TypeScript类型定义确保代码自文档化
-- **单一职责**:
-  - CLI工具负责命令行解析和参数处理
-  - 设备服务负责HTTP端点和MCP/ACP代理
-  - Tunnel管理器负责Cloudflare Tunnel生命周期
-- **低耦合高内聚**: 各模块通过明确的接口通信，设备服务与Web端通过REST API解耦
-- **无重复**: 共享的配置验证、错误处理逻辑将抽取为公共模块
-- **静态分析**: 使用TypeScript严格模式，配置ESLint和Prettier，CI中强制零警告
-- **代码审查**: 所有PR必须经过审查
+- **可读性**: 组件化架构，清晰的命名约定（A2UIComponent, ResourcePanel, Workspace）
+- **单一职责**: 每个组件负责单一功能（资源嗅探、工作区管理、终端会话等）
+- **低耦合高内聚**: 通过 React Context 和 Props 实现组件间通信，模块独立
+- **无重复**: 使用共享组件库（shadcn/ui）避免重复代码
+- **静态分析**: TypeScript 5.x 提供类型检查，配置 ESLint 和 Prettier
+- **代码审查**: 所有变更需经过审查
 
-### Testing Standards ✅
+### II. Testing Standards ✅ PASS
 
-- **测试覆盖率**: 核心业务逻辑（设备绑定、MCP代理、Tunnel管理）目标覆盖率80%+
-- **测试金字塔**:
-  - 单元测试: 配置解析、参数验证、错误处理
-  - 集成测试: 设备服务端点、MCP代理转发
-  - E2E测试: CLI启动→Tunnel创建→设备绑定→MCP调用完整流程
-- **测试隔离**: 使用mock隔离外部依赖（Cloudflare API、Supabase、本地MCP服务）
-- **边界测试**: 测试无效device_secret、Tunnel创建失败、MCP服务不可用等场景
-- **持续集成**: 所有测试在CI中自动执行
+- **测试覆盖率**: 核心业务逻辑（资源嗅探、工作区状态管理）目标 80%+
+- **测试金字塔**: 单元测试（组件逻辑）> 集成测试（API 交互）> E2E 测试（用户流程）
+- **测试隔离**: 使用 Vitest 和 React Testing Library，每个测试独立运行
+- **测试命名**: 描述性命名（如 "should detect file resources in message"）
+- **边界测试**: 测试边界条件（空资源列表、大量文件、网络错误等）
+- **持续集成**: CI 流水线自动执行测试
 
-### User Experience Consistency ✅
+### III. User Experience Consistency ✅ PASS
 
-- **设计规范**: CLI输出使用一致的格式（成功/错误/警告），Web端设备管理界面遵循现有设计系统
-- **交互一致性**: 设备绑定流程与现有用户流程保持一致
-- **响应反馈**: CLI操作提供实时进度反馈，设备服务健康检查<100ms响应
-- **错误处理**: 提供友好的错误信息和解决建议（如"Cloudflare Tunnel创建失败，请检查网络连接"）
-- **可访问性**: Web端设备管理界面满足WCAG 2.1 AA标准
+- **设计规范**: 使用 shadcn/ui 和 TailwindCSS 统一设计系统
+- **交互一致性**: 所有工作区标签页采用相同的交互模式
+- **响应反馈**: A2UI 组件交互 <100ms，工作区展开 <300ms
+- **错误处理**: 友好的错误提示（如终端连接失败、文件加载错误）
+- **可访问性**: 遵循 WCAG 2.1 AA 标准（键盘导航、屏幕阅读器支持）
+- **跨平台一致**: 响应式设计，小屏幕采用全屏模式
 
-### Performance Requirements ✅
+### IV. Performance Requirements ✅ PASS
 
-- **首屏加载**: Web端设备管理页面<2秒加载
-- **交互响应**: CLI命令响应<100ms，设备服务端点响应<100ms
-- **API响应**: MCP代理请求p95延迟<100ms
-- **内存效率**: 设备服务内存占用<200MB，无内存泄漏
-- **性能监控**: 记录Tunnel连接时间、MCP请求延迟等关键指标
-- **性能预算**: 新功能不影响现有对话功能性能
-
-### Quality Gates ✅
-
-**提交前检查**:
-- Prettier格式化
-- ESLint零警告
-- TypeScript类型检查通过
-- Conventional Commits规范
-
-**合并前检查**:
-- 所有单元测试和集成测试通过
-- 代码审查批准
-- Constitution合规性确认
-
-**发布前检查**:
-- E2E测试通过
-- 性能基准测试通过
-- 安全扫描无高危漏洞
-- 文档更新（README、API文档）
+- **首屏加载**: <2s（懒加载 Monaco Editor 和终端组件）
+- **交互响应**: A2UI 组件 <100ms，工作区动画 60fps
+- **API 响应**: 资源查询 <500ms (p95)
+- **内存效率**: 虚拟滚动处理大量资源，及时清理终端会话
+- **性能监控**: 使用 Web Vitals 监控关键指标
+- **性能预算**: 新功能不影响核心对话性能
 
 ### 结论
 
-✅ **通过** - 该实现计划符合所有宪法原则，无需记录违规项。设计遵循KISS和YAGNI原则，避免过度工程化，专注于User Story 3的核心需求。
+✅ **所有宪法检查通过**，无需特殊豁免。设计遵循 KISS、YAGNI、DRY、SOLID 原则。
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/[###-feature]/
+specs/001-agent-chat-platform/
 ├── plan.md              # This file (/speckit.plan command output)
 ├── research.md          # Phase 0 output (/speckit.plan command)
 ├── data-model.md        # Phase 1 output (/speckit.plan command)
 ├── quickstart.md        # Phase 1 output (/speckit.plan command)
 ├── contracts/           # Phase 1 output (/speckit.plan command)
+│   ├── a2ui-api.yaml    # A2UI 组件 API 定义
+│   ├── resource-api.yaml # 资源管理 API 定义
+│   └── workspace-api.yaml # 工作区 API 定义
 └── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
 ```
 
 ### Source Code (repository root)
 
 ```text
-# CLI工具和设备服务 (新增)
-packages/
-├── mango-cli/                    # CLI工具包
-│   ├── src/
-│   │   ├── commands/            # 命令实现
-│   │   │   ├── start.ts        # 启动设备服务命令
-│   │   │   └── config.ts       # 配置管理命令
-│   │   ├── services/           # 核心服务
-│   │   │   ├── device-service.ts      # 设备服务主逻辑
-│   │   │   ├── tunnel-manager.ts      # Cloudflare Tunnel管理
-│   │   │   ├── mcp-proxy.ts          # MCP协议代理
-│   │   │   └── acp-proxy.ts          # ACP协议代理
-│   │   ├── config/             # 配置管理
-│   │   │   ├── config-loader.ts      # 配置加载
-│   │   │   └── secret-manager.ts     # device_secret管理
-│   │   ├── utils/              # 工具函数
-│   │   └── index.ts            # CLI入口
-│   ├── tests/
-│   │   ├── unit/              # 单元测试
-│   │   ├── integration/       # 集成测试
-│   │   └── e2e/              # 端到端测试
-│   └── package.json
-
-# Web端 (现有，需扩展)
-apps/web/
+frontend/
 ├── src/
-│   ├── app/
-│   │   └── devices/           # 设备管理页面 (新增)
-│   │       ├── page.tsx
-│   │       └── [deviceId]/
 │   ├── components/
-│   │   └── device/            # 设备相关组件 (新增)
-│   │       ├── DeviceList.tsx
-│   │       ├── DeviceBinding.tsx
-│   │       └── DeviceSettings.tsx
-│   └── services/
-│       └── DeviceService.ts   # 设备服务API客户端 (新增)
+│   │   ├── chat/
+│   │   │   ├── MessageList.tsx
+│   │   │   ├── MessageItem.tsx
+│   │   │   └── ChatInput.tsx
+│   │   ├── a2ui/
+│   │   │   ├── A2UIRenderer.tsx      # A2UI 组件渲染器
+│   │   │   ├── components/
+│   │   │   │   ├── FormComponent.tsx  # 表单组件
+│   │   │   │   ├── ChartComponent.tsx # 图表组件
+│   │   │   │   └── ButtonComponent.tsx # 按钮组件
+│   │   │   └── types.ts               # A2UI 类型定义
+│   │   ├── resource/
+│   │   │   ├── ResourcePanel.tsx      # 资源面板
+│   │   │   ├── ResourceSniffer.tsx    # 资源嗅探器
+│   │   │   ├── ResourceItem.tsx       # 资源项
+│   │   │   └── types.ts               # 资源类型定义
+│   │   └── workspace/
+│   │       ├── Workspace.tsx          # 工作区容器
+│   │       ├── WorkspaceHeader.tsx    # 工作区头部
+│   │       ├── tabs/
+│   │       │   ├── ResourceTab.tsx    # 资源标签页
+│   │       │   ├── DeviceTab.tsx      # 设备标签页
+│   │       │   ├── FileExplorerTab.tsx # 文件浏览器标签页
+│   │       │   ├── TerminalTab.tsx    # 终端标签页
+│   │       │   └── GitTab.tsx         # Git 源代码管理标签页
+│   │       ├── FileExplorer.tsx       # Monaco Editor 文件浏览器
+│   │       ├── Terminal.tsx           # xterm.js 终端
+│   │       ├── GitPanel.tsx           # Git 面板组件
+│   │       ├── GitDecorator.ts        # Git 装饰器（行标记）
+│   │       └── types.ts               # 工作区类型定义
+│   ├── hooks/
+│   │   ├── useResourceSniffer.ts      # 资源嗅探 Hook
+│   │   ├── useWorkspace.ts            # 工作区状态 Hook
+│   │   ├── useTerminal.ts             # 终端会话 Hook
+│   │   └── useGit.ts                  # Git 操作 Hook
+│   ├── services/
+│   │   ├── a2ui-service.ts            # A2UI 服务
+│   │   ├── resource-service.ts        # 资源管理服务
+│   │   ├── workspace-service.ts       # 工作区服务
+│   │   └── git-service.ts             # Git 服务
+│   └── lib/
+│       ├── a2ui-parser.ts             # A2UI 解析器
+│       └── resource-detector.ts       # 资源检测器
+└── tests/
+    ├── unit/
+    │   ├── a2ui/
+    │   ├── resource/
+    │   └── workspace/
+    └── integration/
+        └── workspace-flow.test.ts
 
-# Supabase函数 (现有，需扩展)
-supabase/
-├── functions/
-│   └── device-proxy/          # 设备代理函数 (新增)
-│       └── index.ts          # 转发Agent请求到设备Tunnel
-└── migrations/
-    └── 20250116000000_device_binding.sql  # 设备绑定表结构 (新增)
+backend/
+├── src/
+│   ├── api/
+│   │   ├── a2ui/
+│   │   │   └── a2ui.controller.ts     # A2UI API 控制器
+│   │   ├── resource/
+│   │   │   └── resource.controller.ts # 资源 API 控制器
+│   │   ├── workspace/
+│   │   │   └── workspace.controller.ts # 工作区 API 控制器
+│   │   └── git/
+│   │       └── git.controller.ts      # Git API 控制器
+│   ├── services/
+│   │   ├── resource-storage.service.ts # 资源存储服务
+│   │   ├── terminal-proxy.service.ts   # 终端代理服务
+│   │   └── git-proxy.service.ts        # Git 代理服务
+│   └── models/
+│       ├── resource.model.ts          # 资源数据模型
+│       ├── workspace.model.ts         # 工作区数据模型
+│       └── git-repository.model.ts    # Git 仓库数据模型
+└── tests/
+    └── api/
+        ├── a2ui.test.ts
+        ├── resource.test.ts
+        ├── workspace.test.ts
+        └── git.test.ts
 ```
 
-**Structure Decision**:
-
-采用 **Monorepo + Web应用** 混合架构：
-
-1. **packages/mango-cli**: 独立的CLI工具包，可单独发布到npm，支持用户通过 `npx @mango/cli start` 启动
-2. **apps/web**: 现有Web应用，扩展设备管理功能
-3. **supabase/functions**: Serverless函数，作为Agent与设备之间的代理层
-
-这种结构的优势：
-- CLI工具独立打包，便于分发和版本管理
-- Web端和CLI共享TypeScript类型定义（通过workspace）
-- 设备服务可以选择Node.js或Deno运行时
-- 清晰的职责分离：CLI负责本地服务，Web负责用户界面，Supabase Functions负责云端代理
+**Structure Decision**: 采用 Web Application 结构（frontend + backend），前端使用 Next.js 14+ 和 React 18+，后端使用 Node.js + TypeScript。组件按功能模块组织（a2ui、resource、workspace、git），每个模块包含组件、服务、类型定义和测试。Git 集成通过设备服务代理实现，前端使用 Monaco Editor Diff 和 Git 装饰器提供可视化支持。
 
 ## Complexity Tracking
 
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+无违规项，本节留空。
