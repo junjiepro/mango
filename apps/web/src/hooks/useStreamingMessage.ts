@@ -69,6 +69,12 @@ interface ToolCallResultPayload {
   deviceName?: string;
 }
 
+interface MessageErrorPayload {
+  messageId: string;
+  error: string;
+  content: string;
+}
+
 /**
  * useStreamingMessage Hook
  * 订阅特定对话的流式消息
@@ -267,6 +273,23 @@ export function useStreamingMessage(conversationId: string | null) {
       updateStreamingMessage(data.messageId, data.fullContent, true, data.files);
 
       // 3秒后清除流式消息状态（给数据库更新留出时间）
+      setTimeout(() => {
+        clearStreamingMessage(data.messageId);
+      }, 3000);
+    });
+
+    // 订阅消息错误事件
+    channel.on('broadcast', { event: 'message_error' }, (payload) => {
+      const data = payload.payload as MessageErrorPayload;
+      logger.error('Message streaming error', {
+        messageId: data.messageId,
+        error: data.error,
+      });
+
+      // 更新流式消息为错误内容
+      updateStreamingMessage(data.messageId, data.content, true);
+
+      // 3秒后清除流式消息状态
       setTimeout(() => {
         clearStreamingMessage(data.messageId);
       }, 3000);

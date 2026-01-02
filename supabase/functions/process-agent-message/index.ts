@@ -18,10 +18,15 @@ import {
 import { experimental_createMCPClient as createMCPClient } from 'https://esm.sh/@ai-sdk/mcp';
 import { z } from 'https://esm.sh/zod@3.23.8';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Import refactored modules
+import type { AgentMessagePayload } from './types.ts';
+import { corsHeaders as CORS_HEADERS } from './config.ts';
+import { createAgentMessage, updateMessageContent } from './lib/message.ts';
+import { getConversationHistory, getNextSequenceNumber } from './lib/history.ts';
+import { getSystemPrompt } from './agent/system-prompt.ts';
+import { createA2UITool } from './tools/a2ui.ts';
+
+const corsHeaders = CORS_HEADERS;
 
 const registry = createProviderRegistry({
   pollinations: createOpenAICompatible({
@@ -44,13 +49,6 @@ const registry = createProviderRegistry({
 
   gateway,
 });
-
-interface AgentMessagePayload {
-  conversationId: string;
-  messageId: string;
-  userId: string;
-  deviceId?: string | null;
-}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -89,46 +87,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get conversation history (last 10 messages for context)
-    const { data: history } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', conversationId)
-      .order('sequence_number', { ascending: false })
-      .limit(10);
+    // Get conversation history using refactored module
+    const conversationHistory = await getConversationHistory(supabase, conversationId);
 
-    const conversationHistory = (history || []).reverse();
+    // Get next sequence number using refactored module
+    const sequenceNumber = await getNextSequenceNumber(supabase, conversationId);
 
-    // Get next sequence number
-    const { data: lastMessage } = await supabase
-      .from('messages')
-      .select('sequence_number')
-      .eq('conversation_id', conversationId)
-      .order('sequence_number', { ascending: false })
-      .limit(1)
-      .single();
-
-    const sequenceNumber = (lastMessage?.sequence_number || 0) + 1;
-
-    // Create agent message placeholder
-    const { data: agentMessage, error: createError } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: conversationId,
-        sender_type: 'agent',
-        content: '思考中...',
-        content_type: 'text/markdown',
-        sequence_number: sequenceNumber,
-        status: 'sending',
-        reply_to_message_id: messageId,
-      })
-      .select()
-      .single();
-
-    if (createError || !agentMessage) {
-      console.error('Failed to create agent message', createError);
-      throw new Error('Failed to create agent message');
-    }
+    // Create agent message placeholder using refactored module
+    const agentMessage = await createAgentMessage(
+      supabase,
+      conversationId,
+      messageId,
+      sequenceNumber
+    );
 
     // Process agent response with streaming
     const process = async () => {
@@ -603,6 +574,11 @@ async function streamAgentResponse(
 
   const abortController = new AbortController();
 
+  // 创建 Realtime Channel 用于流式传输
+  // 使用与前端一致的 channel 名称
+  const channelName = `conversation:${conversationId}:streaming`;
+  const channel = supabase.channel(channelName);
+
   try {
     // 构建消息历史，支持多模态内容
     const attachmentPathMap: Record<string, AttachmentWithPath> = {};
@@ -659,6 +635,50 @@ async function streamAgentResponse(
 - **创建小应用**：可以根据用户需求创建新的小应用（MiniApp）
 - **更新小应用**：可以修改已存在的小应用的代码、描述等信息
 - **调用小应用**：可以调用用户安装的小应用来执行特定功能
+- **生成富交互界面 (A2UI)**：可以创建表单、图表、按钮等交互元素
+
+## 关于 A2UI（Agent-to-UI）
+
+A2UI 允许你生成富交互界面组件,提升用户体验。使用 \`generate_a2ui\` 工具创建交互元素。
+
+**使用场景**：
+- 当需要用户输入时,创建表单组件
+- 当需要展示数据时,使用图表或表格组件
+- 当需要用户操作时,创建按钮组件
+
+**支持的组件类型**：
+- \`form\`: 表单容器
+- \`input\`: 输入框
+- \`select\`: 下拉选择
+- \`button\`: 按钮
+- \`chart\`: 图表
+- \`table\`: 表格
+- \`card\`: 卡片
+- \`tabs\`: 标签页
+- \`list\`: 列表
+- \`grid\`: 网格布局
+
+**示例**：创建一个简单的表单
+\`\`\`javascript
+{
+  id: "user-form",
+  type: "form",
+  props: { title: "用户信息" },
+  children: [
+    {
+      id: "name-input",
+      type: "input",
+      props: { label: "姓名", placeholder: "请输入姓名" }
+    },
+    {
+      id: "submit-btn",
+      type: "button",
+      props: { label: "提交", variant: "primary" },
+      events: [{ event: "click", action: "submit_form" }]
+    }
+  ]
+}
+\`\`\`
 
 ## 关于小应用（MiniApp）
 
@@ -759,11 +779,6 @@ async function streamAgentResponse(
 3. 返回执行结果
 
 请用简洁、清晰、友好的方式回复用户。`;
-
-    // 创建 Realtime Channel 用于流式传输
-    // 使用与前端一致的 channel 名称
-    const channelName = `conversation:${conversationId}:streaming`;
-    const channel = supabase.channel(channelName);
 
     // 订阅 channel（确保已连接）
     await new Promise((resolve) => {
@@ -868,6 +883,7 @@ async function streamAgentResponse(
     // 合并内置工具和 MCP 工具
     const allTools = {
       ...mcpTools,
+      generate_a2ui: createA2UITool(),
       invoke_miniapp: tool({
         description:
           '调用小应用执行特定功能。小应用是用户创建的可复用功能模块,可以处理数据、执行任务等。',
@@ -1587,35 +1603,45 @@ ${updatedFieldsList}
     });
 
     // 使用 Vercel AI SDK 流式生成回复
+    console.log('Starting Agent stream...', { messageId, conversationId });
     const result = mangoAgent.stream({
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
     });
 
+    console.log('Agent stream created, starting text stream iteration...');
     // 处理文本流
-    for await (const textPart of result.textStream) {
-      fullContent += textPart;
+    try {
+      for await (const textPart of result.textStream) {
+        fullContent += textPart;
 
-      // 通过 Realtime Channel 发送流式文本块
-      await channel.send({
-        type: 'broadcast',
-        event: 'message_chunk',
-        payload: {
-          messageId,
-          chunk: textPart,
-          fullContent,
-          type: 'text',
-        },
-      });
+        // 通过 Realtime Channel 发送流式文本块
+        await channel.send({
+          type: 'broadcast',
+          event: 'message_chunk',
+          payload: {
+            messageId,
+            chunk: textPart,
+            fullContent,
+            type: 'text',
+          },
+        });
+      }
+    } catch (streamError) {
+      console.error('Text stream iteration error:', streamError);
+      throw streamError; // 重新抛出以便外层 catch 处理
     }
 
     // 等待流式完成并获取使用统计和生成的文件
-    const finalResult = await result;
-    tokenCount = finalResult.usage?.totalTokens || 0;
+    const finalResult = result;
+    const usage = await finalResult.usage;
+    tokenCount = usage?.totalTokens || 0;
+
+    const response = await finalResult.response;
 
     // 检查是否有生成的文件（如图片）
     // 注意：某些模型（如 Google Gemini）可以生成图片
-    if (finalResult.response?.messages) {
-      for (const message of finalResult.response.messages) {
+    if (response?.messages) {
+      for (const message of response.messages) {
         if (message.content && Array.isArray(message.content)) {
           for (const part of message.content) {
             if (part.type === 'file' || (part.type === 'image' && part.image)) {
@@ -1692,6 +1718,21 @@ ${updatedFieldsList}
     const errorContent = `抱歉，我在处理您的消息时遇到了问题。错误信息：${
       error instanceof Error ? error.message : '未知错误'
     }`;
+
+    // 通过 Realtime Channel 通知前端错误
+    try {
+      await channel.send({
+        type: 'broadcast',
+        event: 'message_error',
+        payload: {
+          messageId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          content: errorContent,
+        },
+      });
+    } catch (channelError) {
+      console.error('Failed to send error notification:', channelError);
+    }
 
     // 更新数据库
     await supabase

@@ -357,28 +357,28 @@ Based on plan.md monorepo structure:
 
 ### A2UI (Agent-to-UI) 组件
 
-- [ ] T147 [P] [US5] Create A2UI types in `packages/shared/types/a2ui.types.ts`
-- [ ] T148 [P] [US5] Create A2UI parser in `apps/web/src/lib/a2ui-parser.ts`
-- [ ] T149 [P] [US5] Create A2UIRenderer component in `apps/web/src/components/a2ui/A2UIRenderer.tsx`
-- [ ] T150 [P] [US5] Create FormComponent in `apps/web/src/components/a2ui/components/FormComponent.tsx`
+- [X] T147 [P] [US5] Create A2UI types in `packages/shared/types/a2ui.types.ts`
+- [X] T148 [P] [US5] Create A2UI parser in `apps/web/src/lib/a2ui-parser.ts`
+- [X] T149 [P] [US5] Create A2UIRenderer component in `apps/web/src/components/a2ui/A2UIRenderer.tsx`
+- [X] T150 [P] [US5] Create FormComponent in `apps/web/src/components/a2ui/components/FormComponent.tsx`
 - [ ] T151 [P] [US5] Create ChartComponent (Recharts) in `apps/web/src/components/a2ui/components/ChartComponent.tsx`
-- [ ] T152 [P] [US5] Create ButtonComponent in `apps/web/src/components/a2ui/components/ButtonComponent.tsx`
+- [X] T152 [P] [US5] Create ButtonComponent in `apps/web/src/components/a2ui/components/ButtonComponent.tsx`
 - [ ] T153 [US5] Integrate A2UI into MessageItem component in `apps/web/src/components/chat/MessageItem.tsx`
 
 ### 资源嗅探与管理
 
-- [ ] T154 [P] [US5] Create resource detector in `apps/web/src/lib/resource-detector.ts`
-- [ ] T155 [P] [US5] Create resource types in `packages/shared/types/resource.types.ts`
-- [ ] T156 [P] [US5] Create ResourcePanel component in `apps/web/src/components/resource/ResourcePanel.tsx`
+- [X] T154 [P] [US5] Create resource detector in `apps/web/src/lib/resource-detector.ts`
+- [X] T155 [P] [US5] Create resource types in `packages/shared/types/resource.types.ts`
+- [X] T156 [P] [US5] Create ResourcePanel component in `apps/web/src/components/resource/ResourcePanel.tsx`
 - [ ] T157 [P] [US5] Create ResourceItem component in `apps/web/src/components/resource/ResourceItem.tsx`
-- [ ] T158 [P] [US5] Create useResourceSniffer hook in `apps/web/src/hooks/useResourceSniffer.ts`
+- [X] T158 [P] [US5] Create useResourceSniffer hook in `apps/web/src/hooks/useResourceSniffer.ts`
 - [ ] T159 [US5] Add resource panel to chat layout in `apps/web/src/components/chat/ChatArea.tsx`
 
 ### 工作区布局与状态
 
-- [ ] T160 [P] [US5] Create workspace types in `packages/shared/types/workspace.types.ts`
-- [ ] T161 [P] [US5] Create useWorkspaceLayout hook in `apps/web/src/hooks/useWorkspaceLayout.ts`
-- [ ] T162 [P] [US5] Create Workspace container in `apps/web/src/components/workspace/Workspace.tsx`
+- [X] T160 [P] [US5] Create workspace types in `packages/shared/types/workspace.types.ts`
+- [X] T161 [P] [US5] Create useWorkspaceLayout hook in `apps/web/src/hooks/useWorkspaceLayout.ts`
+- [X] T162 [P] [US5] Create Workspace container in `apps/web/src/components/workspace/Workspace.tsx`
 - [ ] T163 [P] [US5] Create WorkspaceHeader in `apps/web/src/components/workspace/WorkspaceHeader.tsx`
 - [ ] T164 [US5] Integrate workspace with chat layout using react-resizable-panels
 
@@ -416,12 +416,12 @@ Based on plan.md monorepo structure:
 
 ### 数据库迁移
 
-- [ ] T185 [P] [US5] Create a2ui_components table migration in `supabase/migrations/`
-- [ ] T186 [P] [US5] Create resources table migration in `supabase/migrations/`
-- [ ] T187 [P] [US5] Create workspace_states table migration in `supabase/migrations/`
-- [ ] T188 [P] [US5] Create terminal_sessions table migration in `supabase/migrations/`
-- [ ] T189 [P] [US5] Create git_repositories table migration in `supabase/migrations/`
-- [ ] T190 [US5] Apply migrations using `supabase db push`
+- [X] T185 [P] [US5] Create a2ui_components table migration in `supabase/migrations/`
+- [X] T186 [P] [US5] Create resources table migration in `supabase/migrations/`
+- [X] T187 [P] [US5] Create workspace_states table migration in `supabase/migrations/`
+- [X] T188 [P] [US5] Create terminal_sessions table migration in `supabase/migrations/`
+- [X] T189 [P] [US5] Create git_repositories table migration in `supabase/migrations/`
+- [X] T190 [US5] Apply migrations using `supabase db push`
 
 **Checkpoint**: User Story 5 complete - A2UI components render, resources collected, workspace with Monaco Editor+Git and terminal functional
 
