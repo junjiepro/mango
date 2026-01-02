@@ -1744,48 +1744,112 @@ CREATE POLICY "Users can view their own MCP services"
 
 ---
 
-## 8. A2UI (Agent-to-UI) 技术研究 (User Story 5)
+## 8. A2UI v0.8 协议深度研究 (User Story 5)
 
-### 8.1 A2UI 协议设计
+### 8.1 A2UI v0.8 核心架构
 
-**决策:使用 JSON Schema 定义 UI 组件规范**
+**官方规范来源**: [Google A2UI v0.8 Specification](https://github.com/google/A2UI/blob/main/specification/0.8/docs/a2ui_protocol.md)
 
-**核心设计原则**:
-- **声明式**: Agent 描述"想要什么",而非"如何实现"
-- **类型安全**: 完整的 TypeScript 类型定义
-- **可扩展**: 支持自定义组件类型
-- **安全**: 前端控制渲染,避免执行任意代码
+**设计哲学**:
+A2UI (Agent to UI) 协议是一个基于 JSONL 的流式 UI 协议，专为 LLM 生成用户界面而设计。其核心哲学是：
 
-**A2UI Schema 结构**:
+1. **LLM 友好**: 声明式、扁平化的组件列表（邻接表模型），易于 LLM 逐步生成
+2. **流式渲染**: 通过 JSONL over SSE 实现渐进式渲染，提升感知性能
+3. **平台无关**: 抽象组件定义，客户端负责映射到原生组件
+4. **数据与结构分离**: UI 结构和数据模型独立管理，高效更新
 
-```typescript
-interface A2UIComponent {
-  id: string;                    // 组件唯一标识
-  type: ComponentType;           // 组件类型
-  props: Record<string, any>;    // 组件属性
-  children?: A2UIComponent[];    // 子组件
-  events?: EventHandler[];       // 事件处理器
-  validation?: ValidationRule[]; // 验证规则
-}
+**三层解耦架构**:
 
-type ComponentType =
-  | 'form'           // 表单容器
-  | 'input'          // 输入框
-  | 'select'         // 下拉选择
-  | 'button'         // 按钮
-  | 'chart'          // 图表
-  | 'table'          // 表格
-  | 'card'           // 卡片
-  | 'tabs'           // 标签页
-  | 'list'           // 列表
-  | 'grid';          // 网格布局
+```
+┌─────────────────────────────────────────────────────────┐
+│ Layer 1: Component Tree (UI 结构)                       │
+│ - 服务端通过 surfaceUpdate 消息定义                      │
+│ - 使用邻接表模型（ID 引用）                               │
+│ - 扁平化列表，易于 LLM 生成                               │
+└─────────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│ Layer 2: Data Model (动态数据)                          │
+│ - 服务端通过 dataModelUpdate 消息管理                    │
+│ - JSON 对象存储动态值                                    │
+│ - 通过数据绑定填充 UI                                    │
+└─────────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│ Layer 3: Widget Registry (组件实现)                     │
+│ - 客户端定义的组件映射                                   │
+│ - 将抽象组件类型映射到原生组件                            │
+│ - 通过 Catalog 协商确定可用组件                          │
+└─────────────────────────────────────────────────────────┘
+```
 
-interface EventHandler {
-  event: string;     // 事件名称 (onClick, onChange, onSubmit)
-  action: string;    // 动作类型 (submit, validate, navigate)
-  payload?: any;     // 事件数据
+### 8.2 核心消息类型详解
+
+A2UI v0.8 定义了 4 种服务端到客户端的消息类型：
+
+#### 1. surfaceUpdate - 组件定义
+
+```json
+{
+  "surfaceUpdate": {
+    "surfaceId": "main_content",
+    "components": [
+      {
+        "id": "button_1",
+        "component": {
+          "Button": {
+            "label": {"literalString": "Click Me"},
+            "action": {"name": "submit_form"}
+          }
+        }
+      }
+    ]
+  }
 }
 ```
+
+**关键特性**:
+- 扁平化组件列表（非嵌套树）
+- 每个组件有唯一 ID
+- 组件类型作为对象键（如 "Button"）
+- 支持增量更新（发送新组件或更新现有组件）
+
+#### 2. dataModelUpdate - 数据更新
+
+```json
+{
+  "dataModelUpdate": {
+    "surfaceId": "main_content",
+    "contents": {
+      "userName": "Alice",
+      "score": 95,
+      "items": [1, 2, 3]
+    }
+  }
+}
+```
+
+**关键特性**:
+- 每个 Surface 有独立的数据模型
+- 支持部分更新（只发送变更的数据）
+- 避免重新发送整个 UI 结构
+
+#### 3. beginRendering - 渲染触发
+
+```json
+{
+  "beginRendering": {
+    "surfaceId": "main_content",
+    "root": "root_component_id",
+    "catalogId": "https://github.com/google/A2UI/blob/main/specification/0.8/json/standard_catalog_definition.json"
+  }
+}
+```
+
+**关键特性**:
+- 防止"不完整内容闪烁"
+- 客户端缓冲组件直到收到此消息
+- 指定根组件 ID 和使用的 Catalog
 
 **示例: Agent 生成表单**:
 

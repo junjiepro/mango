@@ -874,3 +874,101 @@ mango --help                           显示帮助信息
 **祝开发顺利！🚀**
 
 最后更新：2025-11-24
+
+## 13. User Story 5: 富交互界面与工作区
+
+### 13.1 A2UI 组件开发
+
+**创建自定义 A2UI 组件**：
+
+```typescript
+// frontend/src/components/a2ui/widgets/CustomWidget.tsx
+import React from 'react';
+
+interface CustomWidgetProps {
+  title: string;
+  data: any;
+  onEvent: (eventName: string, data: any) => void;
+}
+
+export function CustomWidget({ title, data, onEvent }: CustomWidgetProps) {
+  return (
+    <div className="custom-widget">
+      <h3>{title}</h3>
+      <button onClick={() => onEvent('click', { timestamp: Date.now() })}>
+        Click Me
+      </button>
+    </div>
+  );
+}
+```
+
+**注册组件到 Registry**：
+
+```typescript
+// frontend/src/components/a2ui/ComponentRegistry.tsx
+import { CustomWidget } from './widgets/CustomWidget';
+
+export const COMPONENT_REGISTRY = {
+  // 标准组件
+  Text: TextWidget,
+  Button: ButtonWidget,
+  Card: CardWidget,
+  // 自定义组件
+  CustomWidget: CustomWidget,
+};
+```
+
+### 13.2 工作区开发
+
+**使用工作区 Hook**：
+
+```typescript
+// 在组件中使用工作区
+import { useWorkspace } from '@/hooks/useWorkspace';
+
+function ChatPage() {
+  const { isOpen, toggle, activeTab, setActiveTab } = useWorkspace();
+
+  return (
+    <div>
+      <button onClick={toggle}>
+        {isOpen ? '关闭工作区' : '打开工作区'}
+      </button>
+      {isOpen && (
+        <Workspace activeTab={activeTab} onTabChange={setActiveTab} />
+      )}
+    </div>
+  );
+}
+```
+
+### 13.3 终端集成
+
+**创建终端会话**：
+
+```typescript
+import { useTerminal } from '@/hooks/useTerminal';
+
+function TerminalPanel({ deviceId, bindingCode }) {
+  const { createSession, sessions } = useTerminal();
+
+  const handleCreateTerminal = async () => {
+    const session = await createSession(deviceId, bindingCode);
+    console.log('Terminal session created:', session.id);
+  };
+
+  return (
+    <div>
+      <button onClick={handleCreateTerminal}>新建终端</button>
+      {sessions.map(session => (
+        <Terminal key={session.id} sessionId={session.id} />
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+**完成！现在你已经掌握了 Mango 平台的核心开发技能。🎉**
