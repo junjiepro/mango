@@ -8,7 +8,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js';
 import { createOpenAICompatible } from 'https://esm.sh/@ai-sdk/openai-compatible';
 import { gateway } from 'https://esm.sh/@ai-sdk/gateway';
 import {
-  streamText,
   createProviderRegistry,
   tool,
   stepCountIs,

@@ -27,6 +27,7 @@ import { logger } from '@mango/shared/utils';
 import { cn } from '@/lib/utils';
 import { HtmlContentRenderer, isHtmlContent, parseContentSegments } from './HtmlContentRenderer';
 import { MiniAppReference } from './MiniAppReference';
+import { A2UIRenderer } from '@/components/a2ui/A2UIRenderer';
 
 type MessageType = Database['public']['Tables']['messages']['Row'];
 type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
@@ -256,6 +257,16 @@ export function MessageItem({
     () => contentSegments.some((segment) => segment.type === 'html'),
     [contentSegments]
   );
+
+  // 检测消息中是否包含 A2UI 组件
+  const a2uiComponents = useMemo(() => {
+    const metadata = message.metadata as any;
+    if (!metadata || !metadata.a2ui) {
+      return [];
+    }
+    // 支持单个组件或组件数组
+    return Array.isArray(metadata.a2ui) ? metadata.a2ui : [metadata.a2ui];
+  }, [message.metadata]);
 
   // 获取工具调用的显示名称
   const getToolDisplayName = (toolCall: ToolCall) => {
@@ -501,6 +512,21 @@ export function MessageItem({
             <HtmlContentRenderer content={displayContent} />
           ) : (
             <MessageResponse>{displayContent}</MessageResponse>
+          )}
+
+          {/* A2UI 组件渲染 */}
+          {a2uiComponents.length > 0 && (
+            <div className="mt-3 space-y-3">
+              {a2uiComponents.map((component, index) => (
+                <A2UIRenderer
+                  key={index}
+                  schema={component}
+                  onEvent={(event) => {
+                    logger.debug('A2UI event:', event);
+                  }}
+                />
+              ))}
+            </div>
           )}
 
           {/* Agent 元数据 - 显示在消息内容内部 */}

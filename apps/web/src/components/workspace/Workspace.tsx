@@ -8,7 +8,7 @@
 
 import React, { useState } from 'react';
 import type { WorkspaceTab } from '@mango/shared/types/workspace.types';
-import { X } from 'lucide-react';
+import { WorkspaceHeader } from './WorkspaceHeader';
 
 interface WorkspaceProps {
   isOpen: boolean;
@@ -34,16 +34,10 @@ export function Workspace({ isOpen, onClose, children }: WorkspaceProps) {
   return (
     <div className="flex flex-col h-full bg-white border-l">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b">
-        <h2 className="text-sm font-semibold">工作区</h2>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-gray-100 rounded"
-          aria-label="关闭工作区"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+      <WorkspaceHeader
+        title="工作区"
+        onClose={onClose}
+      />
 
       {/* Tabs */}
       <div className="flex border-b">

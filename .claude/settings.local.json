@@ -16,7 +16,9 @@
       "mcp__serena__replace_symbol_body",
       "mcp__serena__list_dir",
       "mcp__serena__find_file",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs"
     ],
     "deny": [],
     "ask": []

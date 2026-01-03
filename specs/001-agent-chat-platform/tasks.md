@@ -363,14 +363,14 @@ Based on plan.md monorepo structure:
 - [X] T150 [P] [US5] Create FormComponent in `apps/web/src/components/a2ui/components/FormComponent.tsx`
 - [ ] T151 [P] [US5] Create ChartComponent (Recharts) in `apps/web/src/components/a2ui/components/ChartComponent.tsx`
 - [X] T152 [P] [US5] Create ButtonComponent in `apps/web/src/components/a2ui/components/ButtonComponent.tsx`
-- [ ] T153 [US5] Integrate A2UI into MessageItem component in `apps/web/src/components/chat/MessageItem.tsx`
+- [X] T153 [US5] Integrate A2UI into MessageItem component in `apps/web/src/components/chat/MessageItem.tsx`
 
 ### 资源嗅探与管理
 
 - [X] T154 [P] [US5] Create resource detector in `apps/web/src/lib/resource-detector.ts`
 - [X] T155 [P] [US5] Create resource types in `packages/shared/types/resource.types.ts`
 - [X] T156 [P] [US5] Create ResourcePanel component in `apps/web/src/components/resource/ResourcePanel.tsx`
-- [ ] T157 [P] [US5] Create ResourceItem component in `apps/web/src/components/resource/ResourceItem.tsx`
+- [X] T157 [P] [US5] Create ResourceItem component in `apps/web/src/components/resource/ResourceItem.tsx`
 - [X] T158 [P] [US5] Create useResourceSniffer hook in `apps/web/src/hooks/useResourceSniffer.ts`
 - [ ] T159 [US5] Add resource panel to chat layout in `apps/web/src/components/chat/ChatArea.tsx`
 
@@ -379,16 +379,16 @@ Based on plan.md monorepo structure:
 - [X] T160 [P] [US5] Create workspace types in `packages/shared/types/workspace.types.ts`
 - [X] T161 [P] [US5] Create useWorkspaceLayout hook in `apps/web/src/hooks/useWorkspaceLayout.ts`
 - [X] T162 [P] [US5] Create Workspace container in `apps/web/src/components/workspace/Workspace.tsx`
-- [ ] T163 [P] [US5] Create WorkspaceHeader in `apps/web/src/components/workspace/WorkspaceHeader.tsx`
+- [X] T163 [P] [US5] Create WorkspaceHeader in `apps/web/src/components/workspace/WorkspaceHeader.tsx`
 - [ ] T164 [US5] Integrate workspace with chat layout using react-resizable-panels
 
 ### 工作区标签页
 
-- [ ] T165 [P] [US5] Create ResourceTab in `apps/web/src/components/workspace/tabs/ResourceTab.tsx`
-- [ ] T166 [P] [US5] Create DeviceTab in `apps/web/src/components/workspace/tabs/DeviceTab.tsx`
-- [ ] T167 [P] [US5] Create FileExplorerTab in `apps/web/src/components/workspace/tabs/FileExplorerTab.tsx`
-- [ ] T168 [P] [US5] Create TerminalTab in `apps/web/src/components/workspace/tabs/TerminalTab.tsx`
-- [ ] T169 [P] [US5] Create GitTab in `apps/web/src/components/workspace/tabs/GitTab.tsx`
+- [X] T165 [P] [US5] Create ResourceTab in `apps/web/src/components/workspace/tabs/ResourceTab.tsx`
+- [X] T166 [P] [US5] Create DeviceTab in `apps/web/src/components/workspace/tabs/DeviceTab.tsx`
+- [X] T167 [P] [US5] Create FileExplorerTab in `apps/web/src/components/workspace/tabs/FileExplorerTab.tsx`
+- [X] T168 [P] [US5] Create TerminalTab in `apps/web/src/components/workspace/tabs/TerminalTab.tsx`
+- [X] T169 [P] [US5] Create GitTab in `apps/web/src/components/workspace/tabs/GitTab.tsx`
 
 ### Monaco Editor 文件浏览器
 
