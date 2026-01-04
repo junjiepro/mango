@@ -13,6 +13,13 @@ import { parseA2UISchema, sanitizeProps } from '@/lib/a2ui-parser';
 // Component imports will be added here
 import { FormComponent } from './components/FormComponent';
 import { ButtonComponent } from './components/ButtonComponent';
+import { ListComponent } from './components/ListComponent';
+import { CardComponent } from './components/CardComponent';
+import { TableComponent } from './components/TableComponent';
+import { InputComponent } from './components/InputComponent';
+import { SelectComponent } from './components/SelectComponent';
+import { TabsComponent } from './components/TabsComponent';
+import { GridComponent } from './components/GridComponent';
 
 interface A2UIRendererProps {
   schema: A2UIComponent | unknown;
@@ -25,7 +32,13 @@ interface A2UIRendererProps {
 const COMPONENT_MAP: Record<string, React.ComponentType<any>> = {
   form: FormComponent,
   button: ButtonComponent,
-  // More components will be added
+  list: ListComponent,
+  card: CardComponent,
+  table: TableComponent,
+  input: InputComponent,
+  select: SelectComponent,
+  tabs: TabsComponent,
+  grid: GridComponent,
 };
 
 export function A2UIRenderer({ schema, onEvent }: A2UIRendererProps) {

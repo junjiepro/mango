@@ -5,17 +5,22 @@
 'use client';
 
 import React from 'react';
-import type { ButtonProps } from '@mango/shared/types/a2ui.types';
 import { Button } from '@/components/ui/button';
 
-interface ButtonComponentProps extends ButtonProps {
+interface ButtonComponentProps {
+  label: string;
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+  size?: 'default' | 'sm' | 'lg' | 'icon';
+  disabled?: boolean;
+  loading?: boolean;
+  icon?: string;
   onEvent?: (eventName: string, data: any) => void;
 }
 
 export function ButtonComponent({
   label,
-  variant = 'primary',
-  size = 'md',
+  variant = 'default',
+  size = 'default',
   disabled = false,
   loading = false,
   icon,
