@@ -42,10 +42,16 @@ export async function updateMessageContent(
   supabase: any,
   messageId: string,
   content: string,
-  status: string = 'sent'
+  status: string = 'sent',
+  metadata?: any
 ): Promise<void> {
+  const updateData: any = { content, status };
+  if (metadata) {
+    updateData.metadata = metadata;
+  }
+
   await supabase
     .from('messages')
-    .update({ content, status })
+    .update(updateData)
     .eq('id', messageId);
 }

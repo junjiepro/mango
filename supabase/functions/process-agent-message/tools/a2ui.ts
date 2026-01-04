@@ -47,12 +47,48 @@ export function createA2UITool() {
     }),
     execute: async (args: any) => {
       const { component } = args;
-      // 验证组件结构
+
+      // 验证和清理组件结构
+      const cleanedComponent = cleanComponent(component);
+
+      console.log('A2UI component validated:', JSON.stringify(cleanedComponent));
+
       return JSON.stringify({
         success: true,
-        component,
+        component: cleanedComponent,
         message: 'A2UI 组件已生成',
       });
     },
   });
+}
+
+/**
+ * 清理和验证组件结构
+ */
+function cleanComponent(component: any): any {
+  if (!component || typeof component !== 'object') {
+    throw new Error('Invalid component structure');
+  }
+
+  const cleaned: any = {
+    id: component.id || `component-${Date.now()}`,
+    type: component.type,
+    props: component.props || {},
+  };
+
+  // 清理 children
+  if (component.children && Array.isArray(component.children)) {
+    cleaned.children = component.children
+      .filter((child: any) => child && typeof child === 'object')
+      .map((child: any) => cleanComponent(child));
+  }
+
+  // 清理 events
+  if (component.events && Array.isArray(component.events)) {
+    cleaned.events = component.events.filter(
+      (event: any) => event && event.event && event.action
+    );
+  }
+
+  return cleaned;
 }

@@ -6,6 +6,7 @@
 
 import React from 'react';
 import type { FormProps } from '@mango/shared/types/a2ui.types';
+import { Button } from '@/components/ui/button';
 
 interface FormComponentProps extends FormProps {
   children?: React.ReactNode;
@@ -38,24 +39,13 @@ export function FormComponent({
       {title && <h3 className="text-lg font-semibold">{title}</h3>}
       {description && <p className="text-sm text-gray-600">{description}</p>}
 
-      <div className={layout === 'horizontal' ? 'flex gap-4 flex-1' : 'space-y-4'}>
-        {children}
-      </div>
+      <div className={layout === 'horizontal' ? 'flex gap-4 flex-1' : 'space-y-4'}>{children}</div>
 
       <div className="flex gap-2 justify-end">
-        <button
-          type="button"
-          onClick={() => onEvent?.('onCancel', {})}
-          className="px-4 py-2 border rounded hover:bg-gray-50"
-        >
+        <Button variant="outline" type="button" onClick={() => onEvent?.('onCancel', {})}>
           {cancelLabel}
-        </button>
-        <button
-          type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          {submitLabel}
-        </button>
+        </Button>
+        <Button type="submit">{submitLabel}</Button>
       </div>
     </form>
   );

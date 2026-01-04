@@ -29,7 +29,7 @@ const corsHeaders = CORS_HEADERS;
 
 const registry = createProviderRegistry({
   pollinations: createOpenAICompatible({
-    apiKey: Deno.env.get('POLLINATIONS_API_KEY'),
+    // apiKey: Deno.env.get('POLLINATIONS_API_KEY'),
     baseURL: 'https://text.pollinations.ai/openai',
     name: 'pollinations',
   }),
@@ -570,6 +570,7 @@ async function streamAgentResponse(
   const startTime = Date.now();
   let fullContent = '';
   let tokenCount = 0;
+  const a2uiComponents: any[] = []; // 收集 A2UI 组件
 
   const abortController = new AbortController();
 
@@ -638,26 +639,53 @@ async function streamAgentResponse(
 
 ## 关于 A2UI（Agent-to-UI）
 
-A2UI 允许你生成富交互界面组件,提升用户体验。使用 \`generate_a2ui\` 工具创建交互元素。
+**重要提示**：A2UI 是你与用户交互的主要方式之一。当你需要展示数据、收集信息或提供操作选项时，**优先使用 A2UI 组件**而不是纯文本。
 
-**使用场景**：
-- 当需要用户输入时,创建表单组件
-- 当需要展示数据时,使用图表或表格组件
-- 当需要用户操作时,创建按钮组件
+### 何时必须使用 A2UI
 
-**支持的组件类型**：
+**强制使用场景**（必须调用 \`generate_a2ui\` 工具）：
+1. **展示列表数据**：当返回多个项目（待办事项、笔记、文件等）时，使用 \`list\` 或 \`table\` 组件
+2. **展示结构化数据**：当数据有多个字段时，使用 \`card\` 或 \`table\` 组件
+3. **需要用户操作**：当用户可能需要点击、编辑、删除时，使用 \`button\` 组件
+4. **数据可视化**：当有数值数据时，使用 \`chart\` 组件展示趋势
+5. **收集用户输入**：当需要用户填写信息时，使用 \`form\` 和 \`input\` 组件
+
+### 推荐使用场景
+
+- 展示小应用数据（待办事项、笔记等）
+- 提供快捷操作按钮
+- 展示统计信息和图表
+- 创建交互式表单
+
+### 支持的组件类型
+
+- \`list\`: 列表（最常用，展示多个项目）
+- \`card\`: 卡片（展示单个项目的详细信息）
+- \`table\`: 表格（展示结构化数据）
+- \`button\`: 按钮（提供操作选项）
 - \`form\`: 表单容器
 - \`input\`: 输入框
 - \`select\`: 下拉选择
-- \`button\`: 按钮
 - \`chart\`: 图表
-- \`table\`: 表格
-- \`card\`: 卡片
 - \`tabs\`: 标签页
-- \`list\`: 列表
 - \`grid\`: 网格布局
 
-**示例**：创建一个简单的表单
+**示例 1**：展示待办事项列表（最常用）
+\`\`\`javascript
+{
+  id: "todo-list",
+  type: "list",
+  props: {
+    title: "待办事项",
+    items: [
+      { id: "1", text: "明天跑步", completed: false },
+      { id: "2", text: "写周报", completed: true }
+    ]
+  }
+}
+\`\`\`
+
+**示例 2**：创建表单
 \`\`\`javascript
 {
   id: "user-form",
@@ -874,9 +902,11 @@ A2UI 允许你生成富交互界面组件,提升用户体验。使用 \`generate
   - 如果信息不完整,可以先调用 read 操作获取现有数据
 
   **响应格式**:
-  - 调用小应用后,用友好的语言向用户解释操作结果
-  - 如果操作成功,确认用户的请求已完成
-  - 如果失败,解释原因并建议解决方案`;
+  - **重要**：调用小应用获取数据后，必须使用 \`generate_a2ui\` 工具以可视化方式展示结果
+  - 对于列表数据（待办事项、笔记等），使用 \`list\` 组件
+  - 对于单个项目，使用 \`card\` 组件
+  - 同时用简短的文字说明操作结果
+  - 如果失败，解释原因并建议解决方案`;
     }
 
     // 合并内置工具和 MCP 工具
@@ -1494,7 +1524,7 @@ ${updatedFieldsList}
     const mangoAgent = new Agent({
       model: registry.languageModel('pollinations:gemini'),
       tools: allTools,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(20),
       prepareStep: () => {
         return {};
       },
@@ -1547,7 +1577,7 @@ ${updatedFieldsList}
               (result.toolName.startsWith('global_') || !result.toolName.startsWith('invoke_'));
 
             // 解析结果
-            let parsedResult: any = result.result;
+            let parsedResult: any = result.output;
             let status: 'success' | 'error' = 'success';
             let errorMessage: string | undefined;
 
@@ -1568,10 +1598,15 @@ ${updatedFieldsList}
                   } else {
                     try {
                       parsedResult = JSON.parse(parsedResult);
-                    } catch {
+                    } catch (e) {
                       // 不是 JSON,保持字符串
                     }
                   }
+                }
+
+                // 收集 A2UI 组件
+                if (result.toolName === 'generate_a2ui' && parsedResult?.component) {
+                  a2uiComponents.push(parsedResult.component);
                 }
               } catch (error) {
                 console.error('Failed to parse tool result:', error);
@@ -1603,6 +1638,7 @@ ${updatedFieldsList}
 
     // 使用 Vercel AI SDK 流式生成回复
     console.log('Starting Agent stream...', { messageId, conversationId });
+
     const result = mangoAgent.stream({
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
     });
@@ -1695,6 +1731,14 @@ ${updatedFieldsList}
         thinking_time_ms: processingTime,
       },
     };
+
+    // 如果有 A2UI 组件，添加到 metadata
+    if (a2uiComponents.length > 0) {
+      updateData.metadata = {
+        a2ui: a2uiComponents,
+      };
+      console.log('Saving A2UI components to metadata:', a2uiComponents.length);
+    }
 
     // 如果有生成的文件，添加到附件中
     if (generatedFiles.length > 0) {
