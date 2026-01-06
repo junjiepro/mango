@@ -659,14 +659,24 @@ async function streamAgentResponse(
 
 ### 支持的组件类型
 
+**展示组件**：
 - \`list\`: 列表（最常用，展示多个项目）
 - \`card\`: 卡片（展示单个项目的详细信息）
 - \`table\`: 表格（展示结构化数据）
+- \`chart\`: 图表（数据可视化，支持折线图、柱状图、饼图、面积图）
+
+**交互组件**：
 - \`button\`: 按钮（提供操作选项）
 - \`form\`: 表单容器
 - \`input\`: 输入框
 - \`select\`: 下拉选择
-- \`chart\`: 图表
+
+**媒体组件**：
+- \`image\`: 图片展示
+- \`video\`: 视频播放
+- \`audio\`: 音频播放
+
+**布局组件**：
 - \`tabs\`: 标签页
 - \`grid\`: 网格布局
 
@@ -704,6 +714,38 @@ async function streamAgentResponse(
       events: [{ event: "click", action: "submit_form" }]
     }
   ]
+}
+\`\`\`
+
+**示例 3**：展示数据图表
+\`\`\`javascript
+{
+  id: "task-chart",
+  type: "chart",
+  chartType: "bar",
+  props: {
+    title: "本月任务统计",
+    data: [
+      { name: "已完成", value: 15 },
+      { name: "进行中", value: 8 },
+      { name: "未开始", value: 3 }
+    ],
+    xAxis: { dataKey: "name" },
+    series: [{ dataKey: "value", name: "任务数" }]
+  }
+}
+\`\`\`
+
+**示例 4**：展示图片
+\`\`\`javascript
+{
+  id: "result-image",
+  type: "image",
+  props: {
+    src: "https://example.com/image.jpg",
+    alt: "结果图片",
+    caption: "生成的图片结果"
+  }
 }
 \`\`\`
 
