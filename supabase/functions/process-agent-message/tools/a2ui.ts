@@ -22,6 +22,9 @@ const A2UIComponentSchema = z.object({
     'tabs',
     'list',
     'grid',
+    'image',
+    'video',
+    'audio'
   ]),
   props: z.record(z.any()),
   children: z.array(z.any()).optional(),

@@ -20,6 +20,10 @@ import { InputComponent } from './components/InputComponent';
 import { SelectComponent } from './components/SelectComponent';
 import { TabsComponent } from './components/TabsComponent';
 import { GridComponent } from './components/GridComponent';
+import { ChartComponent } from './components/ChartComponent';
+import { ImageComponent } from './components/ImageComponent';
+import { VideoComponent } from './components/VideoComponent';
+import { AudioComponent } from './components/AudioComponent';
 
 interface A2UIRendererProps {
   schema: A2UIComponent | unknown;
@@ -39,6 +43,10 @@ const COMPONENT_MAP: Record<string, React.ComponentType<any>> = {
   select: SelectComponent,
   tabs: TabsComponent,
   grid: GridComponent,
+  chart: ChartComponent,
+  image: ImageComponent,
+  video: VideoComponent,
+  audio: AudioComponent,
 };
 
 export function A2UIRenderer({ schema, onEvent }: A2UIRendererProps) {
