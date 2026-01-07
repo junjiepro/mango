@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { TerminalIcon } from 'lucide-react';
+import { Terminal } from '@/components/workspace/Terminal';
 
 interface TerminalTabProps {
   deviceId?: string;
@@ -27,11 +28,8 @@ export function TerminalTab({ deviceId }: TerminalTabProps) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-black">
-      {/* 终端占位符 */}
-      <div className="flex-1 p-4 text-green-400 font-mono text-sm">
-        <div>终端功能将在后续实现</div>
-      </div>
+    <div className="h-full">
+      <Terminal deviceId={deviceId} />
     </div>
   );
 }

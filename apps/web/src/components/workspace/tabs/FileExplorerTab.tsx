@@ -7,7 +7,8 @@
 'use client';
 
 import React from 'react';
-import { FolderIcon, FileIcon } from 'lucide-react';
+import { FolderIcon } from 'lucide-react';
+import { FileExplorer } from '@/components/workspace/FileExplorer';
 
 interface FileExplorerTabProps {
   deviceId?: string;
@@ -27,13 +28,8 @@ export function FileExplorerTab({ deviceId }: FileExplorerTabProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* 文件树占位符 */}
-      <div className="flex-1 p-4">
-        <div className="text-sm text-gray-500">
-          文件浏览器功能将在后续实现
-        </div>
-      </div>
+    <div className="h-full">
+      <FileExplorer deviceId={deviceId} />
     </div>
   );
 }

@@ -35,6 +35,9 @@ export class ResourceDetector {
       ['image', [
         /!\[([^\]]*)\]\(([^\)]+)\)/gi,
       ]],
+      ['code', [
+        /```(\w+)?\n([\s\S]*?)```/gi,
+      ]],
     ]);
   }
 
@@ -48,6 +51,14 @@ export class ResourceDetector {
       for (const pattern of patterns) {
         const matches = content.matchAll(pattern);
         for (const match of matches) {
+          // 对于代码块，只收集多行代码（包含换行符）
+          if (type === 'code') {
+            const codeContent = match[2] || match[0];
+            if (!codeContent.includes('\n')) {
+              continue; // 跳过单行代码
+            }
+          }
+
           resources.push({
             id: generateId(),
             type,
@@ -61,6 +72,10 @@ export class ResourceDetector {
         }
       }
     }
+
+    // 检测未包裹在 ``` 中的 HTML 代码
+    const htmlResources = this.detectHtmlCode(content);
+    resources.push(...htmlResources);
 
     return this.deduplicateResources(resources);
   }
@@ -89,9 +104,71 @@ export class ResourceDetector {
           alt: match[1] || '',
           src: match[2],
         };
+      case 'code':
+        // 检测是否是代码块 (```)
+        if (match[0].startsWith('```')) {
+          return {
+            language: match[1] || 'text',
+            code: match[2] || match[0],
+            isBlock: true,
+          };
+        } else {
+          return {
+            code: match[1] || match[0],
+            isBlock: false,
+          };
+        }
       default:
         return {};
     }
+  }
+
+  /**
+   * 检测未包裹在 ``` 中的 HTML 代码
+   */
+  private detectHtmlCode(content: string): DetectedResource[] {
+    const htmlResources: DetectedResource[] = [];
+
+    // 检测常见的 HTML 标签模式
+    const htmlTagPattern =
+      /<(html|head|body|div|span|p|h[1-6]|ul|ol|li|table|tr|td|th|form|input|button|a|img|script|style|meta|link)[^>]*>/i;
+
+    // 检测 DOCTYPE 声明
+    const doctypePattern = /<!DOCTYPE\s+html/i;
+
+    // 如果内容包含 HTML 标签或 DOCTYPE
+    if (htmlTagPattern.test(content) || doctypePattern.test(content)) {
+      // 匹配完整的 HTML 文档或 HTML 片段
+      const htmlDocPattern =
+        /<!DOCTYPE[^>]*>[\s\S]*?<\/html>|<html[^>]*>[\s\S]*?<\/html>/gi;
+
+      const matches = content.matchAll(htmlDocPattern);
+      for (const match of matches) {
+        // 检查是否已经被 ``` 包裹
+        const beforeMatch = content.substring(Math.max(0, match.index! - 10), match.index!);
+        if (beforeMatch.includes('```')) {
+          continue; // 跳过已经在代码块中的 HTML
+        }
+
+        htmlResources.push({
+          id: generateId(),
+          type: 'code',
+          content: match[0],
+          metadata: {
+            language: 'html',
+            code: match[0],
+            isBlock: true,
+            isUnwrapped: true, // 标记为未包裹的 HTML
+          },
+          position: {
+            start: match.index!,
+            end: match.index! + match[0].length,
+          },
+        });
+      }
+    }
+
+    return htmlResources;
   }
 
   /**

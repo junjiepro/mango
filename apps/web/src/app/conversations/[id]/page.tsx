@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MiniAppWindow } from '@/components/miniapp/MiniAppWindow';
-import { MiniAppQuickAccess } from '@/components/conversation/MiniAppQuickAccess';
+import { ResourceQuickAccess } from '@/components/conversation/ResourceQuickAccess';
 import { Package, Laptop } from 'lucide-react';
 import type { Database } from '@/types/database.types';
 import {
@@ -27,6 +27,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DeviceCache } from '@/lib/deviceCache';
+import { ChatLayout } from '@/components/layouts/ChatLayout';
+import { useResourceSniffer } from '@/hooks/useResourceSniffer';
 
 type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
 type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row'];
@@ -60,6 +62,10 @@ function ConversationDetailContent() {
   const [devices, setDevices] = useState<DeviceBinding[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [loadingDevices, setLoadingDevices] = useState(false);
+  const [showWorkspace, setShowWorkspace] = useState(false);
+
+  // 资源嗅探
+  const { resources } = useResourceSniffer(messages);
 
   // 加载设备列表
   const loadDevices = async () => {
@@ -193,9 +199,9 @@ function ConversationDetailContent() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* 对话信息栏 */}
-      <div className="border-b bg-muted/40">
+      <div className="flex-shrink-0 border-b bg-muted/40">
         <div className="container mx-auto flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => router.push('/conversations')}>
@@ -255,6 +261,17 @@ function ConversationDetailContent() {
               小应用
             </Button>
 
+            {/* 工作区切换按钮 */}
+            <Button
+              variant={showWorkspace ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowWorkspace(!showWorkspace)}
+              className="gap-2"
+            >
+              <Laptop className="h-4 w-4" />
+              工作区
+            </Button>
+
             {/* 实时连接状态 */}
             <div className="flex items-center gap-2 text-xs">
               <div
@@ -271,67 +288,49 @@ function ConversationDetailContent() {
       </div>
 
       {/* 主要内容区域 */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* 消息列表 */}
-        <div className="flex flex-1 flex-col">
-          <MessageList
-            conversationId={currentConversation.id}
-            messages={messages}
-            installations={installations}
-            isLoading={isLoadingMessages}
-            hasMore={hasMoreMessages}
-            onLoadMore={loadMoreMessages}
-            onOpenMiniApp={handleOpenMiniApp}
-            className="flex-1"
-          />
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <ChatLayout
+          resources={resources}
+          showWorkspace={showWorkspace}
+          onToggleWorkspace={() => setShowWorkspace(!showWorkspace)}
+        >
+          {/* 消息列表和输入框容器 */}
+          <div className="flex flex-col h-full">
+            <MessageList
+              conversationId={currentConversation.id}
+              messages={messages}
+              installations={installations}
+              isLoading={isLoadingMessages}
+              hasMore={hasMoreMessages}
+              onLoadMore={loadMoreMessages}
+              onOpenMiniApp={handleOpenMiniApp}
+              className="flex-1 min-h-0"
+            />
 
-          {/* 消息输入框 */}
-          <div className="bg-background p-4">
-            <div className="container mx-auto max-w-4xl">
-              <MessageInput
-                onSendMessage={handleSendMessage}
-                placeholder="输入消息... (Ctrl+Enter 发送)"
-              />
-              {/* MiniApp 快速访问栏 */}
-              {showQuickAccess && (
-                <MiniAppQuickAccess
-                  messages={messages}
-                  installations={installations}
-                  onOpenMiniApp={handleOpenMiniApp}
-                  onClose={() => setShowQuickAccess(false)}
-                />
-              )}
-            </div>
-          </div>
-        </div>
+            {/* 消息输入框和资源栏容器 */}
+            <div className="flex-shrink-0">
+              <div className="bg-background p-4">
+                <div className="container mx-auto max-w-4xl">
+                  <MessageInput
+                    onSendMessage={handleSendMessage}
+                    placeholder="输入消息... (Ctrl+Enter 发送)"
+                  />
 
-        {/* 侧边栏 - 任务列表 */}
-        {tasks.length > 0 && (
-          <div className="w-80 border-l bg-muted/40 p-4 overflow-y-auto">
-            <h3 className="mb-4 font-semibold">运行中的任务</h3>
-            <div className="space-y-3">
-              {tasks
-                .filter((task) => ['pending', 'queued', 'running'].includes(task.status))
-                .map((task) => (
-                  <TaskProgressIndicator key={task.id} task={task} />
-                ))}
-            </div>
-
-            {tasks.some((task) => ['completed', 'failed'].includes(task.status)) && (
-              <>
-                <h3 className="mb-4 mt-6 font-semibold">已完成的任务</h3>
-                <div className="space-y-3">
-                  {tasks
-                    .filter((task) => ['completed', 'failed'].includes(task.status))
-                    .slice(0, 5)
-                    .map((task) => (
-                      <TaskProgressIndicator key={task.id} task={task} />
-                    ))}
+                  {/* 资源快速访问栏 */}
+                  {showQuickAccess && resources.length > 0 && (
+                    <ResourceQuickAccess
+                      resources={resources}
+                      installations={installations}
+                      onOpenMiniApp={handleOpenMiniApp}
+                      onOpenWorkspace={() => setShowWorkspace(true)}
+                      onClose={() => setShowQuickAccess(false)}
+                    />
+                  )}
                 </div>
-              </>
-            )}
+              </div>
+            </div>
           </div>
-        )}
+        </ChatLayout>
       </div>
 
       {/* MiniApp 选择器弹窗 */}
