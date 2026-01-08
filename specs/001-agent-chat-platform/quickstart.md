@@ -971,4 +971,96 @@ function TerminalPanel({ deviceId, bindingCode }) {
 
 ---
 
+## 14. User Story 4: MiniApp 和 Skill 开发
+
+### 14.1 MiniApp 开发快速开始
+
+**创建 MiniApp**：
+
+```javascript
+// MiniApp 代码示例：TodoList
+// 注册工具
+mcpServer.tool({
+  name: 'add_todo',
+  description: '添加待办事项',
+  parameters: z.object({
+    title: z.string().describe('待办事项标题'),
+  }),
+  execute: async ({ title }) => {
+    const todos = await storage.get('todos') || [];
+    todos.push({
+      id: crypto.randomUUID(),
+      title,
+      completed: false,
+    });
+    await storage.set('todos', todos);
+    return { success: true };
+  },
+});
+
+// 注册统一的 UI Resource
+const uiResource = createUIResource({
+  uri: 'ui://mango/main',
+  content: {
+    type: 'container',
+    children: [
+      { type: 'input', id: 'title' },
+      { type: 'button', label: '添加' },
+    ],
+  },
+  encoding: 'json',
+});
+
+mcpServer.resource(uiResource);
+```
+
+---
+
+### 14.2 前端集成 MiniApp
+
+**安装依赖**：
+```bash
+npm install @mcp-ui/client
+```
+
+**使用 UIResourceRenderer**：
+```tsx
+import { UIResourceRenderer } from '@mcp-ui/client';
+
+function MiniAppViewer({ miniAppId }) {
+  const [resource, setResource] = useState(null);
+
+  useEffect(() => {
+    fetch(`/api/miniapp-mcp/${miniAppId}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'resources/read',
+        params: { uri: 'ui://mango/main' },
+        id: 1,
+      }),
+    })
+      .then(r => r.json())
+      .then(data => setResource(data.result.contents[0]));
+  }, [miniAppId]);
+
+  return resource ? (
+    <UIResourceRenderer resource={resource} onUIAction={handleAction} />
+  ) : null;
+}
+```
+
+---
+
+### 14.3 更多资源
+
+- 📚 [MiniApp API 契约](./contracts/miniapp-mcp-api.md)
+- 🔬 [MCP UI 客户端研究](./research-mcp-browser-client.md)
+- 🏗️ [MiniApp 架构设计](./research-miniapp-unified-ui.md)
+- 📖 [Skill 文件系统架构](./research-skill-filesystem.md)
+
+---
+
 **完成！现在你已经掌握了 Mango 平台的核心开发技能。🎉**
+
+最后更新：2026-01-06

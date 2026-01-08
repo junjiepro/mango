@@ -3052,5 +3052,801 @@ export function Terminal({ deviceId, bindingCode }: TerminalProps) {
 
 ---
 
-**研究完成日期**: 2025-11-24 (更新: 2026-01-01)
-**下一步**: Phase 1 - 数据模型设计（data-model.md）
+---
+
+## 13. User Story 4 扩展研究：Agent上下文工程与持续改进
+
+**研究日期**: 2026-01-06
+**参考文档**: research-us4-extension.md, research-architecture-update.md, research-skill-filesystem.md
+
+### 13.1 Skill 架构核心变更
+
+#### 关键架构调整
+
+**原设计**：三层 Skill 都存储在数据库中
+
+**新设计**：
+
+- ✅ **Edge Function Skill**: 基于文件系统（Markdown 格式），不需要数据库表
+- ✅ **设备 Skill**: 基于文件系统（Markdown 格式），不需要数据库表
+- ✅ **Remote Skill**: 仅此层需要数据库表（用户自定义 Skill）
+
+**理由**：
+
+- Edge Function Skill 是系统内置能力，应该随代码部署
+- 设备 Skill 存储在设备本地，通过配置文件管理
+- 只有用户创建的 Remote Skill 需要数据库持久化
+
+#### Claude Agent Skill 规格对齐
+
+**核心要求**：三层 Skill 都需要与 Claude Agent Skill 规格一致
+
+**标准 Skill Markdown 格式**：
+
+```markdown
+# Skill Name
+
+Brief description of what this skill does.
+
+## When to Use
+
+- Scenario 1
+- Scenario 2
+
+## Tools
+
+### tool_name
+
+Description of the tool.
+
+**Parameters:**
+- `param1` (string, required): Description
+- `param2` (number, optional): Description
+
+**Example:**
+\`\`\`json
+{
+  "param1": "value",
+  "param2": 123
+}
+\`\`\`
+
+## Resources
+
+### resource_uri
+
+Description of the resource.
+
+**URI Pattern:** `resource://namespace/path`
+
+## Examples
+
+### Example 1: Common Use Case
+
+\`\`\`
+User: "I want to..."
+Agent: [Uses tool_name with...]
+Result: ...
+\`\`\`
+```
+
+---
+
+### 13.2 统一 Skill 资源加载接口
+
+#### 按需加载策略
+
+**核心理念**：Agent 启动时只加载 Skill 元数据（轻量级），按需加载完整 Skill 内容（Markdown）
+
+```typescript
+// Skill 元数据（轻量级，启动时加载）
+interface SkillMetadata {
+  id: string;
+  name: string;
+  description: string;
+  category: 'edge' | 'remote' | 'device';
+  priority: number;
+  tags: string[];
+  triggerConditions: {
+    keywords: string[];
+    userIntent: string[];
+  };
+  // 不包含完整的 tools 和 resources 定义
+}
+
+// 统一资源加载接口
+async function loadSkillContent(skillId: string): Promise<string> {
+  // 返回 skill.md 的完整内容
+  // Agent 可以解析 Markdown 获取 tools、resources、examples
+
+  const category = skillId.split(':')[0];
+
+  switch (category) {
+    case 'edge':
+      return await loadEdgeSkill(skillId);
+    case 'remote':
+      return await loadRemoteSkill(skillId);
+    case 'device':
+      return await loadDeviceSkill(skillId);
+    default:
+      throw new Error(`Unknown skill category: ${category}`);
+  }
+}
+```
+
+**优势**：
+
+- 减少初始上下文大小（仅加载元数据）
+- 支持动态加载（按需获取完整内容）
+- 与 Claude Agent Skill 规格一致
+- 统一的加载接口，透明切换不同来源
+
+---
+
+#### 三层架构实现
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Agent 启动                                               │
+│ 1. 加载所有 Skill 元数据（轻量级）                       │
+│ 2. 根据上下文选择相关 Skill                              │
+│ 3. 按需加载 skill.md 内容                                │
+└─────────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│ Layer 1: Edge Function Skills (文件系统)                │
+│ - 位置: supabase/functions/skills/*.md                  │
+│ - 示例: a2ui-skill.md, image-gen-skill.md              │
+│ - 加载: 直接读取文件系统                                 │
+│ - 低延迟 (<50ms)                                        │
+└─────────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│ Layer 2: Remote Skills (数据库)                         │
+│ - 位置: PostgreSQL skills 表                            │
+│ - 示例: 用户自定义 Skill、MiniApp Skill                 │
+│ - 加载: 从数据库查询 skill_content 字段                  │
+└─────────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│ Layer 3: Device Skills (设备文件系统)                   │
+│ - 位置: ~/.mango/skills/*.md                            │
+│ - 示例: 本地文件操作、Git 操作                          │
+│ - 加载: 通过设备 API 读取                                │
+└─────────────────────────────────────────────────────────┘
+```
+
+**文件结构**:
+
+```
+supabase/functions/process-agent-message/skills/
+├── a2ui-skill.md              # A2UI 界面生成 Skill
+├── image-gen-skill.md         # 图片生成 Skill
+├── miniapp-skill.md           # MiniApp 管理 Skill
+└── _metadata.json             # Skill 元数据索引
+```
+
+**A2UI Skill 示例** (a2ui-skill.md):
+
+```markdown
+# A2UI 界面生成
+
+生成富交互用户界面组件，支持表单、图表、列表等多种组件类型。
+
+## When to Use
+
+- 用户需要填写表单或输入数据
+- 需要展示数据可视化图表
+- 需要创建交互式界面组件
+- 需要收集用户反馈或选择
+
+## Tools
+
+### generate_form
+
+生成表单界面组件。
+
+**Parameters:**
+- `fields` (array, required): 表单字段定义数组
+- `title` (string, optional): 表单标题
+- `submitLabel` (string, optional): 提交按钮文本
+
+**Example:**
+\`\`\`json
+{
+  "fields": [
+    { "type": "input", "label": "用户名", "required": true },
+    { "type": "select", "label": "角色", "options": ["管理员", "用户"] }
+  ],
+  "title": "用户注册"
+}
+\`\`\`
+
+### generate_chart
+
+生成数据可视化图表。
+
+**Parameters:**
+- `chartType` (string, required): 图表类型（line/bar/pie）
+- `data` (array, required): 图表数据
+
+**Example:**
+\`\`\`json
+{
+  "chartType": "line",
+  "data": [
+    { "month": "1月", "sales": 4000 },
+    { "month": "2月", "sales": 3000 }
+  ]
+}
+\`\`\`
+```
+
+#### Layer 2: Remote Skills (数据库)
+
+**数据库表结构**:
+
+```sql
+-- skills 表（仅存储用户自定义 Skill）
+CREATE TABLE skills (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id),
+  name TEXT NOT NULL,
+  description TEXT,
+  category TEXT DEFAULT 'remote',
+  priority INT DEFAULT 5,
+  tags TEXT[],
+  trigger_conditions JSONB,
+
+  -- 存储完整的 Markdown 内容
+  skill_content TEXT NOT NULL,
+
+  usage_stats JSONB DEFAULT '{"callCount": 0, "successRate": 1.0}',
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 索引
+CREATE INDEX idx_skills_user ON skills(user_id);
+CREATE INDEX idx_skills_active ON skills(is_active);
+```
+
+**Skill 加载实现**:
+
+```typescript
+// 从数据库加载 Remote Skill
+async function loadRemoteSkill(skillId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from('skills')
+    .select('skill_content')
+    .eq('id', skillId)
+    .eq('is_active', true)
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Skill not found: ${skillId}`);
+  }
+
+  return data.skill_content; // 返回 Markdown 内容
+}
+```
+
+#### Layer 3: Device Skills
+
+**文件结构**:
+
+```
+~/.mango/skills/
+├── file-operations-skill.md   # 文件操作 Skill
+├── git-operations-skill.md    # Git 操作 Skill
+└── _metadata.json             # Skill 元数据索引
+```
+
+**Skill 加载实现**:
+
+```typescript
+// 从设备加载 Device Skill
+async function loadDeviceSkill(skillId: string, bindingCode: string): Promise<string> {
+  const binding = await getDeviceBinding(bindingCode);
+
+  const response = await fetch(
+    `${binding.device_url}/skills/${skillId}`,
+    {
+      headers: { 'Authorization': `Bearer ${bindingCode}` }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to load device skill: ${skillId}`);
+  }
+
+  return await response.text(); // 返回 Markdown 内容
+}
+```
+
+**设备 Skill 示例** (file-operations-skill.md):
+
+```markdown
+# 文件操作
+
+访问和操作本地文件系统。
+
+## When to Use
+
+- 需要读取本地文件内容
+- 需要写入或修改文件
+- 需要列出目录内容
+- 需要搜索文件
+
+## Tools
+
+### read_file
+
+读取本地文件内容。
+
+**Parameters:**
+- `path` (string, required): 文件路径
+
+**Example:**
+\`\`\`json
+{
+  "path": "/Users/username/Documents/report.txt"
+}
+\`\`\`
+
+### write_file
+
+写入内容到本地文件。
+
+**Parameters:**
+- `path` (string, required): 文件路径
+- `content` (string, required): 文件内容
+
+**Example:**
+\`\`\`json
+{
+  "path": "/Users/username/Documents/note.txt",
+  "content": "Hello World"
+}
+\`\`\`
+```
+
+#### 统一 Skill 资源加载工具
+
+**核心概念**：Agent 通过统一的工具接口加载 Skill 的子资源（完整 Markdown 内容）到上下文
+
+```typescript
+// Agent 可用的统一工具
+const LOAD_SKILL_TOOL = {
+  name: 'load_skill',
+  description: '加载 Skill 的完整内容到上下文，包括工具定义、资源、示例等',
+  parameters: {
+    type: 'object',
+    properties: {
+      skillId: {
+        type: 'string',
+        description: 'Skill ID，格式：edge:xxx 或 remote:xxx 或 device:xxx'
+      }
+    },
+    required: ['skillId']
+  }
+};
+
+// 工具实现
+async function loadSkillTool(skillId: string): Promise<string> {
+  // 调用统一的资源加载接口
+  const skillContent = await loadSkillContent(skillId);
+
+  return `已加载 Skill: ${skillId}\n\n${skillContent}`;
+}
+```
+
+#### 决策总结
+
+**采用方案**: 基于文件系统的三层 Skill 架构 + 统一资源加载接口
+
+**核心特性**:
+
+- ✅ **Edge Skills**: 文件系统存储（Markdown），低延迟，内置能力
+- ✅ **Remote Skills**: 数据库存储（Markdown），用户自定义，灵活扩展
+- ✅ **Device Skills**: 设备文件系统（Markdown），本地资源访问
+- ✅ **统一加载接口**: `load_skill` 工具，Agent 按需加载完整内容
+- ✅ **Claude Agent Skill 规格**: 所有 Skill 遵循统一的 Markdown 格式
+
+**优势**:
+
+- 减少初始上下文：仅加载元数据，按需加载完整内容
+- 标准化格式：遵循 Claude Agent Skill 规格
+- 透明切换：统一接口，不同来源无缝切换
+- 易于维护：Markdown 格式，易读易编辑
+
+### 13.3 MiniApp 改造为 Skill + MCP Server 架构
+
+#### 核心变更
+
+**原架构问题**：
+
+- HTML 和 Code 分离，管理复杂
+- 缺乏标准化的工具调用接口
+- UI 展示方式不统一
+- 难以与 Agent 深度集成
+
+**新架构设计**：
+
+```
+MiniApp (改造后)
+├── Skill 定义 (Markdown)
+│   ├── name, description, tags
+│   ├── When to Use
+│   └── Tools 定义
+├── MCP Server (Edge Function)
+│   ├── Tools 实现
+│   └── UI Resource
+└── 统一 UI Resource URI: ui://mango/main
+```
+
+#### 技术栈
+
+**核心依赖**：
+
+- ✅ `@modelcontextprotocol/sdk/server/mcp.js` - MCP Server 核心
+- ✅ `@hono/mcp` - Hono 的 MCP 传输层（StreamableHTTPTransport）
+- ✅ `@mcp-ui/server` - MCP UI Resource 创建工具
+- ✅ `Hono` - HTTP 框架
+
+**移除**：
+
+- ❌ `mcp-use` - 不再使用
+
+#### MiniApp 数据库表结构
+
+```sql
+-- mini_apps 表（改造后）
+CREATE TABLE mini_apps (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id),
+  name TEXT NOT NULL,
+  description TEXT,
+  icon_url TEXT,
+
+  -- Skill 定义（Markdown 格式）
+  skill_content TEXT NOT NULL,
+
+  -- MCP Server 代码（JavaScript）
+  code TEXT NOT NULL,
+
+  -- 权限和状态
+  permissions TEXT[],
+  is_public BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+
+  -- 统计
+  install_count INT DEFAULT 0,
+  usage_count INT DEFAULT 0,
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- mini_app_data 表（存储数据）
+CREATE TABLE mini_app_data (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  installation_id UUID REFERENCES mini_app_installations(id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  value JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(installation_id, key)
+);
+```
+
+#### MCP Server 实现
+
+**Edge Function 端点** (supabase/functions/miniapp-mcp/index.ts):
+
+```typescript
+import { Hono } from 'hono';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPTransport } from '@hono/mcp';
+import { createUIResource } from '@mcp-ui/server';
+
+const app = new Hono();
+
+app.all('/:id', async (c) => {
+  const miniAppId = c.req.param('id');
+
+  // 1. 获取 MiniApp
+  const miniApp = await getMiniApp(miniAppId);
+
+  // 2. 创建 MCP Server
+  const mcpServer = new McpServer({
+    name: `miniapp-${miniApp.name}`,
+    version: '1.0.0',
+  });
+
+  // 3. 创建沙箱上下文
+  const context = await createMiniAppContext(c, miniApp);
+
+  // 4. 在沙箱中执行 MiniApp 代码
+  await executeMiniAppCode(mcpServer, miniApp.code, context);
+
+  // 5. 连接传输层
+  const transport = new StreamableHTTPTransport();
+  await mcpServer.connect(transport);
+
+  // 6. 处理请求
+  return transport.handleRequest(c);
+});
+
+export default app;
+```
+
+#### MiniApp 代码结构
+
+**TodoList MiniApp 示例**:
+
+```javascript
+// TodoList MiniApp Code
+// 注册工具
+mcpServer.tool({
+  // 工具 1: 添加待办事项
+  add_todo: {
+    description: '添加新的待办事项',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        dueDate: { type: 'string', format: 'date-time' },
+      },
+      required: ['title'],
+    },
+    async execute(args) {
+      const todo = {
+        id: generateId(),
+        title: args.title,
+        description: args.description || '',
+        dueDate: args.dueDate,
+        completed: false,
+        createdAt: new Date().toISOString(),
+      };
+
+      await storage.set(`todo:${todo.id}`, todo);
+      return { success: true, todo };
+    },
+  },
+
+  // 工具 2: 列出待办事项
+  list_todos: {
+    description: '列出所有待办事项',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filter: { type: 'string', enum: ['all', 'active', 'completed'] },
+      },
+    },
+    async execute(args) {
+      const allTodos = await storage.getAll('todo:*');
+
+      let todos = allTodos;
+      if (args.filter === 'active') {
+        todos = allTodos.filter(t => !t.completed);
+      } else if (args.filter === 'completed') {
+        todos = allTodos.filter(t => t.completed);
+      }
+
+      return { todos };
+    },
+  },
+
+  // 工具 3: 完成待办事项
+  complete_todo: {
+    description: '标记待办事项为已完成',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        todoId: { type: 'string' },
+      },
+      required: ['todoId'],
+    },
+    async execute(args) {
+      const todo = await storage.get(`todo:${args.todoId}`);
+      if (!todo) {
+        throw new Error('Todo not found');
+      }
+
+      todo.completed = true;
+      todo.completedAt = new Date().toISOString();
+      await storage.set(`todo:${args.todoId}`, todo);
+
+      return { success: true, todo };
+    },
+  },
+};
+
+// UI Resource 定义
+exports.ui = {
+  type: 'container',
+  props: {
+    title: '待办事项',
+  },
+  children: [
+    {
+      type: 'form',
+      id: 'add-todo-form',
+      props: {
+        title: '添加待办',
+      },
+      children: [
+        {
+          type: 'input',
+          id: 'title',
+          props: {
+            label: '标题',
+            placeholder: '输入待办事项...',
+            required: true,
+          },
+        },
+        {
+          type: 'input',
+          id: 'description',
+          props: {
+            label: '描述',
+            multiline: true,
+            rows: 3,
+          },
+        },
+        {
+          type: 'button',
+          props: {
+            label: '添加',
+            variant: 'primary',
+          },
+          events: [{
+            event: 'onClick',
+            action: 'call_tool',
+            payload: {
+              tool: 'add_todo',
+              args: {
+                title: '{{form.title}}',
+                description: '{{form.description}}',
+              },
+            },
+          }],
+        },
+      ],
+    },
+    {
+      type: 'list',
+      id: 'todo-list',
+      props: {
+        dataSource: '{{todos}}',
+        itemTemplate: {
+          type: 'card',
+          props: {
+            title: '{{item.title}}',
+            description: '{{item.description}}',
+            actions: [
+              {
+                label: '完成',
+                action: 'call_tool',
+                payload: {
+                  tool: 'complete_todo',
+                  args: { todoId: '{{item.id}}' },
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+  ],
+};
+
+// 主动触发配置
+exports.triggers = [
+  {
+    type: 'schedule',
+    cron: '0 9 * * *', // 每天早上 9 点
+    action: 'send_reminder',
+    async handler() {
+      const todos = await storage.getAll('todo:*');
+      const dueTodos = todos.filter(t => {
+        return !t.completed && new Date(t.dueDate) <= new Date();
+      });
+
+      if (dueTodos.length > 0) {
+        await sendMessage({
+          type: 'notification',
+          title: '待办提醒',
+          content: `你有 ${dueTodos.length} 个待办事项需要完成`,
+          data: { todos: dueTodos },
+        });
+      }
+    },
+  },
+];
+```
+
+#### Agent 调用 MiniApp
+
+**通过 Skill + MCP Server 调用**:
+
+1. 一开始就加载 MiniApp Skill 元数据到Agent上下文
+2. 当Agent请求加载 MiniApp Skill 的SKILL.md时，建立MiniApp MCP 连接，并把其工具加载到Agent工具列表中
+3. Agent按需调用 MiniApp 工具
+
+#### 决策总结
+
+**采用方案**: Skill + MCP Server 架构
+
+- ✅ 标准化工具调用接口
+- ✅ 统一 UI Resource 管理
+- ✅ 更好的 Agent 集成
+- ✅ 支持主动触发机制
+
+#### 决策总结
+
+**采用方案**: Skill + MCP Server 架构（基于 Hono + @hono/mcp）
+
+**核心特性**:
+
+- ✅ **统一 UI Resource URI**: `ui://mango/main`（所有 MiniApp 共用）
+- ✅ **Skill 定义**: Markdown 格式，存储在 `skill_content` 字段
+- ✅ **MCP Server**: Edge Function 实现，使用 `@hono/mcp` 传输层
+- ✅ **沙箱执行**: 安全的代码执行环境，受限的 API 访问
+
+**优势**:
+
+- 标准化：遵循 MCP 协议标准
+- 简化管理：统一的 UI Resource URI
+- 安全性：沙箱隔离，权限控制
+- 易于集成：与 Skill 系统无缝对接
+
+**详细实现**: 参见 `research-miniapp-hono-mcp.md` 和 `research-miniapp-unified-ui.md`
+
+---
+
+### 13.4 扩展 Skill 机制
+
+#### 核心概念
+
+**扩展 Skill (Extension Skill)**：基于用户反馈自动生成的指导性 Skill，告诉 Agent 什么是 Good vs Bad 的行为模式。
+
+**生成流程**：
+
+1. 收集用户反馈（评分、标签、原因）
+2. 聚类相似反馈，识别模式
+3. 生成正向/负向案例 Skill
+4. 注入到 Agent 提示词
+
+**详细实现**: 参见 `research-us4-extension.md`
+
+---
+
+## 14. 技术决策总结（更新）
+
+### 14.1 Skill 架构决策
+
+| 决策项 | 选择 | 理由 |
+|--------|------|------|
+| **Skill 存储** | 文件系统（Edge/Device）+ 数据库（Remote） | 系统内置 Skill 随代码部署，用户自定义 Skill 数据库存储 |
+| **Skill 格式** | Markdown（Claude Agent Skill 规格） | 标准化、易读、易维护 |
+| **资源加载** | 按需加载（`load_skill` 工具） | 减少初始上下文，提升性能 |
+| **MiniApp 架构** | Skill + MCP Server（Hono + @hono/mcp） | 标准化、安全、易集成 |
+
+### 14.2 技术栈更新
+
+**新增**：
+
+- ✅ `@hono/mcp` - Hono 的 MCP 传输层
+- ✅ `@mcp-ui/server` - MCP UI Resource 创建工具
+- ✅ `@mcp-ui/client` - MCP UI Resource 前端渲染
+- ✅ `@modelcontextprotocol/sdk/server/mcp.js` - MCP Server 核心
+
+**移除**：
+
+- ❌ `mcp-use` - 不再使用
+
+---

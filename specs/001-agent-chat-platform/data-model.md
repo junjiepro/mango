@@ -1464,6 +1464,161 @@ CREATE POLICY "Users can manage own git repositories"
 
 ---
 
+## 2.21 Skill 执行历史 (skill_executions) - User Story 4 扩展
+
+**描述**：记录 Skill 的执行历史，用于统计和优化
+
+**说明**：
+- Edge Function Skills 和设备 Skills 基于文件系统，不需要 skills 表
+- 仅 Remote Skills（用户自定义）需要数据库存储
+- 所有 Skill 的执行历史统一记录在此表
+
+**表结构**：
+
+```sql
+CREATE TABLE skill_executions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+
+  -- Skill 信息
+  skill_id TEXT NOT NULL,  -- 格式: edge:a2ui, remote:uuid, device:file-ops
+  skill_name TEXT NOT NULL,
+  skill_category TEXT NOT NULL CHECK (
+    skill_category IN ('edge', 'remote', 'device')
+  ),
+
+  -- 执行信息
+  tool_name TEXT NOT NULL,
+  args JSONB NOT NULL,
+  result JSONB,
+
+  -- 状态
+  success BOOLEAN NOT NULL,
+  error_message TEXT,
+
+  -- 性能指标
+  execution_time_ms INT NOT NULL,
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_skill_executions_user ON skill_executions(user_id, created_at DESC);
+CREATE INDEX idx_skill_executions_skill ON skill_executions(skill_id, created_at DESC);
+CREATE INDEX idx_skill_executions_conversation ON skill_executions(conversation_id) WHERE conversation_id IS NOT NULL;
+CREATE INDEX idx_skill_executions_success ON skill_executions(success);
+CREATE INDEX idx_skill_executions_category ON skill_executions(skill_category);
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE skill_executions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own skill executions"
+  ON skill_executions FOR SELECT
+  USING (auth.uid() = user_id);
+```
+
+---
+
+## 2.22 MiniApp 改造（更新 mini_apps 表）- User Story 4 扩展
+
+**描述**：将 MiniApp 改造为 Skill + MCP Server 架构
+
+**更新后的表结构**：
+
+```sql
+-- mini_apps 表不需要 ui_resource_uri 字段
+-- 所有 MiniApp 统一使用 ui://mango/main 作为 UI Resource URI
+-- MiniApp ID 通过 HTTP 路径传递
+
+-- 无需额外的 ALTER TABLE 语句
+-- 原有的 mini_apps 表结构已经满足需求
+```
+
+**字段说明**：
+- MiniApp 的 `code` 字段存储完整的 MCP Server 代码
+- 所有 MiniApp 统一实现 `ui://mango/main` UI Resource
+- 不需要在数据库中存储 UI Resource URI
+
+---
+
+## 2.23 扩展 Skills (extension_skills) - User Story 4 扩展
+
+**描述**：基于用户反馈自动生成的扩展 Skill（Good vs Bad 实践）
+
+**表结构**：
+
+```sql
+CREATE TABLE extension_skills (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  -- Skill 类型
+  skill_type TEXT NOT NULL CHECK (
+    skill_type IN ('good_practice', 'bad_practice')
+  ),
+
+  -- 行为模式
+  user_intent TEXT NOT NULL,
+  tools_used TEXT[] NOT NULL,
+
+  -- 置信度
+  confidence FLOAT NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+
+  -- 示例案例
+  examples JSONB NOT NULL DEFAULT '[]', -- [{action, outcome, rating}]
+
+  -- 样本大小
+  sample_size INT NOT NULL DEFAULT 0,
+
+  -- 状态
+  is_active BOOLEAN DEFAULT true,
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- 约束
+  CONSTRAINT valid_sample_size CHECK (sample_size >= 0)
+);
+
+CREATE INDEX idx_extension_skills_user ON extension_skills(user_id, is_active);
+CREATE INDEX idx_extension_skills_type ON extension_skills(skill_type);
+CREATE INDEX idx_extension_skills_intent ON extension_skills(user_intent);
+CREATE INDEX idx_extension_skills_confidence ON extension_skills(confidence DESC);
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE extension_skills ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own extension skills"
+  ON extension_skills FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+```
+
+---
+
+## 架构说明：Skill 存储策略
+
+**重要变更**（基于 User Story 4 额外说明）：
+
+1. **Edge Function Skills**: 基于文件系统（`supabase/functions/skills/*.md`），不需要数据库表
+2. **设备 Skills**: 基于文件系统（`~/.mango/skills/*.md`），不需要数据库表
+3. **Remote Skills**: 仅 MiniApp 和扩展 Skill 需要数据库存储
+
+**理由**：
+- Edge Function Skills 是系统内置能力，随代码部署
+- 设备 Skills 存储在设备本地，通过配置文件管理
+- 只有用户创建的动态内容需要数据库持久化
+
+---
+
 ## 3. 辅助表
 
 ### 3.1 通知 (notifications)
