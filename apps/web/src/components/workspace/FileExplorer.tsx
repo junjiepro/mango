@@ -10,12 +10,8 @@ import Editor from '@monaco-editor/react';
 import { useDeviceFiles, type FileNode } from '@/hooks/useDeviceFiles';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { FileTree } from './FileTree';
 import {
-  File,
-  Folder,
-  FolderOpen,
-  ChevronRight,
-  ChevronDown,
   Plus,
   Trash2,
   Edit,
@@ -41,7 +37,6 @@ export function FileExplorer({ deviceId, className }: FileExplorerProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
   const [isEditing, setIsEditing] = useState(false);
-  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(['/']));
 
   // 初始加载根目录
   useEffect(() => {
@@ -49,6 +44,37 @@ export function FileExplorer({ deviceId, className }: FileExplorerProps) {
       loadDirectory('/');
     }
   }, [deviceId, loadDirectory]);
+
+  // 处理文件点击
+  const handleFileClick = async (file: FileNode) => {
+    if (file.type === 'file') {
+      try {
+        const content = await readFile(file.path);
+        setFileContent(content);
+        setSelectedFile(file.path);
+        setIsEditing(false);
+      } catch (error) {
+        console.error('Failed to read file:', error);
+      }
+    }
+  };
+
+  // 处理目录点击
+  const handleDirectoryClick = async (directory: FileNode) => {
+    await loadDirectory(directory.path);
+  };
+
+  // 处理保存文件
+  const handleSaveFile = async () => {
+    if (!selectedFile) return;
+
+    try {
+      await writeFile(selectedFile, fileContent);
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Failed to save file:', error);
+    }
+  };
 
   return (
     <div className={`flex h-full ${className}`}>
@@ -70,10 +96,14 @@ export function FileExplorer({ deviceId, className }: FileExplorerProps) {
           {error && (
             <div className="p-4 text-sm text-destructive">{error}</div>
           )}
-          {!isLoading && !error && files.length === 0 && (
-            <div className="p-4 text-sm text-muted-foreground">暂无文件</div>
+          {!isLoading && !error && (
+            <FileTree
+              files={files}
+              onFileClick={handleFileClick}
+              onDirectoryClick={handleDirectoryClick}
+              selectedPath={selectedFile || undefined}
+            />
           )}
-          {/* 文件树将在下一部分实现 */}
         </ScrollArea>
       </div>
 
@@ -85,12 +115,16 @@ export function FileExplorer({ deviceId, className }: FileExplorerProps) {
               <span className="text-sm font-medium">{selectedFile}</span>
               <div className="flex gap-2">
                 {isEditing && (
-                  <Button variant="default" size="sm">
+                  <Button variant="default" size="sm" onClick={handleSaveFile}>
                     <Save className="h-4 w-4 mr-1" />
                     保存
                   </Button>
                 )}
-                <Button variant="ghost" size="sm">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditing(!isEditing)}
+                >
                   <Edit className="h-4 w-4" />
                 </Button>
               </div>

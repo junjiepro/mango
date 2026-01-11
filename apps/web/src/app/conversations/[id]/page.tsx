@@ -293,6 +293,7 @@ function ConversationDetailContent() {
           resources={resources}
           showWorkspace={showWorkspace}
           onToggleWorkspace={() => setShowWorkspace(!showWorkspace)}
+          deviceId={selectedDeviceId}
         >
           {/* 消息列表和输入框容器 */}
           <div className="flex flex-col h-full">

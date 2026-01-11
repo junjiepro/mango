@@ -31,7 +31,7 @@ export function ResourceTab({ resources, onResourceClick }: ResourceTabProps) {
   }
 
   return (
-    <div className="p-4 space-y-2">
+    <div className="space-y-0.5">
       {resources.map(resource => (
         <ResourceItem
           key={resource.id}
