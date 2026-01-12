@@ -17,8 +17,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MiniAppWindow } from '@/components/miniapp/MiniAppWindow';
 import { ResourceQuickAccess } from '@/components/conversation/ResourceQuickAccess';
+import { ResourcePreviewDialog, canPreviewInDialog } from '@/components/conversation/ResourcePreviewDialog';
 import { Package, Laptop } from 'lucide-react';
 import type { Database } from '@/types/database.types';
+import type { DetectedResource } from '@mango/shared/types/resource.types';
 import {
   Select,
   SelectContent,
@@ -63,6 +65,9 @@ function ConversationDetailContent() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [showWorkspace, setShowWorkspace] = useState(false);
+  // 资源预览状态
+  const [previewResource, setPreviewResource] = useState<DetectedResource | null>(null);
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
 
   // 资源嗅探
   const { resources } = useResourceSniffer(messages);
@@ -159,6 +164,44 @@ function ConversationDetailContent() {
   // 打开 MiniApp（从消息或快速访问栏）
   const handleOpenMiniApp = (miniApp: MiniApp, installation: MiniAppInstallation) => {
     setSelectedMiniApp({ miniApp, installation });
+  };
+
+  // 处理资源点击
+  const handleResourceClick = (resource: DetectedResource) => {
+    // 判断资源是否可以弹窗预览
+    if (canPreviewInDialog(resource)) {
+      // 可弹窗预览类型
+      if (!showWorkspace) {
+        // 工作区未激活，弹窗预览
+        setPreviewResource(resource);
+        setShowPreviewDialog(true);
+      } else {
+        // 工作区已激活，在工作区中预览
+        // TODO: 在工作区中打开资源
+        console.log('在工作区中预览资源:', resource);
+      }
+    } else {
+      // 不可弹窗预览类型，激活工作区并在其中预览
+      setShowWorkspace(true);
+      // TODO: 在工作区中打开资源
+      console.log('激活工作区并预览资源:', resource);
+    }
+  };
+
+  // 处理图片点击
+  const handleImageClick = (url: string, filename?: string) => {
+    // 创建临时资源对象用于预览
+    const imageResource: DetectedResource = {
+      id: `temp-${Date.now()}`,
+      type: 'image',
+      content: filename || 'Image',
+      metadata: {
+        url,
+        filename,
+      },
+      position: { start: 0, end: 0 },
+    };
+    handleResourceClick(imageResource);
   };
 
   // 包装 sendMessage 以传递 deviceId
@@ -305,6 +348,7 @@ function ConversationDetailContent() {
               hasMore={hasMoreMessages}
               onLoadMore={loadMoreMessages}
               onOpenMiniApp={handleOpenMiniApp}
+              onImageClick={handleImageClick}
               className="flex-1 min-h-0"
             />
 
@@ -325,6 +369,8 @@ function ConversationDetailContent() {
                       onOpenMiniApp={handleOpenMiniApp}
                       onOpenWorkspace={() => setShowWorkspace(true)}
                       onClose={() => setShowQuickAccess(false)}
+                      onResourceClick={handleResourceClick}
+                      isWorkspaceActive={showWorkspace}
                     />
                   )}
                 </div>
@@ -418,6 +464,13 @@ function ConversationDetailContent() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* 资源预览弹窗 */}
+      <ResourcePreviewDialog
+        resource={previewResource}
+        open={showPreviewDialog}
+        onOpenChange={setShowPreviewDialog}
+      />
     </div>
   );
 }

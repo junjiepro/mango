@@ -6,9 +6,12 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
-import { FileText, Image as ImageIcon, Video, Music, Code, Link as LinkIcon } from 'lucide-react';
+import { FileText, Image as ImageIcon, Video, Music, Code, Link as LinkIcon, EyeIcon, CodeIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { A2UIRenderer } from '@/components/a2ui/A2UIRenderer';
+import { MiniAppWindow } from '@/components/miniapp/MiniAppWindow';
 
 interface ResourcePreviewProps {
   resource: DetectedResource;
@@ -16,6 +19,40 @@ interface ResourcePreviewProps {
 }
 
 export function ResourcePreview({ resource, className = '' }: ResourcePreviewProps) {
+  const [viewMode, setViewMode] = useState<'preview' | 'source'>('preview');
+
+  // A2UI 组件预览
+  if (resource.metadata?.isA2UI && resource.metadata?.a2uiSchema) {
+    return (
+      <div className={`flex flex-col h-full ${className}`}>
+        <div className="p-4 border-b">
+          <h3 className="font-semibold">A2UI 组件</h3>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          <A2UIRenderer schema={resource.metadata.a2uiSchema} />
+        </div>
+      </div>
+    );
+  }
+
+  // MiniApp 预览
+  if (resource.type === 'miniapp' && resource.metadata?.miniApp && resource.metadata?.installation) {
+    return (
+      <div className={`flex flex-col h-full ${className}`}>
+        <div className="p-4 border-b">
+          <h3 className="font-semibold">{resource.metadata.miniApp.display_name || '小应用'}</h3>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <MiniAppWindow
+            miniApp={resource.metadata.miniApp}
+            installation={resource.metadata.installation}
+            onClose={() => {}}
+            className="h-full"
+          />
+        </div>
+      </div>
+    );
+  }
   // 图片预览
   if (resource.type === 'image' && resource.metadata?.url) {
     return (
@@ -92,27 +129,58 @@ export function ResourcePreview({ resource, className = '' }: ResourcePreviewPro
     );
   }
 
-  // 链接预览
+  // 链接预览 - 支持预览和源码模式
   if (resource.type === 'link' && resource.metadata?.url) {
     return (
       <div className={`flex flex-col h-full ${className}`}>
-        <div className="p-4 border-b">
-          <h3 className="font-semibold">{resource.metadata.title || '链接'}</h3>
-          {resource.metadata.domain && (
-            <p className="text-sm text-muted-foreground">{resource.metadata.domain}</p>
-          )}
+        <div className="p-4 border-b flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold">{resource.metadata.title || '链接'}</h3>
+            {resource.metadata.domain && (
+              <p className="text-sm text-muted-foreground">{resource.metadata.domain}</p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant={viewMode === 'preview' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('preview')}
+            >
+              <EyeIcon className="h-4 w-4 mr-1" />
+              预览
+            </Button>
+            <Button
+              variant={viewMode === 'source' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('source')}
+            >
+              <CodeIcon className="h-4 w-4 mr-1" />
+              源码
+            </Button>
+          </div>
         </div>
-        <div className="flex-1 overflow-auto p-4">
-          <a
-            href={resource.metadata.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline"
-          >
-            {resource.metadata.url}
-          </a>
-          {resource.metadata.description && (
-            <p className="mt-4 text-sm">{resource.metadata.description}</p>
+        <div className="flex-1 overflow-hidden">
+          {viewMode === 'preview' ? (
+            <iframe
+              src={resource.metadata.url}
+              className="w-full h-full border-0"
+              sandbox="allow-scripts allow-same-origin allow-forms"
+              title={resource.metadata.title || '链接预览'}
+            />
+          ) : (
+            <div className="h-full overflow-auto p-4">
+              <a
+                href={resource.metadata.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline block mb-4"
+              >
+                {resource.metadata.url}
+              </a>
+              {resource.metadata.description && (
+                <p className="text-sm">{resource.metadata.description}</p>
+              )}
+            </div>
           )}
         </div>
       </div>

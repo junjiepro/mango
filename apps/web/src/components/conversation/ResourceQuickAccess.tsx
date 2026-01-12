@@ -38,6 +38,10 @@ interface ResourceQuickAccessProps {
   onOpenWorkspace?: () => void;
   onClose?: () => void;
   className?: string;
+  // 新增：资源点击处理
+  onResourceClick?: (resource: DetectedResource) => void;
+  // 新增：工作区激活状态
+  isWorkspaceActive?: boolean;
 }
 
 /**
@@ -47,13 +51,49 @@ interface ResourceItemProps {
   resource: DetectedResource;
   installations?: any[];
   onOpenMiniApp?: (miniApp: MiniApp, installation: MiniAppInstallation) => void;
+  // 新增：资源点击处理
+  onResourceClick?: (resource: DetectedResource) => void;
+  // 新增：工作区激活状态
+  isWorkspaceActive?: boolean;
 }
 
-function ResourceItem({ resource, installations, onOpenMiniApp }: ResourceItemProps) {
+function ResourceItem({ resource, installations, onOpenMiniApp, onResourceClick, isWorkspaceActive }: ResourceItemProps) {
   const isMiniApp = resource.type === 'miniapp';
   const isImage = resource.type === 'image';
   const isFile = resource.type === 'file';
   const isA2UI = resource.metadata?.isA2UI;
+
+  // 判断资源是否可以弹窗预览
+  const canPreviewInDialog = () => {
+    // 可弹窗预览类型：图片、链接、MiniApp、A2UI组件、html代码
+    return (
+      resource.type === 'image' ||
+      resource.type === 'link' ||
+      resource.type === 'miniapp' ||
+      resource.type === 'html' ||
+      isA2UI
+    );
+  };
+
+  // 处理资源点击
+  const handleClick = () => {
+    // MiniApp 特殊处理
+    if (isMiniApp) {
+      const installation = installations?.find(
+        (inst) => inst.id === resource.metadata?.installationId
+      );
+      const miniApp = installation?.mini_app;
+      if (miniApp && installation && onOpenMiniApp) {
+        onOpenMiniApp(miniApp, installation);
+      }
+      return;
+    }
+
+    // 其他资源类型
+    if (onResourceClick) {
+      onResourceClick(resource);
+    }
+  };
 
   // MiniApp 资源 - 使用紫色主题，类似 MiniAppReference
   if (isMiniApp) {
@@ -61,12 +101,6 @@ function ResourceItem({ resource, installations, onOpenMiniApp }: ResourceItemPr
       (inst) => inst.id === resource.metadata?.installationId
     );
     const miniApp = installation?.mini_app;
-
-    const handleClick = () => {
-      if (miniApp && installation && onOpenMiniApp) {
-        onOpenMiniApp(miniApp, installation);
-      }
-    };
 
     // 显示名称优先级：自定义名称 > 应用显示名称 > 资源内容
     const displayName = installation?.custom_name || miniApp?.display_name || resource.content;
@@ -98,6 +132,7 @@ function ResourceItem({ resource, installations, onOpenMiniApp }: ResourceItemPr
   if (isA2UI) {
     return (
       <button
+        onClick={handleClick}
         className="flex items-center gap-2 px-3 py-1.5 bg-background border border-border rounded-md hover:bg-accent transition-colors flex-shrink-0"
         title="A2UI Component"
       >
@@ -111,6 +146,7 @@ function ResourceItem({ resource, installations, onOpenMiniApp }: ResourceItemPr
   if (isImage && resource.metadata?.url) {
     return (
       <button
+        onClick={handleClick}
         className="relative size-8 overflow-hidden rounded-lg border border-border hover:border-primary transition-colors flex-shrink-0"
         title={resource.metadata.filename || 'Image'}
       >
@@ -127,6 +163,7 @@ function ResourceItem({ resource, installations, onOpenMiniApp }: ResourceItemPr
   if (isFile) {
     return (
       <button
+        onClick={handleClick}
         className="flex items-center gap-2 px-3 py-1.5 bg-background border border-border rounded-md hover:bg-accent transition-colors flex-shrink-0"
         title={resource.metadata?.filename || resource.content}
       >
@@ -151,6 +188,7 @@ function ResourceItem({ resource, installations, onOpenMiniApp }: ResourceItemPr
 
   return (
     <button
+      onClick={handleClick}
       className="flex items-center gap-2 px-3 py-1.5 bg-background border border-border rounded-md hover:bg-accent transition-colors flex-shrink-0"
       title={resource.content}
     >
@@ -185,6 +223,8 @@ export function ResourceQuickAccess({
   onOpenWorkspace,
   onClose,
   className,
+  onResourceClick,
+  isWorkspaceActive = false,
 }: ResourceQuickAccessProps) {
   // 获取最近的资源（最多显示10个）
   const recentResources = useMemo(() => {
@@ -227,6 +267,8 @@ export function ResourceQuickAccess({
               resource={resource}
               installations={installations}
               onOpenMiniApp={onOpenMiniApp}
+              onResourceClick={onResourceClick}
+              isWorkspaceActive={isWorkspaceActive}
             />
           ))}
         </div>

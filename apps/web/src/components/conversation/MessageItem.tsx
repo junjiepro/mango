@@ -70,6 +70,8 @@ interface MessageItemProps {
   miniAppInvocation?: MiniAppInvocation;
   // MiniApp 引用支持
   onOpenMiniApp?: (miniApp: MiniApp, installation: MiniAppInstallation) => void;
+  // 新增：图片点击处理
+  onImageClick?: (url: string, filename?: string) => void;
 }
 
 /**
@@ -90,6 +92,7 @@ export function MessageItem({
   toolCalls = [],
   miniAppInvocation,
   onOpenMiniApp,
+  onImageClick,
 }: MessageItemProps) {
   const isUser = message.sender_type === 'user';
   const isAgent = message.sender_type === 'agent';
@@ -500,9 +503,26 @@ export function MessageItem({
         {/* 附件展示 - 在消息内容之前（包含数据库附件和流式附件） */}
         {attachments.length > 0 && (
           <MessageAttachments className={cn('mb-2', messageRole !== 'user' && 'ml-0')}>
-            {attachments.map((attachment, index) => (
-              <MessageAttachment key={index} data={attachment} />
-            ))}
+            {attachments.map((attachment, index) => {
+              // 判断是否为图片类型
+              const isImage = attachment.mediaType?.startsWith('image/');
+
+              if (isImage && onImageClick) {
+                // 图片类型，添加点击处理
+                return (
+                  <div
+                    key={index}
+                    onClick={() => onImageClick(attachment.url, attachment.filename)}
+                    className="cursor-pointer"
+                  >
+                    <MessageAttachment data={attachment} />
+                  </div>
+                );
+              }
+
+              // 非图片类型，正常渲染
+              return <MessageAttachment key={index} data={attachment} />;
+            })}
           </MessageAttachments>
         )}
 

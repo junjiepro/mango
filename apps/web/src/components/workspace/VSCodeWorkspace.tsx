@@ -17,7 +17,7 @@ import { DeviceTab } from './tabs/DeviceTab';
 import { FileExplorerTab } from './tabs/FileExplorerTab';
 import { GitTab } from './tabs/GitTab';
 import { Terminal } from './Terminal';
-import { ResourcePreview } from './ResourcePreview';
+import { EditorTabs } from './EditorTabs';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
 
 interface VSCodeWorkspaceProps {
@@ -34,7 +34,10 @@ export function VSCodeWorkspace({
   const [activeItem, setActiveItem] = useState<ActivityBarItem>('resources');
   const [showSidebar, setShowSidebar] = useState(true);
   const [showBottomPanel, setShowBottomPanel] = useState(false);
-  const [selectedResource, setSelectedResource] = useState<DetectedResource | null>(null);
+  const [editorTabs, setEditorTabs] = useState<
+    Array<{ id: string; resource: DetectedResource; title: string }>
+  >([]);
+  const [activeTabId, setActiveTabId] = useState<string>('');
 
   // 获取侧边栏标题
   const getSidebarTitle = () => {
@@ -72,7 +75,35 @@ export function VSCodeWorkspace({
 
   // 处理资源点击
   const handleResourceClick = (resource: DetectedResource) => {
-    setSelectedResource(resource);
+    const tabId = resource.id;
+    const existingTab = editorTabs.find((tab) => tab.id === tabId);
+
+    if (existingTab) {
+      // 如果标签页已存在，切换到该标签页
+      setActiveTabId(tabId);
+    } else {
+      // 创建新标签页
+      const title =
+        resource.metadata?.filename ||
+        resource.metadata?.title ||
+        resource.content.substring(0, 20);
+      const newTab = { id: tabId, resource, title };
+      setEditorTabs([...editorTabs, newTab]);
+      setActiveTabId(tabId);
+    }
+  };
+
+  // 处理标签页关闭
+  const handleTabClose = (tabId: string) => {
+    const newTabs = editorTabs.filter((tab) => tab.id !== tabId);
+    setEditorTabs(newTabs);
+
+    // 如果关闭的是当前活动标签页，切换到最后一个标签页
+    if (activeTabId === tabId && newTabs.length > 0) {
+      setActiveTabId(newTabs[newTabs.length - 1].id);
+    } else if (newTabs.length === 0) {
+      setActiveTabId('');
+    }
   };
 
   // 渲染侧边栏内容
@@ -108,13 +139,7 @@ export function VSCodeWorkspace({
               {showSidebar && (
                 <>
                   <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    <Sidebar
-                      activeItem={activeItem}
-                      title={getSidebarTitle()}
-                      onClose={() => setShowSidebar(false)}
-                    >
-                      {renderSidebarContent()}
-                    </Sidebar>
+                    <Sidebar title={getSidebarTitle()}>{renderSidebarContent()}</Sidebar>
                   </ResizablePanel>
                   <ResizableHandle withHandle />
                 </>
@@ -123,16 +148,12 @@ export function VSCodeWorkspace({
               {/* 编辑区/预览区 */}
               <ResizablePanel defaultSize={showSidebar ? 80 : 100} minSize={30}>
                 <EditorArea className="h-full">
-                  {selectedResource ? (
-                    <ResourcePreview resource={selectedResource} />
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      <div className="text-center">
-                        <p className="text-sm">选择左侧的资源或文件以查看内容</p>
-                        <p className="text-xs mt-2">或在终端中执行命令</p>
-                      </div>
-                    </div>
-                  )}
+                  <EditorTabs
+                    tabs={editorTabs}
+                    activeTab={activeTabId}
+                    onTabChange={setActiveTabId}
+                    onTabClose={handleTabClose}
+                  />
                 </EditorArea>
               </ResizablePanel>
             </ResizablePanelGroup>

@@ -10,34 +10,32 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { ActivityBarItem } from './ActivityBar';
 
 interface SidebarProps {
-  activeItem: ActivityBarItem;
   title: string;
   children: React.ReactNode;
   onClose?: () => void;
   className?: string;
 }
 
-export function Sidebar({ activeItem, title, children, onClose, className = '' }: SidebarProps) {
+export function Sidebar({ title, children, onClose, className = '' }: SidebarProps) {
   return (
-    <div className={`flex flex-col w-64 bg-background border-r ${className}`}>
+    <div className={`flex flex-col h-full w-full bg-background ${className}`}>
       {/* 标题栏 */}
-      <div className="flex items-center justify-between h-12 px-4 border-b">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center justify-between h-12 px-4 border-b shrink-0">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground truncate">
           {title}
         </h2>
         {onClose && (
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-6 w-6">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-6 w-6 shrink-0">
             <X className="h-4 w-4" />
           </Button>
         )}
       </div>
 
       {/* 内容区域 */}
-      <ScrollArea className="flex-1">
-        <div className="p-2">{children}</div>
+      <ScrollArea className="flex-1 w-full shrink-0">
+        <div className="p-2 w-full min-w-0">{children}</div>
       </ScrollArea>
     </div>
   );

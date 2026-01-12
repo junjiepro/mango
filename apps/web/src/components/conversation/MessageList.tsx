@@ -33,6 +33,7 @@ interface MessageListProps {
   hasMore?: boolean;
   onLoadMore?: () => void;
   onOpenMiniApp?: (miniApp: MiniApp, installation: MiniAppInstallation) => void;
+  onImageClick?: (url: string, filename?: string) => void;
   className?: string;
 }
 
@@ -48,6 +49,7 @@ export function MessageList({
   hasMore = false,
   onLoadMore,
   onOpenMiniApp,
+  onImageClick,
   className = '',
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -170,6 +172,7 @@ export function MessageList({
               streamingFiles={streamingFiles}
               toolCalls={toolCalls}
               onOpenMiniApp={onOpenMiniApp}
+              onImageClick={onImageClick}
             />
           );
         })}
