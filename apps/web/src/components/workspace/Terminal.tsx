@@ -10,20 +10,24 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
+import { DeviceBinding } from '@/services/DeviceService';
 
 interface TerminalProps {
   deviceId?: string;
+  device?: DeviceBinding;
   className?: string;
 }
 
-export function Terminal({ deviceId, className }: TerminalProps) {
+export function Terminal({ deviceId, device, className }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
+  const onlineUrl = device?.online_urls?.[0] || '';
+
   useEffect(() => {
-    if (!terminalRef.current || !deviceId) return;
+    if (!terminalRef.current || !deviceId || !onlineUrl) return;
 
     // 创建终端实例
     const xterm = new XTerm({
@@ -34,6 +38,9 @@ export function Terminal({ deviceId, className }: TerminalProps) {
         background: '#1e1e1e',
         foreground: '#d4d4d4',
       },
+      scrollback: 1000,
+      disableStdin: false,
+      convertEol: true,
     });
 
     // 添加插件
@@ -45,7 +52,19 @@ export function Terminal({ deviceId, className }: TerminalProps) {
 
     // 挂载到 DOM
     xterm.open(terminalRef.current);
-    fitAddon.fit();
+
+    // 延迟调用 fit 以确保容器已渲染
+    setTimeout(() => {
+      fitAddon.fit();
+      // 发送终端大小到后端
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'resize',
+          cols: xterm.cols,
+          rows: xterm.rows,
+        }));
+      }
+    }, 100);
 
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
@@ -53,23 +72,40 @@ export function Terminal({ deviceId, className }: TerminalProps) {
     // 连接 WebSocket
     connectWebSocket(xterm, deviceId);
 
-    // 窗口大小调整
-    const handleResize = () => {
+    // 使用 ResizeObserver 监听容器尺寸变化
+    const resizeObserver = new ResizeObserver(() => {
       fitAddon.fit();
-    };
-    window.addEventListener('resize', handleResize);
+      // 发送新的终端大小到后端
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'resize',
+          cols: xterm.cols,
+          rows: xterm.rows,
+        }));
+      }
+    });
+
+    if (terminalRef.current) {
+      resizeObserver.observe(terminalRef.current);
+    }
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       wsRef.current?.close();
       xterm.dispose();
     };
-  }, [deviceId]);
+  }, [deviceId, onlineUrl]);
 
   const connectWebSocket = async (xterm: XTerm, deviceId: string) => {
     try {
       // 获取 WebSocket URL 和认证信息
-      const response = await fetch(`/api/devices/${deviceId}/terminal`);
+      const response = await fetch(`/api/devices/${deviceId}/terminal`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cli-Url': onlineUrl,
+        },
+      });
       if (!response.ok) {
         throw new Error('Failed to get terminal connection info');
       }
@@ -79,15 +115,27 @@ export function Terminal({ deviceId, className }: TerminalProps) {
       // 连接到设备的 WebSocket
       const ws = new WebSocket(wsUrl);
 
+      // 提前注册键盘输入监听器，确保用户输入能被捕获
+      xterm.onData((data) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'input', data }));
+        }
+      });
+
       ws.onopen = () => {
         // 发送认证信息
         ws.send(JSON.stringify({ type: 'auth', token }));
-        xterm.writeln('终端已连接');
 
-        // 发送终端输入到服务器
-        xterm.onData((data) => {
-          ws.send(JSON.stringify({ type: 'input', data }));
-        });
+        // 认证后立即发送终端尺寸
+        setTimeout(() => {
+          ws.send(JSON.stringify({
+            type: 'resize',
+            cols: xterm.cols,
+            rows: xterm.rows,
+          }));
+        }, 100);
+
+        xterm.writeln('终端已连接');
       };
 
       ws.onmessage = (event) => {
@@ -113,8 +161,8 @@ export function Terminal({ deviceId, className }: TerminalProps) {
   };
 
   return (
-    <div className={`h-full bg-[#1e1e1e] ${className}`}>
-      <div ref={terminalRef} className="h-full p-2" />
+    <div className={`h-full w-full bg-[#1e1e1e] overflow-hidden ${className}`}>
+      <div ref={terminalRef} className="h-full w-full" />
     </div>
   );
 }

@@ -29,6 +29,8 @@ export interface BindingConfig {
   lastUsedAt: string;
   /** 用户 ID（可选） */
   userId?: string;
+  /** 工作空间目录（可选） */
+  workspaceDir?: string;
   /** 其他元数据 */
   metadata?: {
     platform: string;
@@ -58,6 +60,17 @@ export class BindingCodeManager {
    */
   getConfigDir(): string {
     return this.configDir;
+  }
+
+  /**
+   * 获取默认工作空间
+   * @param bindingCode
+   * @returns
+   */
+  private getDefaultWorkspaceDir(bindingCode: string): string {
+    const defaultWorkspaceDir = join(this.configDir, 'workspace', bindingCode);
+
+    return defaultWorkspaceDir;
   }
 
   /**
@@ -171,7 +184,22 @@ export class BindingCodeManager {
 
     try {
       const configJson = readFileSync(this.bindingConfigPath, 'utf-8');
-      return JSON.parse(configJson) as Record<string, BindingConfig>;
+      const raw = JSON.parse(configJson) as Record<string, BindingConfig>;
+      const next: Record<string, BindingConfig> = {};
+
+      Object.keys(raw).forEach((k) => {
+        next[k] = {
+          ...raw[k],
+          workspaceDir: raw[k].workspaceDir || this.getDefaultWorkspaceDir(k),
+        };
+
+        const workingDir = next[k].workspaceDir;
+        if (workingDir && !existsSync(workingDir)) {
+          mkdirSync(workingDir, { recursive: true });
+        }
+      });
+
+      return next;
     } catch (error) {
       return null;
     }

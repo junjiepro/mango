@@ -19,6 +19,7 @@ import { GitTab } from './tabs/GitTab';
 import { Terminal } from './Terminal';
 import { EditorTabs } from './EditorTabs';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
+import { DeviceBinding } from '@/services/DeviceService';
 
 interface VSCodeWorkspaceProps {
   resources?: DetectedResource[];
@@ -31,6 +32,7 @@ export function VSCodeWorkspace({
   deviceId,
   className = '',
 }: VSCodeWorkspaceProps) {
+  const [selectedDevice, setSelectedDevice] = useState<DeviceBinding>(undefined);
   const [activeItem, setActiveItem] = useState<ActivityBarItem>('resources');
   const [showSidebar, setShowSidebar] = useState(true);
   const [showBottomPanel, setShowBottomPanel] = useState(false);
@@ -38,6 +40,28 @@ export function VSCodeWorkspace({
     Array<{ id: string; resource: DetectedResource; title: string }>
   >([]);
   const [activeTabId, setActiveTabId] = useState<string>('');
+
+  const loadDevice = async (id: string) => {
+    try {
+      const response = await fetch(`/api/devices/${id}`);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('设备未找到');
+        }
+        throw new Error('加载设备信息失败');
+      }
+
+      const data = await response.json();
+      setSelectedDevice(data.device);
+    } catch (err) {
+      console.error('Failed to load device:', id, err);
+    }
+  };
+
+  React.useEffect(() => {
+    if (deviceId) loadDevice(deviceId);
+  }, [deviceId]);
 
   // 获取侧边栏标题
   const getSidebarTitle = () => {
@@ -114,7 +138,7 @@ export function VSCodeWorkspace({
       case 'devices':
         return <DeviceTab />;
       case 'files':
-        return <FileExplorerTab deviceId={deviceId} />;
+        return <FileExplorerTab deviceId={deviceId} device={selectedDevice} />;
       case 'git':
         return <GitTab deviceId={deviceId} />;
       case 'settings':
@@ -168,6 +192,7 @@ export function VSCodeWorkspace({
                   isOpen={showBottomPanel}
                   onClose={() => setShowBottomPanel(false)}
                   deviceId={deviceId}
+                  device={selectedDevice}
                 />
               </ResizablePanel>
             </>

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Terminal } from './Terminal';
+import { DeviceBinding } from '@/services/DeviceService';
 
 interface TerminalSession {
   id: string;
@@ -21,13 +22,18 @@ interface BottomPanelProps {
   isOpen: boolean;
   onClose: () => void;
   deviceId?: string;
+  device?: DeviceBinding;
   className?: string;
 }
 
-export function BottomPanel({ isOpen, onClose, deviceId, className = '' }: BottomPanelProps) {
-  const [terminals, setTerminals] = useState<TerminalSession[]>([
-    { id: '1', title: '终端 1' },
-  ]);
+export function BottomPanel({
+  isOpen,
+  onClose,
+  deviceId,
+  device,
+  className = '',
+}: BottomPanelProps) {
+  const [terminals, setTerminals] = useState<TerminalSession[]>([{ id: '1', title: '终端 1' }]);
   const [activeTerminal, setActiveTerminal] = useState('1');
 
   if (!isOpen) return null;
@@ -58,7 +64,11 @@ export function BottomPanel({ isOpen, onClose, deviceId, className = '' }: Botto
 
   return (
     <div className={`flex flex-col h-full border-t bg-background ${className}`}>
-      <Tabs value={activeTerminal} onValueChange={setActiveTerminal} className="flex flex-col h-full">
+      <Tabs
+        value={activeTerminal}
+        onValueChange={setActiveTerminal}
+        className="flex flex-col h-full"
+      >
         {/* 标题栏和标签页 */}
         <div className="flex items-center justify-between h-10 px-2 border-b bg-muted/40">
           <div className="flex items-center gap-1 flex-1 overflow-x-auto">
@@ -109,7 +119,7 @@ export function BottomPanel({ isOpen, onClose, deviceId, className = '' }: Botto
               value={terminal.id}
               className="h-full m-0 data-[state=inactive]:hidden"
             >
-              <Terminal deviceId={deviceId} />
+              <Terminal deviceId={deviceId} device={device} />
             </TabsContent>
           ))}
         </div>

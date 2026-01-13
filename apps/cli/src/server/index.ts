@@ -20,6 +20,9 @@ import { tempBindingManager } from '../lib/temp-binding-manager.js';
 import { tunnelManager } from '../lib/tunnel-manager.js';
 import { randomBytes } from 'crypto';
 import { actualPort } from '../commands/start.js';
+import { WebSocketServer } from 'ws';
+import * as pty from 'node-pty';
+import { existsSync, mkdirSync } from 'fs';
 
 const getBindingCodeAndCheckFromHeader = (
   c: Context
@@ -159,11 +162,20 @@ export function createServer(config: CLIConfig) {
       };
       const platform = platformMap[process.platform] || 'linux';
 
-      // 4. 返回设备信息和绑定码给 Web 端
+      // 4. 生成默认工作空间目录（使用绑定码前8位）
+      const pathModule = await import('path');
+      const workspaceDir = pathModule.join(
+        bindingCodeManager.getConfigDir(),
+        'workspaces',
+        bindingCode.substring(0, 8)
+      );
+
+      // 5. 返回设备信息和绑定码给 Web 端
       // Web 端负责创建 devices 和 device_bindings 记录
       return c.json({
         success: true,
         binding_code: bindingCode,
+        workspace_dir: workspaceDir,
         device_info: {
           device_id: deviceId,
           device_name: binding_name,
@@ -204,6 +216,7 @@ export function createServer(config: CLIConfig) {
         hostname,
         temp_code,
         mcp_services,
+        workspace_dir,
       } = body;
       const rest = { ...body };
       delete rest.binding_code;
@@ -224,6 +237,7 @@ export function createServer(config: CLIConfig) {
         boundAt: new Date().toISOString(),
         lastUsedAt: new Date().toISOString(),
         userId: user_id,
+        workspaceDir: workspace_dir,
         metadata: {
           platform: platform || process.platform,
           hostname: hostname || os.hostname(),
@@ -378,37 +392,230 @@ export function createServer(config: CLIConfig) {
     }
   });
 
-  // ACP端点（ACP协议服务代理，需要认证）
-  app.all('/acp', async (c) => {
+  // ACP会话创建端点
+  app.post('/acp/sessions', async (c) => {
     try {
-      const [bindingCode, _, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      const [bindingCode, codeConfig, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
 
-      if (errorResponse) {
-        return errorResponse;
+      const body = await c.req.json();
+      const { agent, envVars } = body;
+
+      if (!agent || !agent.command) {
+        return c.json({ error: 'Agent configuration is required' }, 400);
       }
 
-      // 获取ACP服务列表
-      const services = acpConnector.getServices();
+      // 准备会话配置
+      const session = {
+        cwd: codeConfig?.workspaceDir || process.cwd(),
+        mcpServers: codeConfig?.mcpServices || [],
+      };
 
-      // 返回服务列表（即使为空也返回 200）
+      // 创建 ACP 会话
+      const sessionId = await acpConnector.createSession(
+        bindingCode,
+        {
+          command: agent.command,
+          args: agent.args,
+          env: envVars,
+          authMethodId: agent.authMethodId,
+        },
+        session
+      );
+
       return c.json({
-        message: services.length === 0
-          ? 'No ACP services configured. Please configure ACP services first.'
-          : 'ACP protocol support is in progress',
-        available_services: services.map((s) => ({
-          name: s.name,
-          description: s.description,
-        })),
-        note: 'Full ACP protocol implementation will be added once the protocol specification is finalized',
+        success: true,
+        sessionId,
+        message: 'ACP session created successfully',
       });
     } catch (error) {
-      console.error('ACP endpoint error:', error);
-      return c.json(
-        {
-          error: error instanceof Error ? error.message : 'Internal server error',
-        },
-        { status: 500 }
+      console.error('ACP session creation error:', error);
+      return c.json({ error: 'Failed to create ACP session' }, 500);
+    }
+  });
+
+  // ACP会话列表端点
+  app.get('/acp/sessions', async (c) => {
+    try {
+      const [bindingCode, _, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const sessions = acpConnector.getSessionsByBinding(bindingCode);
+      return c.json({
+        success: true,
+        sessions: sessions.map((s) => ({
+          sessionId: s.sessionId,
+          status: s.config.status,
+          createdAt: s.config.createdAt,
+          lastActiveAt: s.config.lastActiveAt,
+          agent: s.config.agent,
+        })),
+      });
+    } catch (error) {
+      console.error('ACP sessions list error:', error);
+      return c.json({ error: 'Failed to list ACP sessions' }, 500);
+    }
+  });
+
+  // ACP会话关闭端点
+  app.delete('/acp/sessions/:sessionId', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const { sessionId } = c.req.param();
+      const success = await acpConnector.closeSession(sessionId);
+
+      if (!success) {
+        return c.json({ error: 'Session not found' }, 404);
+      }
+
+      return c.json({ success: true, message: 'Session closed successfully' });
+    } catch (error) {
+      console.error('ACP session close error:', error);
+      return c.json({ error: 'Failed to close session' }, 500);
+    }
+  });
+
+  // ACP聊天端点（AI SDK兼容）
+  app.post('/acp/chat', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const body = await c.req.json();
+      const { sessionId, messages } = body;
+
+      if (!sessionId || !messages) {
+        return c.json({ error: 'sessionId and messages are required' }, 400);
+      }
+
+      const session = acpConnector.getSession(sessionId);
+      if (!session) {
+        return c.json({ error: 'Session not found' }, 404);
+      }
+
+      // 更新会话活跃时间
+      acpConnector.updateSessionActivity(sessionId);
+
+      // 使用 ACP provider 的 streamText
+      const { streamText } = await import('ai');
+      const result = streamText({
+        model: session.provider.languageModel(),
+        messages,
+        tools: session.provider.tools,
+      });
+
+      return result.toDataStreamResponse();
+    } catch (error) {
+      console.error('ACP chat error:', error);
+      return c.json({ error: 'Failed to process chat' }, 500);
+    }
+  });
+
+  // 文件列表端点
+  app.get('/files/list', async (c) => {
+    try {
+      const [bindingCode, codeConfig, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      let path = c.req.query('path') || '';
+      const fs = await import('fs/promises');
+      const pathModule = await import('path');
+
+      // 如果请求的path为空或'/',则使用配置的workspaceDir作为默认路径
+      if (!path || path === '/' || path === '') {
+        const workspaceDir = codeConfig?.workspaceDir;
+        if (workspaceDir) {
+          // 确保工作空间目录存在
+          try {
+            await fs.mkdir(workspaceDir, { recursive: true });
+            path = workspaceDir;
+          } catch (mkdirError) {
+            console.error('Failed to create workspace directory:', mkdirError);
+            path = process.cwd();
+          }
+        } else {
+          path = process.cwd();
+        }
+      }
+
+      const fullPath = pathModule.resolve(path);
+      const stats = await fs.stat(fullPath);
+
+      if (!stats.isDirectory()) {
+        return c.json({ error: 'Path is not a directory' }, 400);
+      }
+
+      const entries = await fs.readdir(fullPath, { withFileTypes: true });
+      const files = await Promise.all(
+        entries.map(async (entry) => {
+          const entryPath = pathModule.join(fullPath, entry.name);
+          const entryStat = await fs.stat(entryPath);
+          return {
+            name: entry.name,
+            path: entryPath,
+            type: entry.isDirectory() ? 'directory' : 'file',
+            size: entryStat.size,
+            modified: entryStat.mtime.toISOString(),
+          };
+        })
       );
+
+      return c.json({ success: true, files, path: fullPath });
+    } catch (error) {
+      console.error('File list error:', error);
+      return c.json({ error: 'Failed to list files' }, 500);
+    }
+  });
+
+  // 文件读取端点
+  app.get('/files/read', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const path = c.req.query('path');
+      if (!path) {
+        return c.json({ error: 'Path is required' }, 400);
+      }
+
+      const fs = await import('fs/promises');
+      const pathModule = await import('path');
+
+      const fullPath = pathModule.resolve(path);
+      const content = await fs.readFile(fullPath, 'utf-8');
+
+      return c.json({ success: true, content, path: fullPath });
+    } catch (error) {
+      console.error('File read error:', error);
+      return c.json({ error: 'Failed to read file' }, 500);
+    }
+  });
+
+  // 文件写入端点
+  app.post('/files/write', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const body = await c.req.json();
+      const { path, content } = body;
+
+      if (!path || content === undefined) {
+        return c.json({ error: 'Path and content are required' }, 400);
+      }
+
+      const fs = await import('fs/promises');
+      const pathModule = await import('path');
+
+      const fullPath = pathModule.resolve(path);
+      await fs.writeFile(fullPath, content, 'utf-8');
+
+      return c.json({ success: true, message: 'File written successfully' });
+    } catch (error) {
+      console.error('File write error:', error);
+      return c.json({ error: 'Failed to write file' }, 500);
     }
   });
 
@@ -438,12 +645,94 @@ export async function startServer(config: CLIConfig): Promise<number> {
 
   return new Promise((resolve, reject) => {
     try {
-      serve(
+      const server = serve(
         {
           fetch: app.fetch,
           port: availablePort,
         },
         (info) => {
+          // 创建 WebSocket 服务器
+          const wss = new WebSocketServer({ server: server as any, path: '/terminal' });
+
+          wss.on('connection', (ws, req) => {
+            console.log('[Server] Terminal WebSocket connected');
+
+            let ptyProcess: pty.IPty | null = null;
+            let authenticated = false;
+
+            ws.on('message', (data) => {
+              try {
+                const message = JSON.parse(data.toString());
+                console.log('[Server] Received message:', message.type);
+
+                if (message.type === 'auth') {
+                  // 验证 binding code
+                  const bindingConfig = bindingCodeManager.readConfig();
+                  if (bindingConfig && bindingConfig[message.token]) {
+                    authenticated = true;
+                    const config = bindingConfig[message.token];
+                    ws.send(JSON.stringify({ type: 'auth', success: true }));
+
+                    // 获取工作目录：优先使用workspaceDir，否则使用当前目录
+                    let workingDir = config.workspaceDir || process.cwd();
+                    // 确保工作空间目录存在
+                    try {
+                      if (!existsSync(workingDir)) {
+                        mkdirSync(workingDir, { recursive: true });
+                      }
+                    } catch (err) {
+                      console.error('Failed to create workspace directory:', err);
+                      workingDir = process.cwd();
+                    }
+
+                    // 使用 node-pty 创建伪终端
+                    const shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
+                    ptyProcess = pty.spawn(shell, [], {
+                      name: 'xterm-256color',
+                      cols: 80,
+                      rows: 30,
+                      cwd: workingDir,
+                      env: process.env as { [key: string]: string },
+                    });
+
+                    console.log('[Server] PTY created:', shell, 'in directory:', workingDir);
+
+                    // 监听 PTY 输出
+                    ptyProcess.onData((data) => {
+                      ws.send(JSON.stringify({ type: 'output', data }));
+                    });
+
+                    // 监听 PTY 退出
+                    ptyProcess.onExit(() => {
+                      ws.close();
+                    });
+                  } else {
+                    ws.send(JSON.stringify({ type: 'auth', success: false }));
+                    ws.close();
+                  }
+                } else if (message.type === 'resize') {
+                  if (ptyProcess && message.cols && message.rows) {
+                    ptyProcess.resize(message.cols, message.rows);
+                    console.log('[Server] Terminal resized to:', message.cols, 'x', message.rows);
+                  }
+                } else if (message.type === 'input') {
+                  if (authenticated && ptyProcess) {
+                    ptyProcess.write(message.data);
+                  }
+                }
+              } catch (error) {
+                console.error('Terminal message error:', error);
+              }
+            });
+
+            ws.on('close', () => {
+              console.log('[Server] Terminal WebSocket disconnected');
+              if (ptyProcess) {
+                ptyProcess.kill();
+              }
+            });
+          });
+
           resolve(info.port);
         }
       );

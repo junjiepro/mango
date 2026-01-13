@@ -20,7 +20,7 @@ interface SidebarProps {
 
 export function Sidebar({ title, children, onClose, className = '' }: SidebarProps) {
   return (
-    <div className={`flex flex-col h-full w-full bg-background ${className}`}>
+    <div className={`flex flex-col h-full w-full min-w-0 bg-background ${className}`}>
       {/* 标题栏 */}
       <div className="flex items-center justify-between h-12 px-4 border-b shrink-0">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground truncate">

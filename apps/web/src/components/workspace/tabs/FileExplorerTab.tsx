@@ -12,19 +12,16 @@ import { useDeviceFiles, type FileNode } from '@/hooks/useDeviceFiles';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FileTree } from '@/components/workspace/FileTree';
+import { DeviceBinding } from '@/services/DeviceService';
 
 interface FileExplorerTabProps {
   deviceId?: string;
+  device?: DeviceBinding;
   onFileClick?: (file: FileNode) => void;
 }
 
-export function FileExplorerTab({ deviceId, onFileClick }: FileExplorerTabProps) {
-  const {
-    files,
-    isLoading,
-    error,
-    loadDirectory,
-  } = useDeviceFiles(deviceId);
+export function FileExplorerTab({ deviceId, device, onFileClick }: FileExplorerTabProps) {
+  const { files, isLoading, error, loadDirectory } = useDeviceFiles(device);
 
   // 初始加载根目录
   useEffect(() => {
@@ -69,12 +66,8 @@ export function FileExplorerTab({ deviceId, onFileClick }: FileExplorerTabProps)
 
       {/* 文件树内容 */}
       <ScrollArea className="flex-1">
-        {isLoading && (
-          <div className="p-4 text-sm text-muted-foreground">加载中...</div>
-        )}
-        {error && (
-          <div className="p-4 text-sm text-destructive">{error}</div>
-        )}
+        {isLoading && <div className="p-4 text-sm text-muted-foreground">加载中...</div>}
+        {error && <div className="p-4 text-sm text-destructive">{error}</div>}
         {!isLoading && !error && (
           <FileTree
             files={files}

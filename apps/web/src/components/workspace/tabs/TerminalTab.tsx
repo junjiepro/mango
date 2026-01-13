@@ -9,12 +9,14 @@
 import React from 'react';
 import { TerminalIcon } from 'lucide-react';
 import { Terminal } from '@/components/workspace/Terminal';
+import { DeviceBinding } from '@/services/DeviceService';
 
 interface TerminalTabProps {
   deviceId?: string;
+  device?: DeviceBinding;
 }
 
-export function TerminalTab({ deviceId }: TerminalTabProps) {
+export function TerminalTab({ deviceId, device }: TerminalTabProps) {
   if (!deviceId) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
@@ -29,7 +31,7 @@ export function TerminalTab({ deviceId }: TerminalTabProps) {
 
   return (
     <div className="h-full">
-      <Terminal deviceId={deviceId} />
+      <Terminal deviceId={deviceId} device={device} />
     </div>
   );
 }

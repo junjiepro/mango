@@ -17,7 +17,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MiniAppWindow } from '@/components/miniapp/MiniAppWindow';
 import { ResourceQuickAccess } from '@/components/conversation/ResourceQuickAccess';
-import { ResourcePreviewDialog, canPreviewInDialog } from '@/components/conversation/ResourcePreviewDialog';
+import {
+  ResourcePreviewDialog,
+  canPreviewInDialog,
+} from '@/components/conversation/ResourcePreviewDialog';
 import { Package, Laptop } from 'lucide-react';
 import type { Database } from '@/types/database.types';
 import type { DetectedResource } from '@mango/shared/types/resource.types';

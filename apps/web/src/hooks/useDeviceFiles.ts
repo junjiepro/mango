@@ -5,6 +5,7 @@
 
 'use client';
 
+import { DeviceBinding } from '@/services/DeviceService';
 import { useState, useCallback, useEffect } from 'react';
 
 export interface FileNode {
@@ -42,7 +43,7 @@ interface UseDeviceFilesReturn {
   renameFile: (oldPath: string, newPath: string) => Promise<void>;
 }
 
-export function useDeviceFiles(deviceId?: string): UseDeviceFilesReturn {
+export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
   const [files, setFiles] = useState<FileNode[]>([]);
   const [currentPath, setCurrentPath] = useState<string>('');
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
@@ -50,12 +51,21 @@ export function useDeviceFiles(deviceId?: string): UseDeviceFilesReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const deviceId = device?.id;
+  const onlineUrl = device?.online_urls?.[0] || '';
+
   // 加载工作空间配置
   const loadWorkspaceConfig = useCallback(async () => {
-    if (!deviceId) return;
+    if (!device) return;
 
     try {
-      const response = await fetch(`/api/devices/${deviceId}/config`);
+      const response = await fetch(`/api/devices/${device.id}/config`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cli-Url': onlineUrl,
+        },
+      });
       if (response.ok) {
         const data = await response.json();
         setWorkspaceDir(data.config?.workspaceDir || null);
@@ -63,7 +73,7 @@ export function useDeviceFiles(deviceId?: string): UseDeviceFilesReturn {
     } catch (err) {
       console.error('Failed to load workspace config:', err);
     }
-  }, [deviceId]);
+  }, [device?.id, onlineUrl]);
 
   // 加载目录
   const loadDirectory = useCallback(
@@ -78,12 +88,18 @@ export function useDeviceFiles(deviceId?: string): UseDeviceFilesReturn {
 
       try {
         // 如果没有提供path,使用空字符串让服务端使用workspaceDir
-        const targetPath = path !== undefined ? path : '';
+        const targetPath = path !== undefined ? (path === '/' ? workspaceDir : path) : '';
         const url = targetPath
           ? `/api/devices/${deviceId}/files?path=${encodeURIComponent(targetPath)}`
           : `/api/devices/${deviceId}/files`;
 
-        const response = await fetch(url);
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cli-Url': onlineUrl,
+          },
+        });
 
         if (!response.ok) {
           throw new Error('加载目录失败');
@@ -104,7 +120,7 @@ export function useDeviceFiles(deviceId?: string): UseDeviceFilesReturn {
         setIsLoading(false);
       }
     },
-    [deviceId]
+    [deviceId, workspaceDir, onlineUrl]
   );
 
   // 切换目录
@@ -175,7 +191,9 @@ export function useDeviceFiles(deviceId?: string): UseDeviceFilesReturn {
         throw new Error('未选择设备');
       }
 
-      const response = await fetch(`/api/devices/${deviceId}/files/read?path=${encodeURIComponent(path)}`);
+      const response = await fetch(
+        `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(path)}`
+      );
 
       if (!response.ok) {
         throw new Error('读取文件失败');
