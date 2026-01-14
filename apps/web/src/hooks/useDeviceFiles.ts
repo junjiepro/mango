@@ -192,7 +192,13 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
       }
 
       const response = await fetch(
-        `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(path)}`
+        `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(path)}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cli-Url': onlineUrl,
+          },
+        }
       );
 
       if (!response.ok) {
@@ -202,7 +208,7 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
       const data = await response.json();
       return data.content;
     },
-    [deviceId]
+    [deviceId, onlineUrl]
   );
 
   const writeFile = useCallback(
@@ -213,7 +219,10 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
 
       const response = await fetch(`/api/devices/${deviceId}/files/write`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cli-Url': onlineUrl,
+        },
         body: JSON.stringify({ path, content }),
       });
 
@@ -221,7 +230,7 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
         throw new Error('写入文件失败');
       }
     },
-    [deviceId]
+    [deviceId, onlineUrl]
   );
 
   const createFile = useCallback(
@@ -232,7 +241,10 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
 
       const response = await fetch(`/api/devices/${deviceId}/files/create`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cli-Url': onlineUrl,
+        },
         body: JSON.stringify({ path, type: 'file' }),
       });
 
@@ -243,7 +255,7 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
       // 重新加载当前目录
       await loadDirectory(currentPath);
     },
-    [deviceId, currentPath, loadDirectory]
+    [deviceId, currentPath, loadDirectory, onlineUrl]
   );
 
   const createDirectory = useCallback(
@@ -254,7 +266,10 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
 
       const response = await fetch(`/api/devices/${deviceId}/files/create`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cli-Url': onlineUrl,
+        },
         body: JSON.stringify({ path, type: 'directory' }),
       });
 
@@ -264,7 +279,7 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
 
       await loadDirectory(currentPath);
     },
-    [deviceId, currentPath, loadDirectory]
+    [deviceId, currentPath, loadDirectory, onlineUrl]
   );
 
   const deleteFile = useCallback(
@@ -275,7 +290,10 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
 
       const response = await fetch(`/api/devices/${deviceId}/files/delete`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cli-Url': onlineUrl,
+        },
         body: JSON.stringify({ path }),
       });
 
@@ -285,7 +303,7 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
 
       await loadDirectory(currentPath);
     },
-    [deviceId, currentPath, loadDirectory]
+    [deviceId, currentPath, loadDirectory, onlineUrl]
   );
 
   const renameFile = useCallback(
@@ -296,7 +314,10 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
 
       const response = await fetch(`/api/devices/${deviceId}/files/rename`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cli-Url': onlineUrl,
+        },
         body: JSON.stringify({ oldPath, newPath }),
       });
 
@@ -306,7 +327,7 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
 
       await loadDirectory(currentPath);
     },
-    [deviceId, currentPath, loadDirectory]
+    [deviceId, currentPath, loadDirectory, onlineUrl]
   );
 
   // 初始化加载配置和历史记录

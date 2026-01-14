@@ -20,6 +20,8 @@ import { Terminal } from './Terminal';
 import { EditorTabs } from './EditorTabs';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
 import { DeviceBinding } from '@/services/DeviceService';
+import { useEditorTabs } from '@/hooks/useEditorTabs';
+import { EnhancedEditorTabs } from './EnhancedEditorTabs';
 
 interface VSCodeWorkspaceProps {
   resources?: DetectedResource[];
@@ -39,7 +41,18 @@ export function VSCodeWorkspace({
   const [editorTabs, setEditorTabs] = useState<
     Array<{ id: string; resource: DetectedResource; title: string }>
   >([]);
-  const [activeTabId, setActiveTabId] = useState<string>('');
+  // const [activeTabId, setActiveTabId] = useState<string>('');
+
+  const {
+    tabs,
+    activeTabId,
+    openFileTab,
+    openResourceTab,
+    closeTab,
+    closeAllTabs,
+    closeOtherTabs,
+    setActiveTabId,
+  } = useEditorTabs();
 
   const loadDevice = async (id: string) => {
     try {
@@ -134,11 +147,13 @@ export function VSCodeWorkspace({
   const renderSidebarContent = () => {
     switch (activeItem) {
       case 'resources':
-        return <ResourceTab resources={resources} onResourceClick={handleResourceClick} />;
+        return <ResourceTab resources={resources} onResourceClick={openResourceTab} />;
       case 'devices':
         return <DeviceTab />;
       case 'files':
-        return <FileExplorerTab deviceId={deviceId} device={selectedDevice} />;
+        return (
+          <FileExplorerTab deviceId={deviceId} device={selectedDevice} onFileClick={openFileTab} />
+        );
       case 'git':
         return <GitTab deviceId={deviceId} />;
       case 'settings':
@@ -150,36 +165,37 @@ export function VSCodeWorkspace({
 
   return (
     <div className={`flex h-full ${className}`}>
-      {/* 活动栏 */}
-      <ActivityBar activeItem={activeItem} onItemClick={handleActivityBarClick} />
-
       {/* 主要内容区域 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <ResizablePanelGroup direction="vertical" className="flex-1">
           {/* 上半部分：侧边栏 + 编辑区 */}
           <ResizablePanel defaultSize={showBottomPanel ? 70 : 100} minSize={30}>
             <ResizablePanelGroup direction="horizontal" className="h-full">
-              {/* 侧边栏 */}
-              {showSidebar && (
-                <>
-                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    <Sidebar title={getSidebarTitle()}>{renderSidebarContent()}</Sidebar>
-                  </ResizablePanel>
-                  <ResizableHandle withHandle />
-                </>
-              )}
-
               {/* 编辑区/预览区 */}
               <ResizablePanel defaultSize={showSidebar ? 80 : 100} minSize={30}>
                 <EditorArea className="h-full">
-                  <EditorTabs
-                    tabs={editorTabs}
-                    activeTab={activeTabId}
+                  <EnhancedEditorTabs
+                    tabs={tabs}
+                    activeTabId={activeTabId}
+                    deviceId={deviceId}
+                    onlineUrl={selectedDevice?.online_urls?.[0]}
                     onTabChange={setActiveTabId}
-                    onTabClose={handleTabClose}
+                    onTabClose={closeTab}
+                    onCloseAll={closeAllTabs}
+                    onCloseOthers={closeOtherTabs}
                   />
                 </EditorArea>
               </ResizablePanel>
+
+              {/* 侧边栏 */}
+              {showSidebar && (
+                <>
+                  <ResizableHandle withHandle />
+                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                    <Sidebar title={getSidebarTitle()}>{renderSidebarContent()}</Sidebar>
+                  </ResizablePanel>
+                </>
+              )}
             </ResizablePanelGroup>
           </ResizablePanel>
 
@@ -199,6 +215,9 @@ export function VSCodeWorkspace({
           )}
         </ResizablePanelGroup>
       </div>
+
+      {/* 活动栏 */}
+      <ActivityBar activeItem={activeItem} onItemClick={handleActivityBarClick} />
     </div>
   );
 }

@@ -361,7 +361,7 @@ Based on plan.md monorepo structure:
 - [X] T148 [P] [US5] Create A2UI parser in `apps/web/src/lib/a2ui-parser.ts`
 - [X] T149 [P] [US5] Create A2UIRenderer component in `apps/web/src/components/a2ui/A2UIRenderer.tsx`
 - [X] T150 [P] [US5] Create FormComponent in `apps/web/src/components/a2ui/components/FormComponent.tsx`
-- [ ] T151 [P] [US5] Create ChartComponent (Recharts) in `apps/web/src/components/a2ui/components/ChartComponent.tsx`
+- [X] T151 [P] [US5] Create ChartComponent (Recharts) in `apps/web/src/components/a2ui/components/ChartComponent.tsx`
 - [X] T152 [P] [US5] Create ButtonComponent in `apps/web/src/components/a2ui/components/ButtonComponent.tsx`
 - [X] T153 [US5] Integrate A2UI into MessageItem component in `apps/web/src/components/chat/MessageItem.tsx`
 
@@ -380,7 +380,7 @@ Based on plan.md monorepo structure:
 - [X] T161 [P] [US5] Create useWorkspaceLayout hook in `apps/web/src/hooks/useWorkspaceLayout.ts`
 - [X] T162 [P] [US5] Create Workspace container in `apps/web/src/components/workspace/Workspace.tsx`
 - [X] T163 [P] [US5] Create WorkspaceHeader in `apps/web/src/components/workspace/WorkspaceHeader.tsx`
-- [ ] T164 [US5] Integrate workspace with chat layout using react-resizable-panels
+- [X] T164 [US5] Integrate workspace with chat layout using react-resizable-panels ✅ 已完成 VSCodeWorkspace 布局
 
 ### 工作区标签页
 
@@ -392,11 +392,11 @@ Based on plan.md monorepo structure:
 
 ### Monaco Editor 文件浏览器
 
-- [ ] T170 [P] [US5] Install @monaco-editor/react and dependencies
-- [ ] T171 [P] [US5] Create FileExplorer component in `apps/web/src/components/workspace/FileExplorer.tsx`
-- [ ] T172 [P] [US5] Create FileTree component with virtual scrolling in `apps/web/src/components/workspace/FileTree.tsx`
-- [ ] T173 [P] [US5] Create useDeviceFiles hook in `apps/web/src/hooks/useDeviceFiles.ts`
-- [ ] T174 [US5] Implement file read/write API routes for device files
+- [X] T170 [P] [US5] Install @monaco-editor/react and dependencies ✅ 已安装
+- [X] T171 [P] [US5] Create FileExplorer component in `apps/web/src/components/workspace/FileExplorer.tsx` ✅ 已完成
+- [X] T172 [P] [US5] Create FileTree component with virtual scrolling in `apps/web/src/components/workspace/FileTree.tsx` ✅ 已完成
+- [X] T173 [P] [US5] Create useDeviceFiles hook in `apps/web/src/hooks/useDeviceFiles.ts` ✅ 已完成
+- [X] T174 [US5] Implement file read/write API routes for device files ✅ 已完成
 
 ### Git 集成
 
@@ -408,11 +408,11 @@ Based on plan.md monorepo structure:
 
 ### 终端集成
 
-- [ ] T180 [P] [US5] Install xterm.js and addons
-- [ ] T181 [P] [US5] Create Terminal component in `apps/web/src/components/workspace/Terminal.tsx`
+- [X] T180 [P] [US5] Install xterm.js and addons ✅ 已安装
+- [X] T181 [P] [US5] Create Terminal component in `apps/web/src/components/workspace/Terminal.tsx` ✅ 已完成
 - [ ] T182 [P] [US5] Create useTerminal hook in `apps/web/src/hooks/useTerminal.ts`
 - [ ] T183 [US5] Implement WebSocket terminal proxy in backend
-- [ ] T184 [US5] Implement terminal API in device service
+- [X] T184 [US5] Implement terminal API in device service ✅ 已完成 Web 端 API
 
 ### 数据库迁移
 

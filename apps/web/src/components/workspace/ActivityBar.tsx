@@ -40,7 +40,7 @@ const activityItems: Array<{
 
 export function ActivityBar({ activeItem, onItemClick, className = '' }: ActivityBarProps) {
   return (
-    <div className={`flex flex-col w-12 bg-muted/40 border-r ${className}`}>
+    <div className={`flex flex-col w-12 bg-muted/40 border-l ${className}`}>
       <TooltipProvider delayDuration={300}>
         {/* 主要功能图标 */}
         <div className="flex-1 flex flex-col items-center py-2 gap-1">

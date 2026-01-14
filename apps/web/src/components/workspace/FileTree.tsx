@@ -6,17 +6,24 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { FileNode } from '@/hooks/useDeviceFiles';
+import { FileContextMenu } from './FileContextMenu';
 
 interface FileTreeProps {
   files: FileNode[];
   onFileClick: (file: FileNode) => void;
-  onDirectoryClick: (directory: FileNode) => void;
+  onDirectoryExpand?: (directory: FileNode) => Promise<FileNode[]>;
+  expandedPaths?: Set<string>;
+  onToggleExpand?: (path: string) => void;
   selectedPath?: string;
   className?: string;
+  onRename?: (node: FileNode) => void;
+  onDelete?: (node: FileNode) => void;
+  onCreateFile?: (parentPath: string) => void;
+  onCreateFolder?: (parentPath: string) => void;
 }
 
 interface FileTreeItemProps {
@@ -26,7 +33,13 @@ interface FileTreeItemProps {
   isSelected: boolean;
   onToggle: () => void;
   onFileClick: (file: FileNode) => void;
-  onDirectoryClick: (directory: FileNode) => void;
+  onDirectoryExpand?: (directory: FileNode) => Promise<FileNode[]>;
+  expandedPaths?: Set<string>;
+  onToggleExpand?: (path: string) => void;
+  onRename?: (node: FileNode) => void;
+  onDelete?: (node: FileNode) => void;
+  onCreateFile?: (parentPath: string) => void;
+  onCreateFolder?: (parentPath: string) => void;
 }
 
 function FileTreeItem({
@@ -36,15 +49,34 @@ function FileTreeItem({
   isSelected,
   onToggle,
   onFileClick,
-  onDirectoryClick,
+  onDirectoryExpand,
+  expandedPaths,
+  onToggleExpand,
+  onRename,
+  onDelete,
+  onCreateFile,
+  onCreateFolder,
 }: FileTreeItemProps) {
+  const [isLoading, setIsLoading] = React.useState(false);
   const isDirectory = node.type === 'directory';
   const paddingLeft = level * 12 + 8;
 
-  const handleClick = () => {
+  const handleClick = async () => {
     if (isDirectory) {
+      // 先切换展开状态
       onToggle();
-      onDirectoryClick(node);
+
+      // 如果文件夹还没有加载子文件，且正在展开（不是折叠），则加载
+      if (!node.children && onDirectoryExpand && !isExpanded) {
+        setIsLoading(true);
+        try {
+          await onDirectoryExpand(node);
+        } catch (error) {
+          console.error('Failed to load children:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      }
     } else {
       onFileClick(node);
     }
@@ -52,35 +84,43 @@ function FileTreeItem({
 
   return (
     <div>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleClick}
-        className={`w-full justify-start h-7 px-2 font-normal ${
-          isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'
-        }`}
-        style={{ paddingLeft: `${paddingLeft}px` }}
+      <FileContextMenu
+        node={node}
+        onRename={onRename}
+        onDelete={onDelete}
+        onCreateFile={onCreateFile}
+        onCreateFolder={onCreateFolder}
       >
-        {isDirectory && (
-          <span className="mr-1">
-            {isExpanded ? (
-              <ChevronDown className="h-3 w-3" />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleClick}
+          className={`w-full justify-start h-7 px-2 font-normal ${
+            isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'
+          }`}
+          style={{ paddingLeft: `${paddingLeft}px` }}
+        >
+          {isDirectory && (
+            <span className="mr-1">
+              {isExpanded ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </span>
+          )}
+          {isDirectory ? (
+            isExpanded ? (
+              <FolderOpen className="h-4 w-4 mr-2 text-blue-500" />
             ) : (
-              <ChevronRight className="h-3 w-3" />
-            )}
-          </span>
-        )}
-        {isDirectory ? (
-          isExpanded ? (
-            <FolderOpen className="h-4 w-4 mr-2 text-blue-500" />
+              <Folder className="h-4 w-4 mr-2 text-blue-500" />
+            )
           ) : (
-            <Folder className="h-4 w-4 mr-2 text-blue-500" />
-          )
-        ) : (
-          <File className="h-4 w-4 mr-2 text-muted-foreground" />
-        )}
-        <span className="truncate text-sm">{node.name}</span>
-      </Button>
+            <File className="h-4 w-4 mr-2 text-muted-foreground" />
+          )}
+          <span className="truncate text-sm">{node.name}</span>
+        </Button>
+      </FileContextMenu>
 
       {isDirectory && isExpanded && node.children && (
         <div>
@@ -90,8 +130,14 @@ function FileTreeItem({
               node={child}
               level={level + 1}
               onFileClick={onFileClick}
-              onDirectoryClick={onDirectoryClick}
+              onDirectoryExpand={onDirectoryExpand}
+              expandedPaths={expandedPaths}
+              onToggleExpand={onToggleExpand}
               selectedPath={isSelected ? node.path : undefined}
+              onRename={onRename}
+              onDelete={onDelete}
+              onCreateFile={onCreateFile}
+              onCreateFolder={onCreateFolder}
             />
           ))}
         </div>
@@ -104,16 +150,29 @@ function FileTreeItemWrapper({
   node,
   level,
   onFileClick,
-  onDirectoryClick,
+  onDirectoryExpand,
+  expandedPaths,
+  onToggleExpand,
   selectedPath,
+  onRename,
+  onDelete,
+  onCreateFile,
+  onCreateFolder,
 }: {
   node: FileNode;
   level: number;
   onFileClick: (file: FileNode) => void;
-  onDirectoryClick: (directory: FileNode) => void;
+  onDirectoryExpand?: (directory: FileNode) => Promise<FileNode[]>;
+  expandedPaths?: Set<string>;
+  onToggleExpand?: (path: string) => void;
   selectedPath?: string;
+  onRename?: (node: FileNode) => void;
+  onDelete?: (node: FileNode) => void;
+  onCreateFile?: (parentPath: string) => void;
+  onCreateFolder?: (parentPath: string) => void;
 }) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  // 使用父组件传递的展开状态，而不是内部状态
+  const isExpanded = expandedPaths?.has(node.path) ?? false;
   const isSelected = selectedPath === node.path;
 
   return (
@@ -122,9 +181,15 @@ function FileTreeItemWrapper({
       level={level}
       isExpanded={isExpanded}
       isSelected={isSelected}
-      onToggle={() => setIsExpanded(!isExpanded)}
+      onToggle={() => onToggleExpand?.(node.path)}
       onFileClick={onFileClick}
-      onDirectoryClick={onDirectoryClick}
+      onDirectoryExpand={onDirectoryExpand}
+      expandedPaths={expandedPaths}
+      onToggleExpand={onToggleExpand}
+      onRename={onRename}
+      onDelete={onDelete}
+      onCreateFile={onCreateFile}
+      onCreateFolder={onCreateFolder}
     />
   );
 }
@@ -132,16 +197,18 @@ function FileTreeItemWrapper({
 export function FileTree({
   files,
   onFileClick,
-  onDirectoryClick,
+  onDirectoryExpand,
+  expandedPaths,
+  onToggleExpand,
   selectedPath,
   className = '',
+  onRename,
+  onDelete,
+  onCreateFile,
+  onCreateFolder,
 }: FileTreeProps) {
   if (files.length === 0) {
-    return (
-      <div className={`p-4 text-sm text-muted-foreground ${className}`}>
-        暂无文件
-      </div>
-    );
+    return <div className={`p-4 text-sm text-muted-foreground ${className}`}>暂无文件</div>;
   }
 
   return (
@@ -152,8 +219,14 @@ export function FileTree({
           node={file}
           level={0}
           onFileClick={onFileClick}
-          onDirectoryClick={onDirectoryClick}
+          onDirectoryExpand={onDirectoryExpand}
+          expandedPaths={expandedPaths}
+          onToggleExpand={onToggleExpand}
           selectedPath={selectedPath}
+          onRename={onRename}
+          onDelete={onDelete}
+          onCreateFile={onCreateFile}
+          onCreateFolder={onCreateFolder}
         />
       ))}
     </div>

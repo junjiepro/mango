@@ -9,13 +9,15 @@
 import React from 'react';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
 import { ResourceItem } from '../../resource/ResourceItem';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ResourceTabProps {
-  resources: DetectedResource[];
+  conversationId?: string;
+  resources?: DetectedResource[];
   onResourceClick?: (resource: DetectedResource) => void;
 }
 
-export function ResourceTab({ resources, onResourceClick }: ResourceTabProps) {
+export function ResourceTab({ conversationId, resources = [], onResourceClick }: ResourceTabProps) {
   if (resources.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
@@ -36,10 +38,12 @@ export function ResourceTab({ resources, onResourceClick }: ResourceTabProps) {
   }
 
   return (
-    <div className="space-y-0.5 w-full min-w-0">
-      {resources.map((resource) => (
-        <ResourceItem key={resource.id} resource={resource} onClick={onResourceClick} />
-      ))}
-    </div>
+    <ScrollArea className="h-full">
+      <div className="space-y-0.5 w-full min-w-0 p-2">
+        {resources.map((resource) => (
+          <ResourceItem key={resource.id} resource={resource} onClick={onResourceClick} />
+        ))}
+      </div>
+    </ScrollArea>
   );
 }
