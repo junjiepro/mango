@@ -16,6 +16,7 @@ interface ChatLayoutProps {
   showWorkspace?: boolean;
   onToggleWorkspace?: () => void;
   deviceId?: string;
+  conversationId?: string;
 }
 
 export function ChatLayout({
@@ -24,6 +25,7 @@ export function ChatLayout({
   showWorkspace = false,
   onToggleWorkspace,
   deviceId,
+  conversationId,
 }: ChatLayoutProps) {
   return (
     <ResizablePanelGroup direction="horizontal" className="flex-1">
@@ -37,7 +39,7 @@ export function ChatLayout({
         <>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={50} minSize={30}>
-            <VSCodeWorkspace resources={resources} deviceId={deviceId} />
+            <VSCodeWorkspace resources={resources} deviceId={deviceId} conversationId={conversationId} />
           </ResizablePanel>
         </>
       )}

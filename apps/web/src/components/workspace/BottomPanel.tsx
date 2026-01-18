@@ -6,14 +6,14 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Terminal } from './Terminal';
 import { DeviceBinding } from '@/services/DeviceService';
 
-interface TerminalSession {
+export interface TerminalSession {
   id: string;
   title: string;
 }
@@ -24,6 +24,10 @@ interface BottomPanelProps {
   deviceId?: string;
   device?: DeviceBinding;
   className?: string;
+  // 状态持久化
+  initialTerminals?: TerminalSession[];
+  initialActiveTerminalId?: string;
+  onStateChange?: (terminals: TerminalSession[], activeTerminalId: string) => void;
 }
 
 export function BottomPanel({
@@ -32,11 +36,31 @@ export function BottomPanel({
   deviceId,
   device,
   className = '',
+  initialTerminals,
+  initialActiveTerminalId,
+  onStateChange,
 }: BottomPanelProps) {
-  const [terminals, setTerminals] = useState<TerminalSession[]>([{ id: '1', title: '终端 1' }]);
-  const [activeTerminal, setActiveTerminal] = useState('1');
+  const isInitializedRef = useRef(false);
+  const [terminals, setTerminals] = useState<TerminalSession[]>(
+    initialTerminals || [{ id: '1', title: '终端 1' }]
+  );
+  const [activeTerminal, setActiveTerminal] = useState(initialActiveTerminalId || '1');
 
-  if (!isOpen) return null;
+  // 初始化时设置状态
+  useEffect(() => {
+    if (!isInitializedRef.current && initialTerminals) {
+      setTerminals(initialTerminals);
+      setActiveTerminal(initialActiveTerminalId || initialTerminals[0]?.id || '1');
+      isInitializedRef.current = true;
+    }
+  }, [initialTerminals, initialActiveTerminalId]);
+
+  // 状态变化时通知外部
+  useEffect(() => {
+    if (isInitializedRef.current && onStateChange) {
+      onStateChange(terminals, activeTerminal);
+    }
+  }, [terminals, activeTerminal, onStateChange]);
 
   // 添加新终端
   const handleAddTerminal = () => {
@@ -63,7 +87,12 @@ export function BottomPanel({
   };
 
   return (
-    <div className={`flex flex-col h-full border-t bg-background ${className}`}>
+    <div
+      className={`flex flex-col h-full w-full border-t bg-background ${className}`}
+      style={{
+        display: isOpen ? 'flex' : 'none'
+      }}
+    >
       <Tabs
         value={activeTerminal}
         onValueChange={setActiveTerminal}
@@ -112,15 +141,18 @@ export function BottomPanel({
         </div>
 
         {/* 终端内容区域 */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden relative">
           {terminals.map((terminal) => (
-            <TabsContent
+            <div
               key={terminal.id}
-              value={terminal.id}
-              className="h-full m-0 data-[state=inactive]:hidden"
+              className="absolute inset-0"
+              style={{
+                visibility: activeTerminal === terminal.id ? 'visible' : 'hidden',
+                zIndex: activeTerminal === terminal.id ? 1 : 0,
+              }}
             >
               <Terminal deviceId={deviceId} device={device} />
-            </TabsContent>
+            </div>
           ))}
         </div>
       </Tabs>

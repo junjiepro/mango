@@ -6,12 +6,12 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { ActivityBar, type ActivityBarItem } from './ActivityBar';
 import { Sidebar } from './Sidebar';
 import { EditorArea } from './EditorArea';
-import { BottomPanel } from './BottomPanel';
+import { BottomPanel, type TerminalSession } from './BottomPanel';
 import { ResourceTab } from './tabs/ResourceTab';
 import { DeviceTab } from './tabs/DeviceTab';
 import { FileExplorerTab } from './tabs/FileExplorerTab';
@@ -20,28 +20,49 @@ import { Terminal } from './Terminal';
 import { EditorTabs } from './EditorTabs';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
 import { DeviceBinding } from '@/services/DeviceService';
-import { useEditorTabs } from '@/hooks/useEditorTabs';
+import { useEditorTabs, type EditorTab } from '@/hooks/useEditorTabs';
+import { useWorkspaceState } from '@/hooks/useWorkspaceState';
 import { EnhancedEditorTabs } from './EnhancedEditorTabs';
 
 interface VSCodeWorkspaceProps {
   resources?: DetectedResource[];
   deviceId?: string;
+  conversationId?: string;
   className?: string;
 }
 
 export function VSCodeWorkspace({
   resources = [],
   deviceId,
+  conversationId,
   className = '',
 }: VSCodeWorkspaceProps) {
-  const [selectedDevice, setSelectedDevice] = useState<DeviceBinding>(undefined);
-  const [activeItem, setActiveItem] = useState<ActivityBarItem>('resources');
-  const [showSidebar, setShowSidebar] = useState(true);
-  const [showBottomPanel, setShowBottomPanel] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<DeviceBinding | undefined>(undefined);
+  const isInitializedRef = useRef(false);
+
+  // 工作区状态持久化
+  const { getInitialState, saveState } = useWorkspaceState(conversationId);
+  const initialState = useRef(getInitialState());
+
+  // 侧边栏状态
+  const [activeItem, setActiveItem] = useState<ActivityBarItem>(initialState.current.activeItem);
+  const [showSidebar, setShowSidebar] = useState(initialState.current.showSidebar);
+
+  // 底部面板状态
+  const [showBottomPanel, setShowBottomPanel] = useState(initialState.current.showBottomPanel);
+  const [terminals, setTerminals] = useState<TerminalSession[]>(initialState.current.terminals);
+  const [activeTerminalId, setActiveTerminalId] = useState(initialState.current.activeTerminalId);
+
   const [editorTabs, setEditorTabs] = useState<
     Array<{ id: string; resource: DetectedResource; title: string }>
   >([]);
-  // const [activeTabId, setActiveTabId] = useState<string>('');
+
+  // 编辑器标签页状态变化回调
+  const handleEditorStateChange = useCallback((tabs: EditorTab[], activeTabId: string | null) => {
+    if (isInitializedRef.current) {
+      saveState({ tabs, activeTabId });
+    }
+  }, [saveState]);
 
   const {
     tabs,
@@ -52,7 +73,50 @@ export function VSCodeWorkspace({
     closeAllTabs,
     closeOtherTabs,
     setActiveTabId,
-  } = useEditorTabs();
+    markTabDirty,
+  } = useEditorTabs({
+    initialTabs: initialState.current.tabs,
+    initialActiveTabId: initialState.current.activeTabId,
+    onStateChange: handleEditorStateChange,
+  });
+
+  // 标记初始化完成
+  useEffect(() => {
+    isInitializedRef.current = true;
+  }, []);
+
+  // 保存侧边栏状态
+  useEffect(() => {
+    if (isInitializedRef.current) {
+      saveState({ activeItem, showSidebar });
+    }
+  }, [activeItem, showSidebar, saveState]);
+
+  // 保存底部面板状态
+  useEffect(() => {
+    if (isInitializedRef.current) {
+      saveState({ showBottomPanel, terminals, activeTerminalId });
+    }
+  }, [showBottomPanel, terminals, activeTerminalId, saveState]);
+
+  // 终端状态变化回调
+  const handleTerminalStateChange = useCallback((newTerminals: TerminalSession[], newActiveId: string) => {
+    setTerminals(newTerminals);
+    setActiveTerminalId(newActiveId);
+  }, []);
+
+  // 文件浏览器展开路径状态
+  const [fileExplorerExpandedPaths, setFileExplorerExpandedPaths] = useState<string[]>(
+    initialState.current.fileExplorerExpandedPaths || []
+  );
+
+  // 文件浏览器状态变化回调
+  const handleFileExplorerExpandedPathsChange = useCallback((paths: string[]) => {
+    setFileExplorerExpandedPaths(paths);
+    if (isInitializedRef.current) {
+      saveState({ fileExplorerExpandedPaths: paths });
+    }
+  }, [saveState]);
 
   const loadDevice = async (id: string) => {
     try {
@@ -122,7 +186,7 @@ export function VSCodeWorkspace({
       // 创建新标签页
       const title =
         resource.metadata?.filename ||
-        resource.metadata?.title ||
+        (resource.metadata as any)?.title ||
         resource.content.substring(0, 20);
       const newTab = { id: tabId, resource, title };
       setEditorTabs([...editorTabs, newTab]);
@@ -152,7 +216,13 @@ export function VSCodeWorkspace({
         return <DeviceTab />;
       case 'files':
         return (
-          <FileExplorerTab deviceId={deviceId} device={selectedDevice} onFileClick={openFileTab} />
+          <FileExplorerTab
+            deviceId={deviceId}
+            device={selectedDevice}
+            onFileClick={openFileTab}
+            initialExpandedPaths={fileExplorerExpandedPaths}
+            onExpandedPathsChange={handleFileExplorerExpandedPathsChange}
+          />
         );
       case 'git':
         return <GitTab deviceId={deviceId} />;
@@ -177,42 +247,54 @@ export function VSCodeWorkspace({
                   <EnhancedEditorTabs
                     tabs={tabs}
                     activeTabId={activeTabId}
-                    deviceId={deviceId}
-                    onlineUrl={selectedDevice?.online_urls?.[0]}
+                    device={selectedDevice}
                     onTabChange={setActiveTabId}
                     onTabClose={closeTab}
                     onCloseAll={closeAllTabs}
                     onCloseOthers={closeOtherTabs}
+                    onMarkTabDirty={markTabDirty}
                   />
                 </EditorArea>
               </ResizablePanel>
 
-              {/* 侧边栏 */}
-              {showSidebar && (
-                <>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    <Sidebar title={getSidebarTitle()}>{renderSidebarContent()}</Sidebar>
-                  </ResizablePanel>
-                </>
-              )}
+              {/* 侧边栏 - 始终渲染以保留状态 */}
+              <>
+                <ResizableHandle withHandle style={{ display: showSidebar ? 'flex' : 'none' }} />
+                <ResizablePanel
+                  defaultSize={20}
+                  minSize={15}
+                  maxSize={40}
+                  style={{ display: showSidebar ? 'flex' : 'none' }}
+                >
+                  <Sidebar title={getSidebarTitle()}>{renderSidebarContent()}</Sidebar>
+                </ResizablePanel>
+              </>
             </ResizablePanelGroup>
           </ResizablePanel>
 
-          {/* 底部面板：终端 */}
-          {showBottomPanel && (
-            <>
-              <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={30} minSize={15} maxSize={70}>
-                <BottomPanel
-                  isOpen={showBottomPanel}
-                  onClose={() => setShowBottomPanel(false)}
-                  deviceId={deviceId}
-                  device={selectedDevice}
-                />
-              </ResizablePanel>
-            </>
-          )}
+          {/* 底部面板：终端 - 始终渲染，通过 display 控制可见性 */}
+          <>
+            <ResizableHandle
+              withHandle
+              style={{ display: showBottomPanel ? 'flex' : 'none' }}
+            />
+            <ResizablePanel
+              defaultSize={30}
+              minSize={15}
+              maxSize={70}
+              style={{ display: showBottomPanel ? 'flex' : 'none' }}
+            >
+              <BottomPanel
+                isOpen={showBottomPanel}
+                onClose={() => setShowBottomPanel(false)}
+                deviceId={deviceId}
+                device={selectedDevice}
+                initialTerminals={terminals}
+                initialActiveTerminalId={activeTerminalId}
+                onStateChange={handleTerminalStateChange}
+              />
+            </ResizablePanel>
+          </>
         </ResizablePanelGroup>
       </div>
 

@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { FileNode } from '@/hooks/useDeviceFiles';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
 
@@ -19,9 +19,34 @@ export interface EditorTab {
   isDirty?: boolean;
 }
 
-export function useEditorTabs() {
-  const [tabs, setTabs] = useState<EditorTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+export interface UseEditorTabsOptions {
+  initialTabs?: EditorTab[];
+  initialActiveTabId?: string | null;
+  onStateChange?: (tabs: EditorTab[], activeTabId: string | null) => void;
+}
+
+export function useEditorTabs(options: UseEditorTabsOptions = {}) {
+  const { initialTabs, initialActiveTabId, onStateChange } = options;
+  const isInitializedRef = useRef(false);
+
+  const [tabs, setTabs] = useState<EditorTab[]>(initialTabs || []);
+  const [activeTabId, setActiveTabId] = useState<string | null>(initialActiveTabId ?? null);
+
+  // 初始化时设置状态
+  useEffect(() => {
+    if (!isInitializedRef.current && initialTabs !== undefined) {
+      setTabs(initialTabs);
+      setActiveTabId(initialActiveTabId ?? null);
+      isInitializedRef.current = true;
+    }
+  }, [initialTabs, initialActiveTabId]);
+
+  // 状态变化时通知外部
+  useEffect(() => {
+    if (isInitializedRef.current && onStateChange) {
+      onStateChange(tabs, activeTabId);
+    }
+  }, [tabs, activeTabId, onStateChange]);
 
   // 打开文件标签页
   const openFileTab = useCallback((file: FileNode) => {

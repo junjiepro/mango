@@ -11,6 +11,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { DeviceBinding } from '@/services/DeviceService';
+import { useDeviceClient } from '@/hooks/useDeviceClient';
 
 interface TerminalProps {
   deviceId?: string;
@@ -19,15 +20,15 @@ interface TerminalProps {
 }
 
 export function Terminal({ deviceId, device, className }: TerminalProps) {
+  const { client, isReady } = useDeviceClient(device);
+
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
-  const onlineUrl = device?.online_urls?.[0] || '';
-
   useEffect(() => {
-    if (!terminalRef.current || !deviceId || !onlineUrl) return;
+    if (!terminalRef.current || !deviceId || !client) return;
 
     // 创建终端实例
     const xterm = new XTerm({
@@ -74,14 +75,20 @@ export function Terminal({ deviceId, device, className }: TerminalProps) {
 
     // 使用 ResizeObserver 监听容器尺寸变化
     const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit();
-      // 发送新的终端大小到后端
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: 'resize',
-          cols: xterm.cols,
-          rows: xterm.rows,
-        }));
+      // 只有在容器有有效尺寸时才调用 fit
+      if (terminalRef.current) {
+        const { offsetWidth, offsetHeight } = terminalRef.current;
+        if (offsetWidth > 0 && offsetHeight > 0) {
+          fitAddon.fit();
+          // 发送新的终端大小到后端
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+              type: 'resize',
+              cols: xterm.cols,
+              rows: xterm.rows,
+            }));
+          }
+        }
       }
     });
 
@@ -94,23 +101,15 @@ export function Terminal({ deviceId, device, className }: TerminalProps) {
       wsRef.current?.close();
       xterm.dispose();
     };
-  }, [deviceId, onlineUrl]);
+  }, [deviceId, client]);
 
   const connectWebSocket = async (xterm: XTerm, deviceId: string) => {
-    try {
-      // 获取 WebSocket URL 和认证信息
-      const response = await fetch(`/api/devices/${deviceId}/terminal`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cli-Url': onlineUrl,
-        },
-      });
-      if (!response.ok) {
-        throw new Error('Failed to get terminal connection info');
-      }
+    if (!client) return;
 
-      const { wsUrl, token } = await response.json();
+    try {
+      // 使用 client 获取 WebSocket URL 和认证信息
+      const wsUrl = client.terminal.getWebSocketUrl();
+      const token = client.terminal.getAuthToken();
 
       // 连接到设备的 WebSocket
       const ws = new WebSocket(wsUrl);

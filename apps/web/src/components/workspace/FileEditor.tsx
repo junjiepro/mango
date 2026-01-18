@@ -11,17 +11,19 @@ import { MonacoEditor } from './MonacoEditor';
 import { Button } from '@/components/ui/button';
 import { Save, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
-import type { FileNode } from '@/hooks/useDeviceFiles';
+import { useDeviceClient, type FileNode } from '@/hooks/useDeviceClient';
+import type { DeviceBinding } from '@/services/DeviceService';
 
 interface FileEditorProps {
   file: FileNode;
-  deviceId: string;
-  onlineUrl: string;
+  device?: DeviceBinding;
   onSave?: (path: string, content: string) => void;
   className?: string;
 }
 
-export function FileEditor({ file, deviceId, onlineUrl, onSave, className = '' }: FileEditorProps) {
+export function FileEditor({ file, device, onSave, className = '' }: FileEditorProps) {
+  const { client, isReady } = useDeviceClient(device);
+
   const [content, setContent] = useState<string>('');
   const [originalContent, setOriginalContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
@@ -31,23 +33,11 @@ export function FileEditor({ file, deviceId, onlineUrl, onSave, className = '' }
   // 加载文件内容
   useEffect(() => {
     const loadFile = async () => {
+      if (!client) return;
+
       setIsLoading(true);
       try {
-        const response = await fetch(
-          `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(file.path)}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Cli-Url': onlineUrl,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('读取文件失败');
-        }
-
-        const data = await response.json();
+        const data = await client.files.read(file.path);
         const fileContent = data.content || '';
         setContent(fileContent);
         setOriginalContent(fileContent);
@@ -62,7 +52,7 @@ export function FileEditor({ file, deviceId, onlineUrl, onSave, className = '' }
     };
 
     loadFile();
-  }, [file.path, deviceId, onlineUrl]);
+  }, [file.path, client]);
 
   // 处理内容变化
   const handleChange = (value: string | undefined) => {
@@ -73,20 +63,11 @@ export function FileEditor({ file, deviceId, onlineUrl, onSave, className = '' }
 
   // 保存文件
   const handleSave = async () => {
+    if (!client) return;
+
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/devices/${deviceId}/files/write`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cli-Url': onlineUrl,
-        },
-        body: JSON.stringify({ path: file.path, content }),
-      });
-
-      if (!response.ok) {
-        throw new Error('保存文件失败');
-      }
+      await client.files.write(file.path, content);
 
       setOriginalContent(content);
       setIsDirty(false);

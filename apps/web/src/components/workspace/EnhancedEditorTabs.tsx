@@ -6,7 +6,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { X, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,35 +17,110 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { FileEditor } from './FileEditor';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { FileEditor, clearFileCache } from './FileEditor.optimized';
 import { FilePreview } from './FilePreview';
 import { ResourcePreview } from './ResourcePreview';
+import { clearModelCache } from './MonacoEditor';
 import type { EditorTab } from '@/hooks/useEditorTabs';
+import type { DeviceBinding } from '@/services/DeviceService';
 
 interface EnhancedEditorTabsProps {
   tabs: EditorTab[];
   activeTabId: string | null;
-  deviceId?: string;
-  onlineUrl?: string;
+  device?: DeviceBinding;
   onTabChange: (tabId: string) => void;
   onTabClose: (tabId: string) => void;
   onCloseAll?: () => void;
   onCloseOthers?: (tabId: string) => void;
+  onMarkTabDirty?: (tabId: string, isDirty: boolean) => void;
   className?: string;
 }
 
 export function EnhancedEditorTabs({
   tabs,
   activeTabId,
-  deviceId,
-  onlineUrl,
+  device,
   onTabChange,
   onTabClose,
   onCloseAll,
   onCloseOthers,
+  onMarkTabDirty,
   className = '',
 }: EnhancedEditorTabsProps) {
-  // 判断文件是否可编辑
+  // 关闭确认对话框状态
+  const [closeConfirmTab, setCloseConfirmTab] = useState<EditorTab | null>(null);
+
+  // 清理文件缓存的辅助函数
+  const cleanupFileCache = (tab: EditorTab) => {
+    if (tab.type === 'file' && tab.file) {
+      clearFileCache(tab.file.path);
+      clearModelCache(tab.file.path);
+    }
+  };
+
+  // 处理关闭标签页
+  const handleCloseTab = (tab: EditorTab) => {
+    // 如果文件未保存,显示确认对话框
+    if (tab.isDirty) {
+      setCloseConfirmTab(tab);
+    } else {
+      cleanupFileCache(tab);
+      onTabClose(tab.id);
+    }
+  };
+
+  // 确认关闭
+  const confirmClose = () => {
+    if (closeConfirmTab) {
+      cleanupFileCache(closeConfirmTab);
+      onTabClose(closeConfirmTab.id);
+      setCloseConfirmTab(null);
+    }
+  };
+  // 处理关闭当前标签页（从菜单）
+  const handleCloseCurrentTab = () => {
+    if (!activeTabId) return;
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (tab) {
+      if (tab.isDirty) {
+        setCloseConfirmTab(tab);
+      } else {
+        cleanupFileCache(tab);
+        onTabClose(activeTabId);
+      }
+    }
+  };
+
+  // 处理关闭其他标签页
+  const handleCloseOthers = () => {
+    if (!activeTabId) return;
+    tabs.forEach(tab => {
+      if (tab.id !== activeTabId && !tab.isDirty) {
+        cleanupFileCache(tab);
+      }
+    });
+    onCloseOthers?.(activeTabId);
+  };
+
+  // 处理关闭所有标签页
+  const handleCloseAll = () => {
+    tabs.forEach(tab => {
+      if (!tab.isDirty) {
+        cleanupFileCache(tab);
+      }
+    });
+    onCloseAll?.();
+  };
   const isEditable = (filename: string) => {
     // const editableExts = [
     //   'txt',
@@ -119,7 +194,7 @@ export function EnhancedEditorTabs({
                   size="icon"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onTabClose(tab.id);
+                    handleCloseTab(tab);
                   }}
                   className="h-3 w-3 ml-1.5 p-0 hover:bg-destructive/20"
                 >
@@ -140,16 +215,16 @@ export function EnhancedEditorTabs({
               <DropdownMenuContent align="end">
                 {activeTabId && (
                   <>
-                    <DropdownMenuItem onClick={() => onTabClose(activeTabId)}>
+                    <DropdownMenuItem onClick={handleCloseCurrentTab}>
                       关闭当前标签页
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onCloseOthers?.(activeTabId)}>
+                    <DropdownMenuItem onClick={handleCloseOthers}>
                       关闭其他标签页
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
                 )}
-                <DropdownMenuItem onClick={onCloseAll}>关闭所有标签页</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCloseAll}>关闭所有标签页</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -161,13 +236,21 @@ export function EnhancedEditorTabs({
             <TabsContent
               key={tab.id}
               value={tab.id}
+              forceMount
               className="h-full m-0 data-[state=inactive]:hidden"
             >
-              {tab.type === 'file' && tab.file && deviceId && onlineUrl ? (
+              {tab.type === 'file' && tab.file && device ? (
                 isEditable(tab.file.name) ? (
-                  <FileEditor file={tab.file} deviceId={deviceId} onlineUrl={onlineUrl} />
+                  <FileEditor
+                    key={tab.file.path}
+                    file={tab.file}
+                    device={device}
+                    tabId={tab.id}
+                    isActive={tab.id === activeTabId}
+                    onMarkDirty={onMarkTabDirty}
+                  />
                 ) : (
-                  <FilePreview file={tab.file} deviceId={deviceId} onlineUrl={onlineUrl} />
+                  <FilePreview file={tab.file} deviceId={device.id} onlineUrl={device.online_urls?.[0]} />
                 )
               ) : tab.type === 'resource' && tab.resource ? (
                 <ResourcePreview resource={tab.resource} />
@@ -180,6 +263,22 @@ export function EnhancedEditorTabs({
           ))}
         </div>
       </Tabs>
+
+      {/* 关闭确认对话框 */}
+      <AlertDialog open={!!closeConfirmTab} onOpenChange={() => setCloseConfirmTab(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>未保存的更改</AlertDialogTitle>
+            <AlertDialogDescription>
+              文件 "{closeConfirmTab?.title}" 有未保存的更改。关闭后这些更改将丢失。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmClose}>关闭</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

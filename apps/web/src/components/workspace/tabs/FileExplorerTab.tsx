@@ -8,7 +8,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { FolderIcon, Plus, FilePlus, FolderPlus } from 'lucide-react';
-import { useDeviceFiles, type FileNode } from '@/hooks/useDeviceFiles';
+import { useDeviceClient, type FileNode } from '@/hooks/useDeviceClient';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FileTree } from '@/components/workspace/FileTree';
@@ -36,25 +36,34 @@ interface FileExplorerTabProps {
   deviceId?: string;
   device?: DeviceBinding;
   onFileClick?: (file: FileNode) => void;
+  // 状态持久化
+  initialExpandedPaths?: string[];
+  onExpandedPathsChange?: (paths: string[]) => void;
 }
 
-export function FileExplorerTab({ deviceId, device, onFileClick }: FileExplorerTabProps) {
-  const {
-    files,
-    isLoading,
-    error,
-    loadDirectory,
-    createFile,
-    createDirectory,
-    deleteFile,
-    renameFile,
-    currentPath,
-  } = useDeviceFiles(device);
+export function FileExplorerTab({
+  deviceId,
+  device,
+  onFileClick,
+  initialExpandedPaths,
+  onExpandedPathsChange,
+}: FileExplorerTabProps) {
+  // 使用新的 useDeviceClient Hook
+  const { client, isReady } = useDeviceClient(device);
+
+  // 状态管理
+  const [files, setFiles] = useState<FileNode[]>([]);
+  const [currentPath, setCurrentPath] = useState('/');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // 展开状态管理
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
+    () => new Set(initialExpandedPaths || [])
+  );
   // 存储已加载的子节点数据
   const [loadedChildren, setLoadedChildren] = useState<Map<string, FileNode[]>>(new Map());
+  const isInitializedRef = React.useRef(false);
 
   // 对话框状态
   const [createFileDialog, setCreateFileDialog] = useState<{ open: boolean; parentPath: string }>({
@@ -77,32 +86,70 @@ export function FileExplorerTab({ deviceId, device, onFileClick }: FileExplorerT
     node: null,
   });
 
+  // 加载目录函数
+  const loadDirectory = async (path: string) => {
+    if (!client) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await client.files.list(path);
+      setFiles(result.files || []);
+      setCurrentPath(result.path || path);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载目录失败');
+      console.error('Load directory error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // 初始加载根目录
   useEffect(() => {
-    if (deviceId) {
+    if (client && deviceId) {
       loadDirectory('/');
     }
-  }, [deviceId, loadDirectory]);
+  }, [client, deviceId]);
+
+  // 恢复展开状态时，加载已展开目录的子内容
+  useEffect(() => {
+    if (!client || !deviceId || expandedPaths.size === 0) return;
+
+    const loadExpandedDirectories = async () => {
+      // 按路径深度排序，先加载浅层目录
+      const sortedPaths = Array.from(expandedPaths).sort(
+        (a, b) => a.split('/').length - b.split('/').length
+      );
+
+      for (const dirPath of sortedPaths) {
+        // 跳过已加载的目录
+        if (loadedChildren.has(dirPath)) continue;
+
+        try {
+          const result = await client.files.list(dirPath);
+          const children = result.files || [];
+          setLoadedChildren((prev) => {
+            const next = new Map(prev);
+            next.set(dirPath, children);
+            return next;
+          });
+        } catch (error) {
+          console.error(`加载目录失败: ${dirPath}`, error);
+        }
+      }
+    };
+
+    loadExpandedDirectories();
+  }, [client, deviceId]); // 只在client和deviceId变化时执行
 
   // 重新加载指定目录的子节点
   const reloadDirectory = async (dirPath: string) => {
+    if (!client) return;
+
     try {
-      const response = await fetch(
-        `/api/devices/${deviceId}/files?path=${encodeURIComponent(dirPath)}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Cli-Url': device?.online_urls?.[0] || '',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('加载目录失败');
-      }
-
-      const data = await response.json();
-      const children = data.files || [];
+      const result = await client.files.list(dirPath);
+      const children = result.files || [];
 
       // 更新缓存
       setLoadedChildren((prev) => {
@@ -122,11 +169,13 @@ export function FileExplorerTab({ deviceId, device, onFileClick }: FileExplorerT
 
   // 事件处理函数
   const handleCreateFile = async (name: string) => {
+    if (!client) return;
+
     try {
       const parentPath = createFileDialog.parentPath || currentPath;
       const filePath = `${parentPath}/${name}`.replace(/\/+/g, '/');
 
-      await createFile(filePath);
+      await client.files.create(filePath, 'file');
 
       // 重新加载父目录
       await reloadDirectory(parentPath);
@@ -141,10 +190,12 @@ export function FileExplorerTab({ deviceId, device, onFileClick }: FileExplorerT
   };
 
   const handleCreateFolder = async (name: string) => {
+    if (!client) return;
+
     try {
       const parentPath = createFolderDialog.parentPath || currentPath;
       const folderPath = `${parentPath}/${name}`.replace(/\/+/g, '/');
-      await createDirectory(folderPath);
+      await client.files.create(folderPath, 'directory');
 
       // 重新加载父目录
       await reloadDirectory(parentPath);
@@ -159,7 +210,7 @@ export function FileExplorerTab({ deviceId, device, onFileClick }: FileExplorerT
   };
 
   const handleRename = async (newName: string) => {
-    if (!renameDialog.node) return;
+    if (!client || !renameDialog.node) return;
     try {
       const oldPath = renameDialog.node.path;
       const pathSeparator = oldPath.includes('\\') ? '\\' : '/';
@@ -172,7 +223,7 @@ export function FileExplorerTab({ deviceId, device, onFileClick }: FileExplorerT
       const parentPath = oldPath.substring(0, lastSeparatorIndex);
       const newPath = `${parentPath}${pathSeparator}${newName}`;
 
-      await renameFile(oldPath, newPath);
+      await client.files.rename(oldPath, newPath);
 
       // 重新加载父目录
       await reloadDirectory(parentPath);
@@ -187,10 +238,10 @@ export function FileExplorerTab({ deviceId, device, onFileClick }: FileExplorerT
   };
 
   const handleDelete = async () => {
-    if (!deleteDialog.node) return;
+    if (!client || !deleteDialog.node) return;
     try {
       const nodePath = deleteDialog.node.path;
-      await deleteFile(nodePath);
+      await client.files.delete(nodePath);
 
       // 获取父目录路径
       const pathSeparator = nodePath.includes('\\') ? '\\' : '/';
@@ -209,6 +260,29 @@ export function FileExplorerTab({ deviceId, device, onFileClick }: FileExplorerT
       });
     }
   };
+
+  // 合并文件数据和已加载的子节点
+  const filesWithChildren = React.useMemo(() => {
+    if (!deviceId) {
+      return [];
+    }
+
+    const mergeFilesWithChildren = (fileList: FileNode[]): FileNode[] => {
+      return fileList.map((file) => {
+        if (file.type === 'directory') {
+          const children = loadedChildren.get(file.path);
+          if (children) {
+            return {
+              ...file,
+              children: mergeFilesWithChildren(children),
+            };
+          }
+        }
+        return file;
+      });
+    };
+    return mergeFilesWithChildren(files);
+  }, [files, loadedChildren, deviceId]);
 
   if (!deviceId) {
     return (
@@ -237,30 +311,18 @@ export function FileExplorerTab({ deviceId, device, onFileClick }: FileExplorerT
       } else {
         next.add(path);
       }
+      // 通知外部状态变化
+      if (isInitializedRef.current && onExpandedPathsChange) {
+        onExpandedPathsChange(Array.from(next));
+      }
       return next;
     });
   };
 
-  // 合并文件数据和已加载的子节点
-  const mergeFilesWithChildren = (fileList: FileNode[]): FileNode[] => {
-    return fileList.map((file) => {
-      if (file.type === 'directory') {
-        const children = loadedChildren.get(file.path);
-        if (children) {
-          return {
-            ...file,
-            children: mergeFilesWithChildren(children),
-          };
-        }
-      }
-      return file;
-    });
-  };
-
-  const filesWithChildren = React.useMemo(
-    () => mergeFilesWithChildren(files),
-    [files, loadedChildren]
-  );
+  // 标记初始化完成
+  React.useEffect(() => {
+    isInitializedRef.current = true;
+  }, []);
 
   // 懒加载子文件夹
   const handleDirectoryExpand = async (directory: FileNode): Promise<FileNode[]> => {
