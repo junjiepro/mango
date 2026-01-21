@@ -23,6 +23,9 @@ import { actualPort } from '../commands/start.js';
 import { WebSocketServer } from 'ws';
 import * as pty from 'node-pty';
 import { existsSync, mkdirSync } from 'fs';
+import { convertToModelMessages, streamText } from 'ai';
+import { planEntrySchema } from '@agentclientprotocol/sdk';
+import z from 'zod';
 
 const getBindingCodeAndCheckFromHeader = (
   c: Context
@@ -375,10 +378,25 @@ export function createServer(config: CLIConfig) {
         );
       }
 
-      // Get the aggregator's transport
-      const transport = await aggregator.getConnectedTransport();
-
-      return transport.handleRequest(c);
+      try {
+        // Get the aggregator's transport
+        const transport = await aggregator.getConnectedTransport();
+        return transport.handleRequest(c);
+      } catch (transportError) {
+        console.error('MCP transport error:', transportError);
+        return c.json(
+          {
+            jsonrpc: '2.0',
+            error: {
+              code: -32603,
+              message:
+                transportError instanceof Error ? transportError.message : 'Transport error',
+            },
+            id: null,
+          },
+          { status: 503 }
+        );
+      }
     } catch (error) {
       console.error('MCP streamable endpoint error:', error);
       return c.json(
@@ -490,23 +508,74 @@ export function createServer(config: CLIConfig) {
         return c.json({ error: 'sessionId and messages are required' }, 400);
       }
 
-      const session = acpConnector.getSession(sessionId);
+      // 使用带就绪检查的获取方法
+      const session = await acpConnector.getReadySession(sessionId);
       if (!session) {
-        return c.json({ error: 'Session not found' }, 404);
+        const rawSession = acpConnector.getSession(sessionId);
+        if (!rawSession) {
+          return c.json({ error: 'Session not found' }, 404);
+        }
+        // 会话存在但未就绪
+        return c.json(
+          {
+            error: 'Session not ready',
+            details: rawSession.initError || 'Session is still initializing',
+          },
+          503
+        );
       }
 
       // 更新会话活跃时间
       acpConnector.updateSessionActivity(sessionId);
 
-      // 使用 ACP provider 的 streamText
-      const { streamText } = await import('ai');
-      const result = streamText({
-        model: session.provider.languageModel(),
-        messages,
-        tools: session.provider.tools,
-      });
+      try {
+        // 使用 ACP provider 的 streamText
+        const result = streamText({
+          model: session.provider.languageModel(),
+          // Ensure raw chunks like agent plan are included for streaming
+          includeRawChunks: true,
+          messages: await convertToModelMessages(messages),
+          onError: (error) => {
+            console.error('Error occurred while streaming text:', error);
+          },
+          tools: session.provider.tools,
+        });
 
-      return result.toDataStreamResponse();
+        return result.toUIMessageStreamResponse({
+          messageMetadata: ({ part }) => {
+            // Convert raw parts to metadata for easier UI access
+            if (part.type === 'raw' && part.rawValue) {
+              try {
+                const data = JSON.parse(part.rawValue as string);
+                switch (data.type) {
+                  case 'plan':
+                    return { plan: data.entries };
+                  case 'diff':
+                    return { diffs: [data] }; // Accumulate multiple diffs
+                  case 'terminal':
+                    return { terminals: [data] }; // Accumulate terminal outputs
+                }
+              } catch {
+                // 忽略解析错误
+              }
+            }
+          },
+          onError: (error) => {
+            console.error('Stream error:', error);
+            return error instanceof Error ? error.message : String(error);
+          },
+        });
+      } catch (streamError) {
+        // 捕获 streamText 的同步错误
+        console.error('StreamText error:', streamError);
+        return c.json(
+          {
+            error: 'Failed to process stream',
+            details: streamError instanceof Error ? streamError.message : String(streamError),
+          },
+          500
+        );
+      }
     } catch (error) {
       console.error('ACP chat error:', error);
       return c.json({ error: 'Failed to process chat' }, 500);
@@ -584,12 +653,53 @@ export function createServer(config: CLIConfig) {
       const pathModule = await import('path');
 
       const fullPath = pathModule.resolve(path);
-      const content = await fs.readFile(fullPath, 'utf-8');
+      const [content, stats] = await Promise.all([
+        fs.readFile(fullPath, 'utf-8'),
+        fs.stat(fullPath),
+      ]);
 
-      return c.json({ success: true, content, path: fullPath });
+      return c.json({
+        success: true,
+        content,
+        path: fullPath,
+        modified: stats.mtime.toISOString(),
+        size: stats.size,
+      });
     } catch (error) {
       console.error('File read error:', error);
       return c.json({ error: 'Failed to read file' }, 500);
+    }
+  });
+
+  // 文件元数据获取端点（仅获取修改时间、大小等，不读取内容）
+  app.get('/files/stat', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const path = c.req.query('path');
+      if (!path) {
+        return c.json({ error: 'Path is required' }, 400);
+      }
+
+      const fs = await import('fs/promises');
+      const pathModule = await import('path');
+
+      const fullPath = pathModule.resolve(path);
+      const stats = await fs.stat(fullPath);
+
+      return c.json({
+        success: true,
+        path: fullPath,
+        type: stats.isDirectory() ? 'directory' : 'file',
+        size: stats.size,
+        modified: stats.mtime.toISOString(),
+        created: stats.birthtime.toISOString(),
+        accessed: stats.atime.toISOString(),
+      });
+    } catch (error) {
+      console.error('File stat error:', error);
+      return c.json({ error: 'Failed to get file stats' }, 500);
     }
   });
 
@@ -616,6 +726,133 @@ export function createServer(config: CLIConfig) {
     } catch (error) {
       console.error('File write error:', error);
       return c.json({ error: 'Failed to write file' }, 500);
+    }
+  });
+
+  // 文件/目录创建端点
+  app.post('/files/create', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const body = await c.req.json();
+      const { path, type } = body;
+
+      if (!path || !type) {
+        return c.json({ error: 'Path and type are required' }, 400);
+      }
+
+      if (type !== 'file' && type !== 'directory') {
+        return c.json({ error: 'Type must be "file" or "directory"' }, 400);
+      }
+
+      const fs = await import('fs/promises');
+      const pathModule = await import('path');
+
+      const fullPath = pathModule.resolve(path);
+
+      if (type === 'directory') {
+        await fs.mkdir(fullPath, { recursive: true });
+      } else {
+        // 确保父目录存在
+        const dir = pathModule.dirname(fullPath);
+        await fs.mkdir(dir, { recursive: true });
+        // 创建空文件
+        await fs.writeFile(fullPath, '', 'utf-8');
+      }
+
+      return c.json({
+        success: true,
+        message: `${type === 'file' ? 'File' : 'Directory'} created successfully`,
+      });
+    } catch (error) {
+      console.error('File/directory create error:', error);
+      return c.json({ error: 'Failed to create file or directory' }, 500);
+    }
+  });
+
+  // 文件/目录删除端点
+  app.delete('/files/delete', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const body = await c.req.json();
+      const { path } = body;
+
+      if (!path) {
+        return c.json({ error: 'Path is required' }, 400);
+      }
+
+      const fs = await import('fs/promises');
+      const pathModule = await import('path');
+
+      const fullPath = pathModule.resolve(path);
+
+      // 检查文件/目录是否存在
+      const stats = await fs.stat(fullPath);
+
+      if (stats.isDirectory()) {
+        await fs.rm(fullPath, { recursive: true, force: true });
+      } else {
+        await fs.unlink(fullPath);
+      }
+
+      return c.json({ success: true, message: 'Deleted successfully' });
+    } catch (error) {
+      console.error('File/directory delete error:', error);
+      return c.json({ error: 'Failed to delete file or directory' }, 500);
+    }
+  });
+
+  // 文件/目录重命名端点
+  app.post('/files/rename', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const body = await c.req.json();
+      const { oldPath, newPath } = body;
+
+      if (!oldPath || !newPath) {
+        return c.json({ error: 'oldPath and newPath are required' }, 400);
+      }
+
+      const fs = await import('fs/promises');
+      const pathModule = await import('path');
+
+      const fullOldPath = pathModule.resolve(oldPath);
+      const fullNewPath = pathModule.resolve(newPath);
+
+      // 检查源文件/目录是否存在
+      const stats = await fs.stat(fullOldPath);
+
+      // 尝试使用 rename，如果失败则使用 copy + delete（支持跨设备）
+      try {
+        await fs.rename(fullOldPath, fullNewPath);
+      } catch (renameError: any) {
+        // EXDEV 错误表示跨设备操作，需要使用 copy + delete
+        if (renameError.code === 'EXDEV') {
+          if (stats.isDirectory()) {
+            // 递归复制目录
+            await fs.cp(fullOldPath, fullNewPath, { recursive: true });
+            // 删除原目录
+            await fs.rm(fullOldPath, { recursive: true, force: true });
+          } else {
+            // 复制文件
+            await fs.copyFile(fullOldPath, fullNewPath);
+            // 删除原文件
+            await fs.unlink(fullOldPath);
+          }
+        } else {
+          throw renameError;
+        }
+      }
+
+      return c.json({ success: true, message: 'Renamed successfully' });
+    } catch (error) {
+      console.error('File/directory rename error:', error);
+      return c.json({ error: 'Failed to rename file or directory' }, 500);
     }
   });
 
@@ -685,50 +922,94 @@ export async function startServer(config: CLIConfig): Promise<number> {
                       workingDir = process.cwd();
                     }
 
-                    // 使用 node-pty 创建伪终端
-                    const shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
-                    ptyProcess = pty.spawn(shell, [], {
-                      name: 'xterm-256color',
-                      cols: 80,
-                      rows: 30,
-                      cwd: workingDir,
-                      env: process.env as { [key: string]: string },
-                    });
+                    try {
+                      // 使用 node-pty 创建伪终端
+                      const shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
+                      ptyProcess = pty.spawn(shell, [], {
+                        name: 'xterm-256color',
+                        cols: 80,
+                        rows: 30,
+                        cwd: workingDir,
+                        env: process.env as { [key: string]: string },
+                      });
 
-                    console.log('[Server] PTY created:', shell, 'in directory:', workingDir);
+                      console.log('[Server] PTY created:', shell, 'in directory:', workingDir);
 
-                    // 监听 PTY 输出
-                    ptyProcess.onData((data) => {
-                      ws.send(JSON.stringify({ type: 'output', data }));
-                    });
+                      // 监听 PTY 输出
+                      ptyProcess.onData((data) => {
+                        try {
+                          ws.send(JSON.stringify({ type: 'output', data }));
+                        } catch (sendError) {
+                          console.error('Failed to send PTY output:', sendError);
+                        }
+                      });
 
-                    // 监听 PTY 退出
-                    ptyProcess.onExit(() => {
+                      // 监听 PTY 退出
+                      ptyProcess.onExit(({ exitCode }) => {
+                        console.log('[Server] PTY exited with code:', exitCode);
+                        try {
+                          ws.close();
+                        } catch {
+                          // 忽略关闭错误
+                        }
+                      });
+                    } catch (ptyError) {
+                      console.error('Failed to create PTY:', ptyError);
+                      ws.send(
+                        JSON.stringify({
+                          type: 'error',
+                          message: 'Failed to create terminal',
+                        })
+                      );
                       ws.close();
-                    });
+                    }
                   } else {
                     ws.send(JSON.stringify({ type: 'auth', success: false }));
                     ws.close();
                   }
                 } else if (message.type === 'resize') {
                   if (ptyProcess && message.cols && message.rows) {
-                    ptyProcess.resize(message.cols, message.rows);
-                    console.log('[Server] Terminal resized to:', message.cols, 'x', message.rows);
+                    try {
+                      ptyProcess.resize(message.cols, message.rows);
+                      console.log('[Server] Terminal resized to:', message.cols, 'x', message.rows);
+                    } catch (resizeError) {
+                      console.error('Failed to resize PTY:', resizeError);
+                    }
                   }
                 } else if (message.type === 'input') {
                   if (authenticated && ptyProcess) {
-                    ptyProcess.write(message.data);
+                    try {
+                      ptyProcess.write(message.data);
+                    } catch (writeError) {
+                      console.error('Failed to write to PTY:', writeError);
+                    }
                   }
                 }
               } catch (error) {
                 console.error('Terminal message error:', error);
+                // 不关闭连接，只记录错误
               }
             });
 
             ws.on('close', () => {
               console.log('[Server] Terminal WebSocket disconnected');
               if (ptyProcess) {
-                ptyProcess.kill();
+                try {
+                  ptyProcess.kill();
+                } catch (killError) {
+                  console.error('Failed to kill PTY:', killError);
+                }
+              }
+            });
+
+            ws.on('error', (error) => {
+              console.error('[Server] Terminal WebSocket error:', error);
+              if (ptyProcess) {
+                try {
+                  ptyProcess.kill();
+                } catch {
+                  // 忽略
+                }
               }
             });
           });

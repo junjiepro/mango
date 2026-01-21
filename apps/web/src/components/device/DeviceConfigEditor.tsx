@@ -13,13 +13,13 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Save, AlertCircle } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { useDeviceClient } from '@/hooks/useDeviceClient';
+import type { DeviceBinding } from '@/services/DeviceService';
 
 interface DeviceConfigEditorProps {
-  deviceId: string;
-  bindingCode: string;
+  device?: DeviceBinding;
   bindingName: string;
   onUpdate?: () => void;
-  onlineUrls?: string[];
 }
 
 type MCPServiceConfig = {
@@ -31,12 +31,12 @@ type MCPServiceConfig = {
 };
 
 export function DeviceConfigEditor({
-  deviceId,
-  bindingCode,
+  device,
   bindingName,
   onUpdate,
-  onlineUrls,
 }: DeviceConfigEditorProps) {
+  const { client, isReady } = useDeviceClient(device);
+
   const [name, setName] = useState(bindingName);
   const [config, setConfig] = useState<Record<string, any>>({});
   const [configJson, setConfigJson] = useState('');
@@ -46,38 +46,24 @@ export function DeviceConfigEditor({
   const [success, setSuccess] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
 
-  const onlineUrl = onlineUrls?.[0];
-
   useEffect(() => {
     loadConfig();
-  }, [deviceId, onlineUrl]);
+  }, [client]);
 
   const loadConfig = async () => {
+    if (!client) return;
+
     setIsLoading(true);
     setError(null);
 
     try {
-      if (onlineUrl) {
-        const response = await fetch(`/api/devices/${deviceId}/config`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cli-Url': onlineUrl,
-          },
-        });
+      const data = await client.config.get();
+      const config = {
+        mcpServices: data.config?.mcpServices || {},
+      };
 
-        if (!response.ok) {
-          throw new Error('Failed to load device config');
-        }
-
-        const data = await response.json();
-        const config = {
-          mcpServices: data.config?.mcpServices || {},
-        };
-
-        setConfig(config);
-        setConfigJson(JSON.stringify(config, null, 2));
-      }
+      setConfig(config);
+      setConfigJson(JSON.stringify(config, null, 2));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -98,6 +84,8 @@ export function DeviceConfigEditor({
   };
 
   const handleSave = async () => {
+    if (!client || !device) return;
+
     setIsSaving(true);
     setError(null);
     setSuccess(false);
@@ -113,48 +101,34 @@ export function DeviceConfigEditor({
         }
       }
 
-      if (onlineUrl) {
-        // 更新设备配置到设备端
-        const configResponse = await fetch(`/api/devices/${deviceId}/config`, {
-          method: 'POST',
+      // 更新设备配置到设备端
+      await client.config.update({
+        binding_code: device.binding_code,
+        ...parsedConfig,
+      });
+
+      // 更新设备绑定名称（如果名称有变化）
+      if (name !== bindingName) {
+        const nameResponse = await fetch(`/api/devices/${device.id}`, {
+          method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            'Cli-Url': onlineUrl,
           },
           body: JSON.stringify({
-            binding_code: bindingCode,
-            ...parsedConfig,
+            binding_name: name,
           }),
         });
 
-        if (!configResponse.ok) {
-          const errorData = await configResponse.json();
-          throw new Error(errorData.error || 'Failed to update device config');
+        if (!nameResponse.ok) {
+          throw new Error('Failed to update device name');
         }
+      }
 
-        // 更新设备绑定名称（如果名称有变化）
-        if (name !== bindingName) {
-          const nameResponse = await fetch(`/api/devices/${deviceId}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              binding_name: name,
-            }),
-          });
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
 
-          if (!nameResponse.ok) {
-            throw new Error('Failed to update device name');
-          }
-        }
-
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
-
-        if (onUpdate) {
-          onUpdate();
-        }
+      if (onUpdate) {
+        onUpdate();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');

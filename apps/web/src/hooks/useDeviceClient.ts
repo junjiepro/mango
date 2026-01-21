@@ -11,11 +11,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { DeviceBinding } from '@/services/DeviceService';
-import {
-  DeviceClient,
-  createDeviceConfig,
-  DeviceClientError,
-} from '@/lib/device-client';
+import { DeviceClient, createDeviceConfig, DeviceClientError } from '@/lib/device-client';
 
 /**
  * 文件节点类型
@@ -167,10 +163,7 @@ class ACPAPI {
   /**
    * 发送聊天消息
    */
-  async sendMessage(
-    sessionId: string,
-    message: string
-  ): Promise<{ response: string }> {
+  async sendMessage(sessionId: string, message: string): Promise<{ response: string }> {
     return this.client.post('/acp/chat', { sessionId, message });
   }
 }
@@ -200,7 +193,10 @@ class ConfigAPI {
  * 终端操作API
  */
 class TerminalAPI {
-  constructor(private client: DeviceClient, private bindingCode: string) {}
+  constructor(
+    private client: DeviceClient,
+    private bindingCode: string
+  ) {}
 
   /**
    * 获取WebSocket连接URL
@@ -226,6 +222,8 @@ export interface DeviceClientAPI {
   acp: ACPAPI;
   config: ConfigAPI;
   terminal: TerminalAPI;
+  deviceUrl: string;
+  deviceBindingCode: string;
 }
 
 /**
@@ -264,6 +262,8 @@ export function useDeviceClient(device?: DeviceBinding): UseDeviceClientReturn {
       acp: new ACPAPI(deviceClient),
       config: new ConfigAPI(deviceClient),
       terminal: new TerminalAPI(deviceClient, config.bindingCode),
+      deviceUrl: config.deviceUrl,
+      deviceBindingCode: config.bindingCode,
     };
   }, [device?.id, device?.online_urls?.[0], device?.binding_code]);
 

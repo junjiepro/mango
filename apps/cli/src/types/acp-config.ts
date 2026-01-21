@@ -171,6 +171,54 @@ export function validateACPConfig(config: ACPServiceConfig): string[] {
 }
 
 /**
+ * ACP会话配置（用于 @mcpc-tech/acp-ai-provider）
+ */
+export interface ACPSessionConfig {
+  /** 会话ID */
+  sessionId: string;
+
+  /** 绑定码 */
+  bindingCode: string;
+
+  /** Agent配置 */
+  agent: {
+    /** Agent命令 */
+    command: string;
+    /** 命令参数 */
+    args?: string[];
+    /** 环境变量 */
+    env?: Record<string, string>;
+    /** 认证方法ID */
+    authMethodId?: string;
+  };
+
+  /** 会话配置 */
+  session: {
+    /** 工作目录 */
+    cwd: string;
+    /** MCP服务器列表 */
+    mcpServers: Array<{
+      name: string;
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+    }>;
+  };
+
+  /** 会话创建时间 */
+  createdAt: string;
+
+  /** 最后活跃时间 */
+  lastActiveAt: string;
+
+  /** 会话状态 */
+  status: 'active' | 'idle' | 'closed' | 'error';
+
+  /** 空闲超时时间（毫秒） */
+  idleTimeout?: number;
+}
+
+/**
  * 创建默认ACP配置
  */
 export function createDefaultACPConfig(name: string, command: string): ACPServiceConfig {

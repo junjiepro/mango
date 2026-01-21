@@ -34,6 +34,13 @@ import {
 import { DeviceCache } from '@/lib/deviceCache';
 import { ChatLayout } from '@/components/layouts/ChatLayout';
 import { useResourceSniffer } from '@/hooks/useResourceSniffer';
+import { useSessionManager } from '@/hooks/useSessionManager';
+import { SessionTabs } from '@/components/conversation/SessionTabs';
+import { ACPSessionCreateDialog } from '@/components/conversation/ACPSessionCreateDialog';
+import { ACPChat } from '@/components/acp/ACPChat';
+import { useACPSession } from '@/hooks/useACPSession';
+import { useDeviceClient } from '@/hooks/useDeviceClient';
+import type { ACPAgent } from '@/hooks/useACPSession';
 
 type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
 type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row'];
@@ -71,6 +78,51 @@ function ConversationDetailContent() {
   // 资源预览状态
   const [previewResource, setPreviewResource] = useState<DetectedResource | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+
+  // ACP 会话管理
+  const {
+    sessions,
+    activeSessionId,
+    loading: sessionsLoading,
+    error: sessionsError,
+    addACPSession,
+    removeSession,
+    switchSession,
+    getActiveSession,
+  } = useSessionManager(currentConversation?.id || '');
+
+  const [showACPCreateDialog, setShowACPCreateDialog] = useState(false);
+
+  // 获取当前选中的设备对象
+  const [selectedDevice, setSelectedDevice] = useState<DeviceBinding | undefined>(undefined);
+
+  const loadDevice = async (id: string) => {
+    try {
+      const response = await fetch(`/api/devices/${id}`);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('设备未找到');
+        }
+        throw new Error('加载设备信息失败');
+      }
+
+      const data = await response.json();
+      setSelectedDevice(data.device);
+    } catch (err) {
+      console.error('Failed to load device:', id, err);
+    }
+  };
+
+  React.useEffect(() => {
+    if (selectedDeviceId) loadDevice(selectedDeviceId);
+  }, [selectedDeviceId]);
+
+  // 初始化设备客户端
+  const { client: deviceClient } = useDeviceClient(selectedDevice);
+
+  // 初始化 ACP Session Hook
+  const { createSession: createACPSessionAPI } = useACPSession(deviceClient);
 
   // 资源嗅探
   const { resources } = useResourceSniffer(messages);
@@ -216,6 +268,30 @@ function ConversationDetailContent() {
     return sendMessage(content, attachments, miniAppData, selectedDeviceId || undefined);
   };
 
+  // 处理创建 ACP 会话
+  const handleCreateACPSession = async (agent: ACPAgent, envVars: Record<string, string>) => {
+    if (!selectedDeviceId) {
+      console.error('No device selected');
+      return;
+    }
+
+    try {
+      const sessionId = await createACPSessionAPI(agent, envVars);
+      await addACPSession(sessionId, selectedDeviceId, agent.name, {
+        agentCommand: agent.command,
+        agentArgs: agent.args,
+        envVars,
+        sessionConfig: {
+          cwd: agent.session?.cwd || process.cwd(),
+          mcpServers: agent.session?.mcpServers || [],
+        },
+      });
+    } catch (error) {
+      console.error('Failed to create ACP session:', error);
+      throw error;
+    }
+  };
+
   React.useEffect(() => {
     loadInstallations();
     loadDevices();
@@ -333,54 +409,76 @@ function ConversationDetailContent() {
         </div>
       </div>
 
+      {/* 会话标签页 */}
+      <SessionTabs
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSessionChange={switchSession}
+        onSessionClose={removeSession}
+        onCreateACPSession={() => setShowACPCreateDialog(true)}
+      />
+
       {/* 主要内容区域 */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ChatLayout
-          resources={resources}
-          showWorkspace={showWorkspace}
-          onToggleWorkspace={() => setShowWorkspace(!showWorkspace)}
-          deviceId={selectedDeviceId}
-        >
-          {/* 消息列表和输入框容器 */}
-          <div className="flex flex-col h-full">
-            <MessageList
-              conversationId={currentConversation.id}
-              messages={messages}
-              installations={installations}
-              isLoading={isLoadingMessages}
-              hasMore={hasMoreMessages}
-              onLoadMore={loadMoreMessages}
-              onOpenMiniApp={handleOpenMiniApp}
-              onImageClick={handleImageClick}
-              className="flex-1 min-h-0"
-            />
+        {getActiveSession()?.type === 'mango' ? (
+          <ChatLayout
+            resources={resources}
+            showWorkspace={showWorkspace}
+            onToggleWorkspace={() => setShowWorkspace(!showWorkspace)}
+            deviceId={selectedDeviceId}
+            conversationId={currentConversation?.id}
+          >
+            {/* 消息列表和输入框容器 */}
+            <div className="flex flex-col h-full">
+              <MessageList
+                conversationId={currentConversation.id}
+                messages={messages}
+                installations={installations}
+                isLoading={isLoadingMessages}
+                hasMore={hasMoreMessages}
+                onLoadMore={loadMoreMessages}
+                onOpenMiniApp={handleOpenMiniApp}
+                onImageClick={handleImageClick}
+                className="flex-1 min-h-0"
+              />
 
-            {/* 消息输入框和资源栏容器 */}
-            <div className="flex-shrink-0">
-              <div className="bg-background p-4">
-                <div className="container mx-auto max-w-4xl">
-                  <MessageInput
-                    onSendMessage={handleSendMessage}
-                    placeholder="输入消息... (Ctrl+Enter 发送)"
-                  />
-
-                  {/* 资源快速访问栏 */}
-                  {showQuickAccess && resources.length > 0 && (
-                    <ResourceQuickAccess
-                      resources={resources}
-                      installations={installations}
-                      onOpenMiniApp={handleOpenMiniApp}
-                      onOpenWorkspace={() => setShowWorkspace(true)}
-                      onClose={() => setShowQuickAccess(false)}
-                      onResourceClick={handleResourceClick}
-                      isWorkspaceActive={showWorkspace}
+              {/* 消息输入框和资源栏容器 */}
+              <div className="flex-shrink-0">
+                <div className="bg-background p-4">
+                  <div className="container mx-auto max-w-4xl">
+                    <MessageInput
+                      onSendMessage={handleSendMessage}
+                      placeholder="输入消息... (Ctrl+Enter 发送)"
                     />
-                  )}
+
+                    {/* 资源快速访问栏 */}
+                    {showQuickAccess && resources.length > 0 && (
+                      <ResourceQuickAccess
+                        resources={resources}
+                        installations={installations}
+                        onOpenMiniApp={handleOpenMiniApp}
+                        onOpenWorkspace={() => setShowWorkspace(true)}
+                        onClose={() => setShowQuickAccess(false)}
+                        onResourceClick={handleResourceClick}
+                        isWorkspaceActive={showWorkspace}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </ChatLayout>
+          </ChatLayout>
+        ) : (
+          <ACPChat
+            deviceId={getActiveSession()?.deviceId || ''}
+            sessionId={getActiveSession()?.acpSessionId || ''}
+            agentName={getActiveSession()?.agentName || ''}
+            deviceClient={deviceClient}
+            showWorkspace={showWorkspace}
+            onToggleWorkspace={() => setShowWorkspace(!showWorkspace)}
+            conversationId={currentConversation?.id}
+          />
+        )}
       </div>
 
       {/* MiniApp 选择器弹窗 */}
@@ -473,6 +571,47 @@ function ConversationDetailContent() {
         resource={previewResource}
         open={showPreviewDialog}
         onOpenChange={setShowPreviewDialog}
+      />
+
+      {/* ACP 会话创建对话框 */}
+      <ACPSessionCreateDialog
+        open={showACPCreateDialog}
+        onOpenChange={setShowACPCreateDialog}
+        availableAgents={[
+          // TODO: 从设备 API 获取可用的 Agent 列表
+          // 临时示例数据
+          {
+            name: 'Claude Code',
+            command: 'cmd',
+            args: ['/c', 'npx', '-y', '@zed-industries/claude-code-acp'],
+            env: [],
+            meta: {
+              icon: '🤖',
+              description: 'Claude Code AI 助手',
+            },
+          },
+          {
+            name: 'Gemini Cli',
+            command: 'cmd',
+            args: ['/c', 'gemini', '--experimental-acp'],
+            env: [],
+            meta: {
+              icon: '🤖',
+              description: 'Gemini Cli AI 助手',
+            },
+          },
+          {
+            name: 'Codex',
+            command: 'cmd',
+            args: ['/c', 'npx', '-y', '@zed-industries/codex-acp'],
+            env: [],
+            meta: {
+              icon: '🤖',
+              description: 'Codex AI 助手',
+            },
+          },
+        ]}
+        onCreateSession={handleCreateACPSession}
       />
     </div>
   );

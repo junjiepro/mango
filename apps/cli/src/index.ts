@@ -8,6 +8,29 @@ import { showStatus } from './commands/status.js';
 import { formatter } from './lib/formatter.js';
 import { configManager } from './lib/config.js';
 
+// 全局错误处理 - 防止进程崩溃
+process.on('uncaughtException', (error) => {
+  formatter.error('Uncaught Exception:');
+  formatter.error(error.message);
+  if (error.stack) {
+    formatter.errorStack(error);
+  }
+  // 不退出进程，让服务继续运行
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  formatter.error('Unhandled Promise Rejection:');
+  if (reason instanceof Error) {
+    formatter.error(reason.message);
+    if (reason.stack) {
+      formatter.errorStack(reason);
+    }
+  } else {
+    formatter.error(String(reason));
+  }
+  // 不退出进程，让服务继续运行
+});
+
 const program = new Command();
 
 program.name('mango-cli').description('Mango CLI - 智能Agent对话平台命令行工具').version('0.1.0');

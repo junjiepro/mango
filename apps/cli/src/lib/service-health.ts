@@ -56,10 +56,10 @@ export class ServiceHealthChecker {
     }
 
     // 检查ACP服务
-    const acpServices = acpConnector.getServices();
-    for (const service of acpServices) {
-      await this.checkACPService('', service.name);
-    }
+    // const acpServices = acpConnector.getServices();
+    // for (const service of acpServices) {
+    //   await this.checkACPService('', service.name);
+    // }
   }
 
   /**
@@ -132,12 +132,20 @@ export class ServiceHealthChecker {
     };
 
     try {
-      if (!acpConnector.isRegistered(serviceName)) {
+      // 获取该绑定码的所有会话
+      const sessions = acpConnector.getSessionsByBinding(bindingCode);
+      if (sessions.length === 0) {
         status.status = 'unhealthy';
-        status.error = 'Service not registered';
+        status.error = 'No active sessions';
       } else {
-        // ACP协议待实现,暂时标记为healthy
-        status.status = 'healthy';
+        // 检查是否有活跃的会话
+        const hasActiveSession = sessions.some(
+          (s) => s.config.status === 'active' && s.isReady()
+        );
+        status.status = hasActiveSession ? 'healthy' : 'unhealthy';
+        if (!hasActiveSession) {
+          status.error = 'No ready sessions';
+        }
       }
     } catch (error) {
       status.status = 'unhealthy';
