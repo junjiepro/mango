@@ -3,15 +3,27 @@
  * 统一的设备通信Hook - 前端直接与CLI端通信
  *
  * 使用方式:
- * const { client, isReady, error } = useDeviceClient(device);
+ * const { client, isReady, error, connectionStatus, reconnect } = useDeviceClient(device);
  * const data = await client.files.list('/path');
+ *
+ * 特性:
+ * - 自动处理CLI服务重启导致的URL变更
+ * - 请求失败时自动重试（带最大重试次数限制）
+ * - 健康检查确保连接可用性
+ * - 连接状态实时通知
  */
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { DeviceBinding } from '@/services/DeviceService';
-import { DeviceClient, createDeviceConfig, DeviceClientError } from '@/lib/device-client';
+import {
+  ResilientDeviceClient,
+  createResilientConfig,
+  ConnectionStatus,
+  ResilientClientError,
+  ResilientErrorCode,
+} from '@/lib/resilient-device-client';
 
 /**
  * 文件节点类型
@@ -57,6 +69,7 @@ export interface ACPSession {
     args?: string[];
     env?: Record<string, string>;
   };
+  isActivated?: boolean;
 }
 
 /**
@@ -68,10 +81,22 @@ export interface DeviceConfig {
 }
 
 /**
+ * 客户端接口 - 统一DeviceClient和ResilientDeviceClient的接口
+ */
+interface ClientInterface {
+  get<T = unknown>(endpoint: string, params?: Record<string, string>): Promise<T>;
+  post<T = unknown>(endpoint: string, body?: unknown): Promise<T>;
+  delete<T = unknown>(endpoint: string, body?: unknown): Promise<T>;
+  patch<T = unknown>(endpoint: string, body?: unknown): Promise<T>;
+  readonly deviceUrl: string;
+  readonly bindingCode: string;
+}
+
+/**
  * 文件操作API
  */
 class FilesAPI {
-  constructor(private client: DeviceClient) {}
+  constructor(private client: ClientInterface) {}
 
   /**
    * 列出目录文件
@@ -128,22 +153,85 @@ class FilesAPI {
   async rename(oldPath: string, newPath: string): Promise<{ success: boolean }> {
     return this.client.post('/files/rename', { oldPath, newPath });
   }
+
+  /**
+   * 上传文件
+   */
+  async upload(
+    file: File,
+    targetPath: string
+  ): Promise<{ success: boolean; path: string; size: number }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('path', targetPath);
+
+    const response = await fetch(`${this.client.deviceUrl}/files/upload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.client.bindingCode}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Upload failed');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * 下载文件
+   */
+  async download(path: string): Promise<Blob> {
+    const response = await fetch(
+      `${this.client.deviceUrl}/files/download?path=${encodeURIComponent(path)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${this.client.bindingCode}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Download failed');
+    }
+
+    return response.blob();
+  }
+
+  /**
+   * 下载文件并触发浏览器下载
+   */
+  async downloadAndSave(path: string, filename?: string): Promise<void> {
+    const blob = await this.download(path);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || path.split('/').pop() || 'download';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 }
 
 /**
  * ACP会话操作API
  */
 class ACPAPI {
-  constructor(private client: DeviceClient) {}
+  constructor(private client: ClientInterface) {}
 
   /**
    * 创建ACP会话
    */
   async createSession(
     agent: ACPAgent,
-    envVars: Record<string, string>
-  ): Promise<{ sessionId: string }> {
-    return this.client.post('/acp/sessions', { agent, envVars });
+    envVars: Record<string, string>,
+    workingDirectory?: string
+  ): Promise<{ sessionId: string; workingDirectory?: string }> {
+    return this.client.post('/acp/sessions', { agent, envVars, workingDirectory });
   }
 
   /**
@@ -166,13 +254,31 @@ class ACPAPI {
   async sendMessage(sessionId: string, message: string): Promise<{ response: string }> {
     return this.client.post('/acp/chat', { sessionId, message });
   }
+
+  /**
+   * 获取会话历史消息
+   */
+  async getSessionMessages(
+    sessionId: string
+  ): Promise<{ messages: any[]; isActivated: boolean }> {
+    return this.client.get(`/acp/sessions/${sessionId}/messages`);
+  }
+
+  /**
+   * 激活会话（初始化ACP连接）
+   */
+  async activateSession(
+    sessionId: string
+  ): Promise<{ success: boolean; isActivated: boolean }> {
+    return this.client.post(`/acp/sessions/${sessionId}/activate`, {});
+  }
 }
 
 /**
  * 配置操作API
  */
 class ConfigAPI {
-  constructor(private client: DeviceClient) {}
+  constructor(private client: ClientInterface) {}
 
   /**
    * 获取设备配置
@@ -193,16 +299,13 @@ class ConfigAPI {
  * 终端操作API
  */
 class TerminalAPI {
-  constructor(
-    private client: DeviceClient,
-    private bindingCode: string
-  ) {}
+  constructor(private client: ClientInterface) {}
 
   /**
    * 获取WebSocket连接URL
    */
   getWebSocketUrl(): string {
-    const wsUrl = this.client['config'].deviceUrl.replace(/^http/, 'ws');
+    const wsUrl = this.client.deviceUrl.replace(/^http/, 'ws');
     return `${wsUrl}/terminal`;
   }
 
@@ -210,7 +313,7 @@ class TerminalAPI {
    * 获取认证Token
    */
   getAuthToken(): string {
-    return this.bindingCode;
+    return this.client.bindingCode;
   }
 }
 
@@ -224,6 +327,8 @@ export interface DeviceClientAPI {
   terminal: TerminalAPI;
   deviceUrl: string;
   deviceBindingCode: string;
+  /** 手动重连 */
+  reconnect: () => Promise<boolean>;
 }
 
 /**
@@ -233,45 +338,119 @@ export interface UseDeviceClientReturn {
   client: DeviceClientAPI | null;
   isReady: boolean;
   error: string | null;
+  /** 当前连接状态 */
+  connectionStatus: ConnectionStatus;
+  /** 手动触发重连 */
+  reconnect: () => Promise<boolean>;
+}
+
+/**
+ * 扩展的设备绑定类型（包含online_urls）
+ */
+interface ExtendedDeviceBinding extends DeviceBinding {
+  online_urls?: string[];
 }
 
 /**
  * useDeviceClient Hook
- * 统一的设备通信Hook
+ * 统一的设备通信Hook - 支持自动重试和URL刷新
  */
 export function useDeviceClient(device?: DeviceBinding): UseDeviceClientReturn {
   const [error, setError] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
+  const resilientClientRef = useRef<ResilientDeviceClient | null>(null);
 
-  // 创建设备客户端API
-  const client = useMemo(() => {
+  // 连接状态变化回调
+  const handleConnectionStatusChange = useCallback((status: ConnectionStatus) => {
+    setConnectionStatus(status);
+  }, []);
+
+  // 创建弹性客户端
+  useEffect(() => {
     if (!device) {
-      return null;
+      resilientClientRef.current = null;
+      setConnectionStatus('disconnected');
+      return;
     }
 
-    const config = createDeviceConfig(device);
+    const extendedDevice = device as ExtendedDeviceBinding;
+    const config = createResilientConfig(extendedDevice, {
+      onConnectionStatusChange: handleConnectionStatusChange,
+    });
+
     if (!config) {
       setError('设备配置无效或设备不在线');
-      return null;
+      setConnectionStatus('disconnected');
+      resilientClientRef.current = null;
+      return;
     }
 
     setError(null);
-    const deviceClient = new DeviceClient(config);
+    const resilientClient = new ResilientDeviceClient(config);
+    resilientClientRef.current = resilientClient;
+    setConnectionStatus('connected');
+
+    return () => {
+      resilientClientRef.current = null;
+    };
+  }, [device?.id, (device as ExtendedDeviceBinding)?.online_urls?.[0], device?.binding_code, handleConnectionStatusChange]);
+
+  // 手动重连函数
+  const reconnect = useCallback(async (): Promise<boolean> => {
+    if (!resilientClientRef.current) {
+      return false;
+    }
+    try {
+      return await resilientClientRef.current.reconnect();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '重连失败');
+      return false;
+    }
+  }, []);
+
+  // 创建设备客户端API
+  const client = useMemo((): DeviceClientAPI | null => {
+    const resilientClient = resilientClientRef.current;
+    if (!resilientClient) {
+      return null;
+    }
+
+    // 创建符合ClientInterface的包装对象
+    const clientInterface: ClientInterface = {
+      get: resilientClient.get.bind(resilientClient),
+      post: resilientClient.post.bind(resilientClient),
+      delete: resilientClient.delete.bind(resilientClient),
+      patch: resilientClient.patch.bind(resilientClient),
+      get deviceUrl() {
+        return resilientClient.deviceUrl;
+      },
+      get bindingCode() {
+        return resilientClient.bindingCode;
+      },
+    };
 
     return {
-      files: new FilesAPI(deviceClient),
-      acp: new ACPAPI(deviceClient),
-      config: new ConfigAPI(deviceClient),
-      terminal: new TerminalAPI(deviceClient, config.bindingCode),
-      deviceUrl: config.deviceUrl,
-      deviceBindingCode: config.bindingCode,
+      files: new FilesAPI(clientInterface),
+      acp: new ACPAPI(clientInterface),
+      config: new ConfigAPI(clientInterface),
+      terminal: new TerminalAPI(clientInterface),
+      deviceUrl: resilientClient.deviceUrl,
+      deviceBindingCode: resilientClient.bindingCode,
+      reconnect: () => resilientClient.reconnect(),
     };
-  }, [device?.id, device?.online_urls?.[0], device?.binding_code]);
+  }, [resilientClientRef.current?.deviceUrl, resilientClientRef.current?.bindingCode]);
 
-  const isReady = client !== null;
+  const isReady = client !== null && connectionStatus === 'connected';
 
   return {
     client,
     isReady,
     error,
+    connectionStatus,
+    reconnect,
   };
 }
+
+// 导出错误类型和状态类型供外部使用
+export { ResilientClientError, ResilientErrorCode };
+export type { ConnectionStatus };

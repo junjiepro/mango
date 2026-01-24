@@ -11,6 +11,7 @@ export interface DeviceBinding {
   device_url: string;
   status: 'active' | 'inactive' | 'expired';
   binding_code: string;
+  online_urls?: string[];
 }
 
 export interface MCPService {

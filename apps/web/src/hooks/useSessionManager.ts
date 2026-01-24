@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import type { SessionTab, SessionType } from '@/types/session.types';
+import type { UIMessage } from 'ai';
 
 export function useSessionManager(conversationId: string) {
   // 初始化时创建 Mango 主会话标签
@@ -58,6 +59,9 @@ export function useSessionManager(conversationId: string) {
         deviceId: session.device_binding_id,
         agentName: session.agent_name,
         persistedId: session.id, // 保存数据库 ID 用于后续更新/删除
+        isActivated: false, // 历史会话默认未激活
+        cachedMessages: [], // 初始化消息缓存
+        workingDirectory: session.session_config?.cwd, // 从会话配置中提取工作目录
       }));
 
       // 合并 Mango 主会话和 ACP 会话
@@ -91,6 +95,7 @@ export function useSessionManager(conversationId: string) {
         agentArgs?: string[];
         envVars?: Record<string, string>;
         sessionConfig?: any;
+        workingDirectory?: string;
       }
     ) => {
       if (!conversationId) return;
@@ -102,6 +107,9 @@ export function useSessionManager(conversationId: string) {
         acpSessionId,
         deviceId,
         agentName,
+        isActivated: true, // 新创建的会话默认激活
+        cachedMessages: [],
+        workingDirectory: sessionData?.workingDirectory,
       };
 
       // 先添加到本地状态
@@ -210,6 +218,92 @@ export function useSessionManager(conversationId: string) {
     return sessions.find((s) => s.id === activeSessionId);
   }, [sessions, activeSessionId]);
 
+  /**
+   * 更新会话的消息缓存
+   */
+  const updateSessionMessages = useCallback(
+    (sessionId: string, messages: UIMessage[]) => {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId ? { ...s, cachedMessages: messages } : s
+        )
+      );
+    },
+    []
+  );
+
+  /**
+   * 获取会话的消息缓存
+   */
+  const getSessionMessages = useCallback(
+    (sessionId: string): UIMessage[] => {
+      const session = sessions.find((s) => s.id === sessionId);
+      return session?.cachedMessages || [];
+    },
+    [sessions]
+  );
+
+  /**
+   * 更新会话激活状态
+   */
+  const updateSessionActivation = useCallback(
+    (sessionId: string, isActivated: boolean) => {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId ? { ...s, isActivated } : s
+        )
+      );
+    },
+    []
+  );
+
+  /**
+   * 获取会话的工作目录
+   */
+  const getSessionWorkingDirectory = useCallback(
+    (sessionId: string): string | undefined => {
+      const session = sessions.find((s) => s.id === sessionId);
+      return session?.workingDirectory;
+    },
+    [sessions]
+  );
+
+  /**
+   * 更新会话的工作目录
+   */
+  const updateSessionWorkingDirectory = useCallback(
+    (sessionId: string, workingDirectory: string) => {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId ? { ...s, workingDirectory } : s
+        )
+      );
+    },
+    []
+  );
+
+  /**
+   * 检查切换会话时工作目录是否不一致
+   * 返回目标会话的工作目录（如果与当前工作区目录不同）
+   */
+  const checkWorkingDirectoryMismatch = useCallback(
+    (targetSessionId: string, currentWorkspaceDir: string): string | null => {
+      const targetSession = sessions.find((s) => s.id === targetSessionId);
+      if (!targetSession?.workingDirectory) return null;
+
+      // 规范化路径进行比较
+      const normalize = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '');
+      const targetDir = normalize(targetSession.workingDirectory);
+      const currentDir = normalize(currentWorkspaceDir);
+
+      if (targetDir !== currentDir) {
+        return targetSession.workingDirectory;
+      }
+      return null;
+    },
+    [sessions]
+  );
+
   return {
     sessions,
     activeSessionId,
@@ -220,5 +314,11 @@ export function useSessionManager(conversationId: string) {
     switchSession,
     getActiveSession,
     loadPersistedSessions,
+    updateSessionMessages,
+    getSessionMessages,
+    updateSessionActivation,
+    getSessionWorkingDirectory,
+    updateSessionWorkingDirectory,
+    checkWorkingDirectoryMismatch,
   };
 }

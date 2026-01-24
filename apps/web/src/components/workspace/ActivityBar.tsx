@@ -40,7 +40,7 @@ const activityItems: Array<{
 
 export function ActivityBar({ activeItem, onItemClick, className = '' }: ActivityBarProps) {
   return (
-    <div className={`flex flex-col w-12 bg-muted/40 border-l ${className}`}>
+    <div className={`flex flex-col w-12 bg-muted/40 ${className}`}>
       <TooltipProvider delayDuration={300}>
         {/* 主要功能图标 */}
         <div className="flex-1 flex flex-col items-center py-2 gap-1">
@@ -76,7 +76,7 @@ export function ActivityBar({ activeItem, onItemClick, className = '' }: Activit
         </div>
 
         {/* 底部设置图标 */}
-        <div className="flex flex-col items-center py-2 border-t">
+        <div className="flex flex-col items-center py-2">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

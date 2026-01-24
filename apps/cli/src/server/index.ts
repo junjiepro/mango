@@ -165,20 +165,17 @@ export function createServer(config: CLIConfig) {
       };
       const platform = platformMap[process.platform] || 'linux';
 
-      // 4. 生成默认工作空间目录（使用绑定码前8位）
-      const pathModule = await import('path');
-      const workspaceDir = pathModule.join(
-        bindingCodeManager.getConfigDir(),
-        'workspaces',
-        bindingCode.substring(0, 8)
-      );
+      // 4. 使用新的目录结构生成工作空间目录
+      const workingDir = bindingCodeManager.getBindingWorkspaceDir(bindingCode);
+      const bindingDataDir = bindingCodeManager.getBindingDataDir(bindingCode);
 
       // 5. 返回设备信息和绑定码给 Web 端
       // Web 端负责创建 devices 和 device_bindings 记录
       return c.json({
         success: true,
         binding_code: bindingCode,
-        workspace_dir: workspaceDir,
+        working_dir: workingDir,
+        binding_data_dir: bindingDataDir,
         device_info: {
           device_id: deviceId,
           device_name: binding_name,
@@ -194,15 +191,22 @@ export function createServer(config: CLIConfig) {
 
   // 配置管理端点（GET）
   app.get('/setting', async (c) => {
-    const [_, targetConfig, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+    const [bindingCode, targetConfig, errorResponse] = getBindingCodeAndCheckFromHeader(c);
 
     if (errorResponse) {
       return errorResponse;
     }
 
+    const workingDir = bindingCodeManager.getBindingWorkspaceDir(bindingCode);
+    const bindingDataDir = bindingCodeManager.getBindingDataDir(bindingCode);
+
     return c.json({
       success: true,
-      config: targetConfig,
+      config: {
+        ...targetConfig,
+        workspaceDir: targetConfig?.workspaceDir || workingDir,
+        bindingDataDir: targetConfig?.bindingDataDir || bindingDataDir,
+      },
     });
   });
 
@@ -220,6 +224,7 @@ export function createServer(config: CLIConfig) {
         temp_code,
         mcp_services,
         workspace_dir,
+        binding_data_dir,
       } = body;
       const rest = { ...body };
       delete rest.binding_code;
@@ -241,6 +246,7 @@ export function createServer(config: CLIConfig) {
         lastUsedAt: new Date().toISOString(),
         userId: user_id,
         workspaceDir: workspace_dir,
+        bindingDataDir: binding_data_dir,
         metadata: {
           platform: platform || process.platform,
           hostname: hostname || os.hostname(),
@@ -389,8 +395,7 @@ export function createServer(config: CLIConfig) {
             jsonrpc: '2.0',
             error: {
               code: -32603,
-              message:
-                transportError instanceof Error ? transportError.message : 'Transport error',
+              message: transportError instanceof Error ? transportError.message : 'Transport error',
             },
             id: null,
           },
@@ -417,15 +422,16 @@ export function createServer(config: CLIConfig) {
       if (errorResponse) return errorResponse;
 
       const body = await c.req.json();
-      const { agent, envVars } = body;
+      const { agent, envVars, workingDirectory } = body;
 
       if (!agent || !agent.command) {
         return c.json({ error: 'Agent configuration is required' }, 400);
       }
 
-      // 准备会话配置
+      // 准备会话配置，优先使用传入的workingDirectory
+      const cwd = workingDirectory || codeConfig?.workspaceDir || process.cwd();
       const session = {
-        cwd: codeConfig?.workspaceDir || process.cwd(),
+        cwd,
         mcpServers: codeConfig?.mcpServices || [],
       };
 
@@ -444,6 +450,7 @@ export function createServer(config: CLIConfig) {
       return c.json({
         success: true,
         sessionId,
+        workingDirectory: cwd,
         message: 'ACP session created successfully',
       });
     } catch (error) {
@@ -467,6 +474,7 @@ export function createServer(config: CLIConfig) {
           createdAt: s.config.createdAt,
           lastActiveAt: s.config.lastActiveAt,
           agent: s.config.agent,
+          isActivated: acpConnector.isSessionActivated(s.sessionId),
         })),
       });
     } catch (error) {
@@ -492,6 +500,80 @@ export function createServer(config: CLIConfig) {
     } catch (error) {
       console.error('ACP session close error:', error);
       return c.json({ error: 'Failed to close session' }, 500);
+    }
+  });
+
+  // ACP会话历史消息获取端点
+  app.get('/acp/sessions/:sessionId/messages', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const { sessionId } = c.req.param();
+      const session = acpConnector.getSession(sessionId);
+
+      if (!session) {
+        return c.json({ error: 'Session not found' }, 404);
+      }
+
+      const messages = acpConnector.getSessionMessages(sessionId);
+      return c.json({
+        success: true,
+        sessionId,
+        messages,
+        isActivated: acpConnector.isSessionActivated(sessionId),
+      });
+    } catch (error) {
+      console.error('ACP session messages error:', error);
+      return c.json({ error: 'Failed to get session messages' }, 500);
+    }
+  });
+
+  // ACP会话激活端点
+  app.post('/acp/sessions/:sessionId/activate', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const { sessionId } = c.req.param();
+      const session = acpConnector.getSession(sessionId);
+
+      if (!session) {
+        return c.json({ error: 'Session not found' }, 404);
+      }
+
+      // 如果已经激活，直接返回成功
+      if (acpConnector.isSessionActivated(sessionId)) {
+        return c.json({
+          success: true,
+          message: 'Session already activated',
+          sessionId,
+          isActivated: true,
+        });
+      }
+
+      // 激活会话
+      const success = await acpConnector.activateSession(sessionId);
+
+      if (!success) {
+        return c.json(
+          {
+            error: 'Failed to activate session',
+            details: session.initError || 'Unknown error',
+          },
+          503
+        );
+      }
+
+      return c.json({
+        success: true,
+        message: 'Session activated successfully',
+        sessionId,
+        isActivated: true,
+      });
+    } catch (error) {
+      console.error('ACP session activate error:', error);
+      return c.json({ error: 'Failed to activate session' }, 500);
     }
   });
 
@@ -528,17 +610,73 @@ export function createServer(config: CLIConfig) {
       // 更新会话活跃时间
       acpConnector.updateSessionActivity(sessionId);
 
+      // 保存用户消息到持久化存储
+      // messages 是 UIMessage[] 格式，直接保存
+      acpConnector.updateSessionMessages(sessionId, messages);
+
       try {
         // 使用 ACP provider 的 streamText
         const result = streamText({
-          model: session.provider.languageModel(),
+          model: session.provider!.languageModel(),
           // Ensure raw chunks like agent plan are included for streaming
           includeRawChunks: true,
           messages: await convertToModelMessages(messages),
           onError: (error) => {
             console.error('Error occurred while streaming text:', error);
           },
-          tools: session.provider.tools,
+          onFinish: ({ response }) => {
+            // 流完成后，将助手响应追加到消息并保存
+            // response.messages 包含了本次生成的消息
+            if (response.messages && response.messages.length > 0) {
+              // 获取当前已保存的消息
+              const currentMessages = acpConnector.getSessionMessages(sessionId);
+
+              // 将 CoreMessage 转换为 UIMessage 格式并追加
+              for (const msg of response.messages) {
+                if (msg.role === 'assistant') {
+                  const uiMessage = {
+                    id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    role: 'assistant' as const,
+                    content: typeof msg.content === 'string' ? msg.content : '',
+                    parts:
+                      typeof msg.content === 'string'
+                        ? [{ type: 'text' as const, text: msg.content }]
+                        : Array.isArray(msg.content)
+                          ? msg.content.map((part: any) => {
+                              if (typeof part === 'string') {
+                                return { type: 'text' as const, text: part };
+                              }
+                              // Convert raw parts to metadata for easier UI access
+                              if (part.type === 'raw' && part.rawValue) {
+                                try {
+                                  const data = JSON.parse(part.rawValue as string);
+                                  switch (data.type) {
+                                    case 'plan':
+                                      return { plan: data.entries };
+                                    case 'diff':
+                                      return { diffs: [data] }; // Accumulate multiple diffs
+                                    case 'terminal':
+                                      return { terminals: [data] }; // Accumulate terminal outputs
+                                  }
+                                } catch {
+                                  // 忽略解析错误
+                                }
+                              }
+                              return part;
+                            })
+                          : [],
+                    createdAt: new Date(),
+                  };
+                  currentMessages.push(uiMessage as any);
+                }
+              }
+
+              // 更新持久化存储
+              acpConnector.updateSessionMessages(sessionId, currentMessages);
+              console.log(`Saved ${currentMessages.length} messages for session ${sessionId}`);
+            }
+          },
+          tools: session.provider!.tools,
         });
 
         return result.toUIMessageStreamResponse({
@@ -853,6 +991,84 @@ export function createServer(config: CLIConfig) {
     } catch (error) {
       console.error('File/directory rename error:', error);
       return c.json({ error: 'Failed to rename file or directory' }, 500);
+    }
+  });
+
+  // 文件上传端点（支持二进制文件）
+  app.post('/files/upload', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const formData = await c.req.formData();
+      const file = formData.get('file') as File | null;
+      const targetPath = formData.get('path') as string | null;
+
+      if (!file || !targetPath) {
+        return c.json({ error: 'File and path are required' }, 400);
+      }
+
+      const fs = await import('fs/promises');
+      const pathModule = await import('path');
+
+      const fullPath = pathModule.resolve(targetPath);
+
+      // 确保父目录存在
+      const dir = pathModule.dirname(fullPath);
+      await fs.mkdir(dir, { recursive: true });
+
+      // 将文件内容写入目标路径
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      await fs.writeFile(fullPath, buffer);
+
+      return c.json({
+        success: true,
+        message: 'File uploaded successfully',
+        path: fullPath,
+        size: buffer.length,
+      });
+    } catch (error) {
+      console.error('File upload error:', error);
+      return c.json({ error: 'Failed to upload file' }, 500);
+    }
+  });
+
+  // 文件下载端点（返回二进制流）
+  app.get('/files/download', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const path = c.req.query('path');
+      if (!path) {
+        return c.json({ error: 'Path is required' }, 400);
+      }
+
+      const fs = await import('fs/promises');
+      const pathModule = await import('path');
+
+      const fullPath = pathModule.resolve(path);
+
+      // 检查文件是否存在
+      const stats = await fs.stat(fullPath);
+      if (stats.isDirectory()) {
+        return c.json({ error: 'Cannot download a directory' }, 400);
+      }
+
+      // 读取文件内容
+      const content = await fs.readFile(fullPath);
+      const filename = pathModule.basename(fullPath);
+
+      // 设置响应头
+      c.header('Content-Type', 'application/octet-stream');
+      c.header('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      c.header('Content-Length', String(content.length));
+
+      return c.body(content);
+    } catch (error) {
+      console.error('File download error:', error);
+      return c.json({ error: 'Failed to download file' }, 500);
     }
   });
 

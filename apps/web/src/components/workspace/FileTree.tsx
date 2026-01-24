@@ -24,6 +24,8 @@ interface FileTreeProps {
   onDelete?: (node: FileNode) => void;
   onCreateFile?: (parentPath: string) => void;
   onCreateFolder?: (parentPath: string) => void;
+  onDownload?: (node: FileNode) => void;
+  onUpload?: (parentPath: string) => void;
 }
 
 interface FileTreeItemProps {
@@ -40,6 +42,8 @@ interface FileTreeItemProps {
   onDelete?: (node: FileNode) => void;
   onCreateFile?: (parentPath: string) => void;
   onCreateFolder?: (parentPath: string) => void;
+  onDownload?: (node: FileNode) => void;
+  onUpload?: (parentPath: string) => void;
 }
 
 function FileTreeItem({
@@ -56,6 +60,8 @@ function FileTreeItem({
   onDelete,
   onCreateFile,
   onCreateFolder,
+  onDownload,
+  onUpload,
 }: FileTreeItemProps) {
   const [isLoading, setIsLoading] = React.useState(false);
   const isDirectory = node.type === 'directory';
@@ -90,18 +96,20 @@ function FileTreeItem({
         onDelete={onDelete}
         onCreateFile={onCreateFile}
         onCreateFolder={onCreateFolder}
+        onDownload={onDownload}
+        onUpload={onUpload}
       >
         <Button
           variant="ghost"
           size="sm"
           onClick={handleClick}
-          className={`w-full justify-start h-7 px-2 font-normal ${
+          className={`w-full justify-start h-7 px-2 font-normal overflow-hidden ${
             isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'
           }`}
           style={{ paddingLeft: `${paddingLeft}px` }}
         >
           {isDirectory && (
-            <span className="mr-1">
+            <span className="mr-1 shrink-0">
               {isExpanded ? (
                 <ChevronDown className="h-3 w-3" />
               ) : (
@@ -111,14 +119,14 @@ function FileTreeItem({
           )}
           {isDirectory ? (
             isExpanded ? (
-              <FolderOpen className="h-4 w-4 mr-2 text-blue-500" />
+              <FolderOpen className="h-4 w-4 mr-2 shrink-0 text-blue-500" />
             ) : (
-              <Folder className="h-4 w-4 mr-2 text-blue-500" />
+              <Folder className="h-4 w-4 mr-2 shrink-0 text-blue-500" />
             )
           ) : (
-            <File className="h-4 w-4 mr-2 text-muted-foreground" />
+            <File className="h-4 w-4 mr-2 shrink-0 text-muted-foreground" />
           )}
-          <span className="truncate text-sm">{node.name}</span>
+          <span className="truncate text-sm min-w-0">{node.name}</span>
         </Button>
       </FileContextMenu>
 
@@ -138,6 +146,8 @@ function FileTreeItem({
               onDelete={onDelete}
               onCreateFile={onCreateFile}
               onCreateFolder={onCreateFolder}
+              onDownload={onDownload}
+              onUpload={onUpload}
             />
           ))}
         </div>
@@ -158,6 +168,8 @@ function FileTreeItemWrapper({
   onDelete,
   onCreateFile,
   onCreateFolder,
+  onDownload,
+  onUpload,
 }: {
   node: FileNode;
   level: number;
@@ -170,6 +182,8 @@ function FileTreeItemWrapper({
   onDelete?: (node: FileNode) => void;
   onCreateFile?: (parentPath: string) => void;
   onCreateFolder?: (parentPath: string) => void;
+  onDownload?: (node: FileNode) => void;
+  onUpload?: (parentPath: string) => void;
 }) {
   // 使用父组件传递的展开状态，而不是内部状态
   const isExpanded = expandedPaths?.has(node.path) ?? false;
@@ -190,6 +204,8 @@ function FileTreeItemWrapper({
       onDelete={onDelete}
       onCreateFile={onCreateFile}
       onCreateFolder={onCreateFolder}
+      onDownload={onDownload}
+      onUpload={onUpload}
     />
   );
 }
@@ -206,6 +222,8 @@ export function FileTree({
   onDelete,
   onCreateFile,
   onCreateFolder,
+  onDownload,
+  onUpload,
 }: FileTreeProps) {
   if (files.length === 0) {
     return <div className={`p-4 text-sm text-muted-foreground ${className}`}>暂无文件</div>;
@@ -227,6 +245,8 @@ export function FileTree({
           onDelete={onDelete}
           onCreateFile={onCreateFile}
           onCreateFolder={onCreateFolder}
+          onDownload={onDownload}
+          onUpload={onUpload}
         />
       ))}
     </div>

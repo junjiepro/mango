@@ -7,6 +7,8 @@
 import { NewSessionResponse } from '@agentclientprotocol/sdk';
 import type { ACPSessionConfig } from '../../types/acp-config.js';
 import { ACPProvider, createACPProvider } from '@mcpc-tech/acp-ai-provider';
+import { acpSessionStore, PersistedACPSession } from '../acp-session-store.js';
+import type { UIMessage } from 'ai';
 
 /**
  * 重连配置
@@ -30,7 +32,7 @@ class ACPSession {
   public sessionId: string;
   public bindingCode: string;
   public config: ACPSessionConfig;
-  public provider: ACPProvider;
+  public provider: ACPProvider | null = null;
   public lastActiveAt: Date;
   public initError?: string;
   public isInitialized: boolean = false;
@@ -38,25 +40,56 @@ class ACPSession {
   private innerSessionId?: string;
   private idleTimer?: NodeJS.Timeout;
   private reconnectConfig: ReconnectConfig = DEFAULT_RECONNECT_CONFIG;
+  private providerCreated: boolean = false;
 
-  constructor(sessionId: string, bindingCode: string, config: ACPSessionConfig) {
+  constructor(
+    sessionId: string,
+    bindingCode: string,
+    config: ACPSessionConfig,
+    createProvider: boolean = true
+  ) {
     this.sessionId = sessionId;
     this.bindingCode = bindingCode;
     this.config = config;
-    this.lastActiveAt = new Date();
+    this.lastActiveAt = new Date(config.lastActiveAt || new Date());
 
-    // 创建 ACP Provider
+    if (createProvider) {
+      this.createProvider();
+    }
+  }
+
+  /**
+   * 创建 ACP Provider
+   */
+  private createProvider(): void {
+    if (this.providerCreated) return;
+
     this.provider = createACPProvider({
-      command: config.agent.command,
-      args: config.agent.args,
-      env: config.agent.env,
+      command: this.config.agent.command,
+      args: this.config.agent.args,
+      env: this.config.agent.env,
       session: {
-        ...config.session,
+        ...this.config.session,
         mcpServers: [],
       },
-      authMethodId: config.agent.authMethodId,
-      persistSession: true, // Keep session alive
+      authMethodId: this.config.agent.authMethodId,
+      persistSession: true,
     });
+    this.providerCreated = true;
+  }
+
+  /**
+   * 确保 Provider 已创建
+   */
+  ensureProvider(): void {
+    this.createProvider();
+  }
+
+  /**
+   * 检查 Provider 是否已创建
+   */
+  hasProvider(): boolean {
+    return this.providerCreated && this.provider !== null;
   }
 
   /**
@@ -80,6 +113,14 @@ class ACPSession {
   }
 
   async initSession(): Promise<string | undefined> {
+    // 确保 Provider 已创建
+    this.ensureProvider();
+
+    if (!this.provider) {
+      this.initError = 'Provider not created';
+      return undefined;
+    }
+
     for (let attempt = 0; attempt <= this.reconnectConfig.maxRetries; attempt++) {
       try {
         const session = await this.provider.initSession();
@@ -90,6 +131,9 @@ class ACPSession {
 
         // 启动空闲超时检查
         this.startIdleTimer();
+
+        // 更新持久化存储的激活状态
+        acpSessionStore.updateActivationStatus(this.sessionId, true);
 
         console.log(`ACP session ${this.sessionId} initialized successfully`);
         return this.innerSessionId;
@@ -172,7 +216,10 @@ class ACPSession {
     }
     this.config.status = 'closed';
     // ACP provider 清理资源
-    this.provider.cleanup();
+    if (this.provider) {
+      this.provider.cleanup();
+    }
+    this.isInitialized = false;
   }
 }
 
@@ -182,6 +229,51 @@ class ACPSession {
 export class ACPConnector {
   private sessions: Map<string, ACPSession> = new Map();
   private sessionsByBinding: Map<string, Set<string>> = new Map();
+  private initialized: boolean = false;
+
+  /**
+   * 初始化连接器（服务启动时调用）
+   * 还原持久化的会话，但不初始化ACP连接
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+
+    // 标记所有持久化会话为未激活
+    acpSessionStore.markAllAsDeactivated();
+
+    // 清理过期会话（默认7天）
+    acpSessionStore.cleanupExpiredSessions();
+
+    // 加载持久化的会话（不初始化连接）
+    const persistedSessions = acpSessionStore.getAllSessions();
+    console.log(`Loading ${persistedSessions.length} persisted ACP sessions`);
+
+    for (const persisted of persistedSessions) {
+      this.restoreSessionFromPersisted(persisted);
+    }
+
+    this.initialized = true;
+    console.log('ACP Connector initialized');
+  }
+
+  /**
+   * 从持久化数据还原会话（不初始化ACP连接）
+   */
+  private restoreSessionFromPersisted(persisted: PersistedACPSession): void {
+    const { sessionId, bindingCode, config } = persisted;
+
+    // 创建会话对象但不初始化ACP Provider
+    const acpSession = new ACPSession(sessionId, bindingCode, config, false);
+    this.sessions.set(sessionId, acpSession);
+
+    // 记录绑定码对应的会话
+    if (!this.sessionsByBinding.has(bindingCode)) {
+      this.sessionsByBinding.set(bindingCode, new Set());
+    }
+    this.sessionsByBinding.get(bindingCode)!.add(sessionId);
+
+    console.log(`Restored ACP session: ${sessionId} (not activated)`);
+  }
 
   /**
    * 创建新的 ACP 会话
@@ -207,6 +299,18 @@ export class ACPConnector {
     const acpSession = new ACPSession(sessionId, bindingCode, config);
     this.sessions.set(sessionId, acpSession);
 
+    // 持久化会话
+    const persistedSession: PersistedACPSession = {
+      sessionId,
+      bindingCode,
+      config,
+      messages: [],
+      createdAt: config.createdAt,
+      lastActiveAt: config.lastActiveAt,
+      isActivated: false,
+    };
+    acpSessionStore.saveSession(persistedSession);
+
     // 后台初始化（带错误处理）
     acpSession.initSession().catch((error) => {
       console.error(`Failed to initialize ACP session ${sessionId}:`, error);
@@ -220,6 +324,56 @@ export class ACPConnector {
 
     console.log(`ACP session created: ${sessionId} for binding ${bindingCode}`);
     return sessionId;
+  }
+
+  /**
+   * 激活会话（初始化ACP连接）
+   * 用于还原的历史会话在需要时激活
+   */
+  async activateSession(sessionId: string): Promise<boolean> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      console.error(`Session not found: ${sessionId}`);
+      return false;
+    }
+
+    // 如果已经初始化，直接返回成功
+    if (session.isReady()) {
+      return true;
+    }
+
+    // 初始化会话
+    const result = await session.initSession();
+    return result !== undefined;
+  }
+
+  /**
+   * 获取会话的历史消息
+   */
+  getSessionMessages(sessionId: string): UIMessage[] {
+    return acpSessionStore.getMessages(sessionId);
+  }
+
+  /**
+   * 更新会话消息
+   */
+  updateSessionMessages(sessionId: string, messages: UIMessage[]): void {
+    acpSessionStore.updateMessages(sessionId, messages);
+  }
+
+  /**
+   * 添加消息到会话
+   */
+  appendSessionMessage(sessionId: string, message: UIMessage): void {
+    acpSessionStore.appendMessage(sessionId, message);
+  }
+
+  /**
+   * 检查会话是否已激活
+   */
+  isSessionActivated(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    return session?.isReady() || false;
   }
 
   /**
@@ -273,7 +427,7 @@ export class ACPConnector {
   /**
    * 关闭会话
    */
-  async closeSession(sessionId: string): Promise<boolean> {
+  async closeSession(sessionId: string, deletePersisted: boolean = true): Promise<boolean> {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
 
@@ -287,6 +441,11 @@ export class ACPConnector {
       if (bindingSessions.size === 0) {
         this.sessionsByBinding.delete(session.bindingCode);
       }
+    }
+
+    // 从持久化存储中删除
+    if (deletePersisted) {
+      acpSessionStore.deleteSession(sessionId);
     }
 
     console.log(`ACP session closed: ${sessionId}`);

@@ -7,7 +7,17 @@
  */
 
 import { randomBytes } from 'crypto';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  unlinkSync,
+  readdirSync,
+  statSync,
+  cpSync,
+  rmSync,
+} from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import type { MCPServiceConfig } from '../types/mcp-config.js';
@@ -31,6 +41,8 @@ export interface BindingConfig {
   userId?: string;
   /** 工作空间目录（可选） */
   workspaceDir?: string;
+  /** 绑定数据目录（可选，用于自定义数据存储位置） */
+  bindingDataDir?: string;
   /** 其他元数据 */
   metadata?: {
     platform: string;
@@ -63,14 +75,55 @@ export class BindingCodeManager {
   }
 
   /**
-   * 获取默认工作空间
+   * 获取 binding 目录前缀（前8位）
+   */
+  private getBindingPrefix(bindingCode: string): string {
+    return bindingCode.substring(0, 8);
+  }
+
+  /**
+   * 获取 binding 根目录
+   * @param bindingCode 绑定码
+   * @returns binding 根目录路径
+   */
+  getBindingDir(bindingCode: string): string {
+    const prefix = this.getBindingPrefix(bindingCode);
+    return join(this.configDir, 'bindings', prefix);
+  }
+
+  /**
+   * 获取 binding 的工作空间目录
+   * @param bindingCode 绑定码
+   * @returns workspace 子目录路径
+   */
+  getBindingWorkspaceDir(bindingCode: string): string {
+    return join(this.getBindingDir(bindingCode), 'workspace');
+  }
+
+  /**
+   * 获取 binding 的数据目录
+   * @param bindingCode 绑定码
+   * @returns data 子目录路径
+   */
+  getBindingDataDir(bindingCode: string): string {
+    return join(this.getBindingDir(bindingCode), 'data');
+  }
+
+  /**
+   * 获取默认工作空间（使用新的目录结构）
    * @param bindingCode
    * @returns
    */
   private getDefaultWorkspaceDir(bindingCode: string): string {
-    const defaultWorkspaceDir = join(this.configDir, 'workspace', bindingCode);
+    return this.getBindingWorkspaceDir(bindingCode);
+  }
 
-    return defaultWorkspaceDir;
+  /**
+   * 获取旧版工作空间目录路径（用于迁移检测）
+   */
+  private getOldWorkspaceDir(bindingCode: string): string {
+    const prefix = this.getBindingPrefix(bindingCode);
+    return join(this.configDir, 'workspaces', prefix);
   }
 
   /**
@@ -123,6 +176,13 @@ export class BindingCodeManager {
     const canUpdate = (this.bindingCodes.has(bindingCode) && initConfig) || existing;
 
     if (canUpdate) {
+      const prevBindingConfig = prevConfig[bindingCode];
+
+      // 检查目录是否变化，需要迁移
+      if (existing && prevBindingConfig) {
+        this.handleDirectoryMigration(bindingCode, prevBindingConfig, config);
+      }
+
       // 安全存储（仅当前用户可读）
       const configJson = JSON.stringify(
         {
@@ -186,8 +246,21 @@ export class BindingCodeManager {
       const configJson = readFileSync(this.bindingConfigPath, 'utf-8');
       const raw = JSON.parse(configJson) as Record<string, BindingConfig>;
       const next: Record<string, BindingConfig> = {};
+      let needsSave = false;
 
       Object.keys(raw).forEach((k) => {
+        // 检查是否需要迁移旧目录结构
+        const migrated = this.migrateOldStructureIfNeeded(k);
+        if (migrated) {
+          needsSave = true;
+        }
+
+        // 确保 binding 数据目录存在
+        const dataDir = this.getBindingDataDir(k);
+        if (!existsSync(dataDir)) {
+          mkdirSync(dataDir, { recursive: true });
+        }
+
         next[k] = {
           ...raw[k],
           workspaceDir: raw[k].workspaceDir || this.getDefaultWorkspaceDir(k),
@@ -293,6 +366,189 @@ export class BindingCodeManager {
     this.ensureConfigDir();
     const configJson = JSON.stringify(config, null, 2);
     writeFileSync(this.bindingConfigPath, configJson, { mode: 0o600 });
+  }
+
+  /**
+   * 处理目录迁移（仅当 bindingDataDir 变化时迁移内容）
+   */
+  private handleDirectoryMigration(
+    bindingCode: string,
+    prevConfig: BindingConfig,
+    newConfig: Partial<BindingConfig>
+  ): void {
+    const defaultDataDir = this.getBindingDataDir(bindingCode);
+
+    // 仅当 bindingDataDir 变化时，迁移内容并删除旧目录
+    if (newConfig.bindingDataDir && newConfig.bindingDataDir !== prevConfig.bindingDataDir) {
+      const oldDir = prevConfig.bindingDataDir || defaultDataDir;
+      const newDir = newConfig.bindingDataDir;
+
+      if (existsSync(oldDir) && oldDir !== newDir) {
+        console.log(`Migrating data dir: ${oldDir} -> ${newDir}`);
+        this.migrateDirectory(oldDir, newDir, true);
+      } else if (!existsSync(newDir)) {
+        mkdirSync(newDir, { recursive: true });
+      }
+    }
+
+    // workspaceDir 变化时，仅确保新目录存在，不迁移内容
+    if (newConfig.workspaceDir && newConfig.workspaceDir !== prevConfig.workspaceDir) {
+      const newDir = newConfig.workspaceDir;
+      if (!existsSync(newDir)) {
+        mkdirSync(newDir, { recursive: true });
+      }
+    }
+  }
+
+  /**
+   * 迁移目录（复制内容到新位置，可选删除旧目录）
+   */
+  private migrateDirectory(srcDir: string, destDir: string, deleteOld: boolean = false): void {
+    if (!existsSync(srcDir)) return;
+
+    // 确保目标目录存在
+    if (!existsSync(destDir)) {
+      mkdirSync(destDir, { recursive: true });
+    }
+
+    // 复制内容
+    this.copyDirContents(srcDir, destDir);
+    console.log(`Directory migration completed: ${srcDir} -> ${destDir}`);
+
+    // 删除旧目录
+    if (deleteOld) {
+      try {
+        rmSync(srcDir, { recursive: true, force: true });
+        console.log(`Old directory removed: ${srcDir}`);
+      } catch (err) {
+        console.error(`Failed to remove old directory: ${srcDir}`, err);
+      }
+    }
+  }
+
+  /**
+   * 检查并迁移旧目录结构到新结构
+   * @param bindingCode 绑定码
+   * @returns 是否执行了迁移
+   */
+  private migrateOldStructureIfNeeded(bindingCode: string): boolean {
+    const oldWorkspaceDir = this.getOldWorkspaceDir(bindingCode);
+    const newBindingDir = this.getBindingDir(bindingCode);
+    const newWorkspaceDir = this.getBindingWorkspaceDir(bindingCode);
+    const newDataDir = this.getBindingDataDir(bindingCode);
+
+    // 如果旧目录存在且新目录不存在，执行迁移
+    if (existsSync(oldWorkspaceDir) && !existsSync(newBindingDir)) {
+      console.log(`Migrating binding directory: ${oldWorkspaceDir} -> ${newBindingDir}`);
+
+      try {
+        // 创建新目录结构
+        mkdirSync(newWorkspaceDir, { recursive: true });
+        mkdirSync(newDataDir, { recursive: true });
+
+        // 复制旧工作空间内容到新位置
+        this.copyDirContents(oldWorkspaceDir, newWorkspaceDir);
+
+        console.log(`Migration completed for binding: ${bindingCode.substring(0, 8)}...`);
+        return true;
+      } catch (error) {
+        console.error(`Migration failed for binding ${bindingCode.substring(0, 8)}:`, error);
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 复制目录内容（合并策略：不覆盖已存在的文件）
+   */
+  private copyDirContents(srcDir: string, destDir: string): void {
+    if (!existsSync(srcDir)) return;
+
+    const entries = readdirSync(srcDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = join(srcDir, entry.name);
+      const destPath = join(destDir, entry.name);
+
+      // 如果目标已存在，跳过（合并策略）
+      if (existsSync(destPath)) {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        cpSync(srcPath, destPath, { recursive: true });
+      } else {
+        cpSync(srcPath, destPath);
+      }
+    }
+  }
+
+  /**
+   * 迁移 binding 目录到新位置
+   * @param bindingCode 绑定码
+   * @param newBaseDir 新的基础目录
+   */
+  async migrateBindingDir(bindingCode: string, newBaseDir: string): Promise<void> {
+    const oldDir = this.getBindingDir(bindingCode);
+
+    if (!existsSync(oldDir)) {
+      // 如果旧目录不存在，直接创建新目录结构
+      mkdirSync(join(newBaseDir, 'workspace'), { recursive: true });
+      mkdirSync(join(newBaseDir, 'data'), { recursive: true });
+      return;
+    }
+
+    // 合并目录内容
+    this.mergeDirectories(oldDir, newBaseDir);
+
+    // 更新配置
+    this.updateBindingDataDir(bindingCode, newBaseDir);
+  }
+
+  /**
+   * 合并两个目录（目标目录已有文件保留）
+   */
+  private mergeDirectories(srcDir: string, destDir: string): void {
+    if (!existsSync(destDir)) {
+      mkdirSync(destDir, { recursive: true });
+    }
+
+    const entries = readdirSync(srcDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = join(srcDir, entry.name);
+      const destPath = join(destDir, entry.name);
+
+      if (entry.isDirectory()) {
+        this.mergeDirectories(srcPath, destPath);
+      } else if (!existsSync(destPath)) {
+        cpSync(srcPath, destPath);
+      }
+    }
+  }
+
+  /**
+   * 更新 binding 的数据目录配置
+   */
+  private updateBindingDataDir(bindingCode: string, newDataDir: string): void {
+    if (!existsSync(this.bindingConfigPath)) return;
+
+    try {
+      const configJson = readFileSync(this.bindingConfigPath, 'utf-8');
+      const config = JSON.parse(configJson) as Record<string, BindingConfig>;
+
+      if (config[bindingCode]) {
+        config[bindingCode].bindingDataDir = newDataDir;
+        config[bindingCode].workspaceDir = join(newDataDir, 'workspace');
+        config[bindingCode].lastUsedAt = new Date().toISOString();
+
+        writeFileSync(this.bindingConfigPath, JSON.stringify(config, null, 2), { mode: 0o600 });
+      }
+    } catch (error) {
+      console.error('Failed to update binding data dir:', error);
+    }
   }
 }
 

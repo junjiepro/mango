@@ -141,6 +141,22 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
     setActiveTabId(tabId);
   }, []);
 
+  // 关闭所有文件类型的标签页（用于工作目录切换时）
+  const closeAllFileTabs = useCallback(() => {
+    setTabs((prevTabs) => {
+      const nonFileTabs = prevTabs.filter((t) => t.type !== 'file');
+      // 如果当前激活的是文件标签页，切换到第一个非文件标签页或设为 null
+      if (activeTabId?.startsWith('file-')) {
+        if (nonFileTabs.length > 0) {
+          setActiveTabId(nonFileTabs[0].id);
+        } else {
+          setActiveTabId(null);
+        }
+      }
+      return nonFileTabs;
+    });
+  }, [activeTabId]);
+
   // 获取当前激活的标签页
   const activeTab = tabs.find((t) => t.id === activeTabId) || null;
 
@@ -154,6 +170,7 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
     markTabDirty,
     closeAllTabs,
     closeOtherTabs,
+    closeAllFileTabs,
     setActiveTabId,
   };
 }

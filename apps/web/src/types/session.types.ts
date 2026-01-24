@@ -3,6 +3,8 @@
  * 会话类型定义和状态管理
  */
 
+import type { UIMessage } from 'ai';
+
 export type SessionType = 'mango' | 'acp';
 
 export interface SessionTab {
@@ -17,6 +19,11 @@ export interface SessionTab {
   deviceId?: string;
   agentName?: string;
   persistedId?: string; // 数据库中的持久化记录 ID
+  isActivated?: boolean; // ACP连接是否已激活
+  // 工作目录（ACP会话启动时的工作目录）
+  workingDirectory?: string;
+  // 消息缓存（用于标签页切换时保留消息）
+  cachedMessages?: UIMessage[];
 }
 
 export interface SessionState {

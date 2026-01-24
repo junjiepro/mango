@@ -94,6 +94,7 @@ export async function PATCH(
     if (body.context !== undefined) updates.context = body.context
     if (body.status !== undefined) updates.status = body.status
     if (body.device_id !== undefined) updates.device_id = body.device_id
+    if (body.metadata !== undefined) updates.metadata = body.metadata
 
     // 更新对话
     const { data: conversation, error } = await supabase

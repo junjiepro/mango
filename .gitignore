@@ -78,3 +78,5 @@ supabase/.temp/
 
 # Turbo
 .turbo/
+
+tmpclaude-*

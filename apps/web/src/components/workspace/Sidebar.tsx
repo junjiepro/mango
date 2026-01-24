@@ -34,8 +34,8 @@ export function Sidebar({ title, children, onClose, className = '' }: SidebarPro
       </div>
 
       {/* 内容区域 */}
-      <ScrollArea className="flex-1 w-full shrink-0">
-        <div className="p-2 w-full min-w-0">{children}</div>
+      <ScrollArea className="flex-1 w-full min-w-0">
+        <div className="p-2 w-full min-w-0 overflow-hidden">{children}</div>
       </ScrollArea>
     </div>
   );

@@ -16,9 +16,17 @@ export function useACPSession(client: DeviceClientAPI | null) {
 
   /**
    * 创建新的 ACP 会话 (使用新的client)
+   * @param agent Agent配置
+   * @param envVars 环境变量
+   * @param workingDirectory 工作目录（可选，默认使用设备配置的工作目录）
+   * @returns 返回会话ID和实际使用的工作目录
    */
   const createSession = useCallback(
-    async (agent: ACPAgent, envVars: Record<string, string>) => {
+    async (
+      agent: ACPAgent,
+      envVars: Record<string, string>,
+      workingDirectory?: string
+    ): Promise<{ sessionId: string; workingDirectory?: string }> => {
       if (!client) {
         throw new Error('设备客户端未就绪');
       }
@@ -27,8 +35,11 @@ export function useACPSession(client: DeviceClientAPI | null) {
       setError(null);
 
       try {
-        const result = await client.acp.createSession(agent, envVars);
-        return result.sessionId;
+        const result = await client.acp.createSession(agent, envVars, workingDirectory);
+        return {
+          sessionId: result.sessionId,
+          workingDirectory: result.workingDirectory,
+        };
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         setError(message);

@@ -6,8 +6,17 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { FolderIcon, Plus, FilePlus, FolderPlus } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  FolderIcon,
+  Plus,
+  FilePlus,
+  FolderPlus,
+  Upload,
+  Download,
+  FolderOpen,
+  ChevronRight,
+} from 'lucide-react';
 import { useDeviceClient, type FileNode } from '@/hooks/useDeviceClient';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -20,6 +29,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
@@ -31,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface FileExplorerTabProps {
   deviceId?: string;
@@ -39,6 +50,9 @@ interface FileExplorerTabProps {
   // 状态持久化
   initialExpandedPaths?: string[];
   onExpandedPathsChange?: (paths: string[]) => void;
+  // 工作目录相关
+  currentWorkingDirectory?: string;
+  onWorkingDirectoryChange?: (path: string) => void;
 }
 
 export function FileExplorerTab({
@@ -47,6 +61,8 @@ export function FileExplorerTab({
   onFileClick,
   initialExpandedPaths,
   onExpandedPathsChange,
+  currentWorkingDirectory,
+  onWorkingDirectoryChange,
 }: FileExplorerTabProps) {
   // 使用新的 useDeviceClient Hook
   const { client, isReady } = useDeviceClient(device);
@@ -56,6 +72,10 @@ export function FileExplorerTab({
   const [currentPath, setCurrentPath] = useState('/');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // 文件上传输入框ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 展开状态管理
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
@@ -105,12 +125,26 @@ export function FileExplorerTab({
     }
   };
 
-  // 初始加载根目录
+  // 初始加载根目录（使用工作目录或根目录）
   useEffect(() => {
     if (client && deviceId) {
-      loadDirectory('/');
+      loadDirectory(currentWorkingDirectory || '/');
     }
   }, [client, deviceId]);
+
+  // 工作目录变更时重新加载文件列表并清空缓存
+  const prevWorkingDirectoryRef = useRef(currentWorkingDirectory);
+  useEffect(() => {
+    if (client && deviceId && currentWorkingDirectory !== prevWorkingDirectoryRef.current) {
+      prevWorkingDirectoryRef.current = currentWorkingDirectory;
+      // 清空已加载的子节点缓存
+      setLoadedChildren(new Map());
+      // 清空展开状态
+      setExpandedPaths(new Set());
+      // 重新加载根目录（使用新的工作目录）
+      loadDirectory(currentWorkingDirectory || '/');
+    }
+  }, [client, deviceId, currentWorkingDirectory]);
 
   // 恢复展开状态时，加载已展开目录的子内容
   useEffect(() => {
@@ -261,6 +295,53 @@ export function FileExplorerTab({
     }
   };
 
+  // 处理文件上传
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !client) return;
+
+    setIsUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const targetPath = `${currentPath}/${file.name}`.replace(/\/+/g, '/').replace(/\\/g, '/');
+        await client.files.upload(file, targetPath);
+        toast.success('上传成功', { description: file.name });
+      }
+      // 刷新当前目录
+      await loadDirectory(currentPath);
+    } catch (error) {
+      toast.error('上传失败', {
+        description: error instanceof Error ? error.message : '未知错误',
+      });
+    } finally {
+      setIsUploading(false);
+      // 清空输入框以允许重复上传相同文件
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // 处理文件下载
+  const handleDownload = async (file: FileNode) => {
+    if (!client || file.type !== 'file') return;
+
+    try {
+      await client.files.downloadAndSave(file.path, file.name);
+      toast.success('下载成功', { description: file.name });
+    } catch (error) {
+      toast.error('下载失败', {
+        description: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  };
+
+  // 打开目录选择
+  const handleOpenDirectory = () => {
+    // 触发工作目录选择
+    onWorkingDirectoryChange?.(currentPath);
+  };
+
   // 合并文件数据和已加载的子节点
   const filesWithChildren = React.useMemo(() => {
     if (!deviceId) {
@@ -363,31 +444,60 @@ export function FileExplorerTab({
 
   return (
     <div className="flex flex-col h-full w-full">
+      {/* 隐藏的文件上传输入框 */}
+      <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleUpload} />
+
       {/* 文件树标题 */}
       <div className="p-2 border-b shrink-0">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold truncate">文件</span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0">
-                <Plus className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => setCreateFileDialog({ open: true, parentPath: currentPath })}
-              >
-                <FilePlus className="mr-2 h-4 w-4" />
-                新建文件
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setCreateFolderDialog({ open: true, parentPath: currentPath })}
-              >
-                <FolderPlus className="mr-2 h-4 w-4" />
-                新建文件夹
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-1">
+            {/* 上传按钮 */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 shrink-0"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                  >
+                    <Upload className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>上传文件</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {/* 新建菜单 */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0">
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => setCreateFileDialog({ open: true, parentPath: currentPath })}
+                >
+                  <FilePlus className="mr-2 h-4 w-4" />
+                  新建文件
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setCreateFolderDialog({ open: true, parentPath: currentPath })}
+                >
+                  <FolderPlus className="mr-2 h-4 w-4" />
+                  新建文件夹
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  上传文件
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
@@ -406,6 +516,8 @@ export function FileExplorerTab({
             onDelete={(node) => setDeleteDialog({ open: true, node })}
             onCreateFile={(parentPath) => setCreateFileDialog({ open: true, parentPath })}
             onCreateFolder={(parentPath) => setCreateFolderDialog({ open: true, parentPath })}
+            onDownload={handleDownload}
+            onUpload={() => fileInputRef.current?.click()}
           />
         )}
       </ScrollArea>

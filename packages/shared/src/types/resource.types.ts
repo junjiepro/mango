@@ -49,4 +49,11 @@ export interface ResourceMetadata {
   icon?: string;
   url?: string;
   fileExtension?: string;
+  // 扩展属性
+  title?: string;
+  description?: string;
+  isA2UI?: boolean;
+  a2uiSchema?: unknown;
+  miniApp?: unknown;
+  installation?: unknown;
 }

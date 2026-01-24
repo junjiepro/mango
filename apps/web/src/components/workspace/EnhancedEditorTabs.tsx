@@ -6,8 +6,8 @@
 
 'use client';
 
-import React, { useState } from 'react';
-import { X, MoreHorizontal } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { X, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -27,8 +27,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { FileEditor, clearFileCache } from './FileEditor.optimized';
-import { FilePreview } from './FilePreview';
+import { clearFileCache } from './FileEditor.optimized';
+import { UnifiedFileViewer } from './UnifiedFileViewer';
 import { ResourcePreview } from './ResourcePreview';
 import { clearModelCache } from './MonacoEditor';
 import type { EditorTab } from '@/hooks/useEditorTabs';
@@ -60,6 +60,51 @@ export function EnhancedEditorTabs({
   // 关闭确认对话框状态
   const [closeConfirmTab, setCloseConfirmTab] = useState<EditorTab | null>(null);
 
+  // 滚动相关状态
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  // 检查滚动状态
+  const checkScrollState = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    setCanScrollLeft(container.scrollLeft > 0);
+    setCanScrollRight(
+      container.scrollLeft < container.scrollWidth - container.clientWidth - 1
+    );
+  }, []);
+
+  // 监听滚动和尺寸变化
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    checkScrollState();
+    container.addEventListener('scroll', checkScrollState);
+
+    const resizeObserver = new ResizeObserver(checkScrollState);
+    resizeObserver.observe(container);
+
+    return () => {
+      container.removeEventListener('scroll', checkScrollState);
+      resizeObserver.disconnect();
+    };
+  }, [checkScrollState, tabs.length]);
+
+  // 滚动函数
+  const scroll = (direction: 'left' | 'right') => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const scrollAmount = 150;
+    container.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth',
+    });
+  };
+
   // 清理文件缓存的辅助函数
   const cleanupFileCache = (tab: EditorTab) => {
     if (tab.type === 'file' && tab.file) {
@@ -90,7 +135,7 @@ export function EnhancedEditorTabs({
   // 处理关闭当前标签页（从菜单）
   const handleCloseCurrentTab = () => {
     if (!activeTabId) return;
-    const tab = tabs.find(t => t.id === activeTabId);
+    const tab = tabs.find((t) => t.id === activeTabId);
     if (tab) {
       if (tab.isDirty) {
         setCloseConfirmTab(tab);
@@ -104,7 +149,7 @@ export function EnhancedEditorTabs({
   // 处理关闭其他标签页
   const handleCloseOthers = () => {
     if (!activeTabId) return;
-    tabs.forEach(tab => {
+    tabs.forEach((tab) => {
       if (tab.id !== activeTabId && !tab.isDirty) {
         cleanupFileCache(tab);
       }
@@ -114,48 +159,12 @@ export function EnhancedEditorTabs({
 
   // 处理关闭所有标签页
   const handleCloseAll = () => {
-    tabs.forEach(tab => {
+    tabs.forEach((tab) => {
       if (!tab.isDirty) {
         cleanupFileCache(tab);
       }
     });
     onCloseAll?.();
-  };
-  const isEditable = (filename: string) => {
-    // const editableExts = [
-    //   'txt',
-    //   'md',
-    //   'json',
-    //   'js',
-    //   'jsx',
-    //   'ts',
-    //   'tsx',
-    //   'html',
-    //   'css',
-    //   'scss',
-    //   'less',
-    //   'xml',
-    //   'yaml',
-    //   'yml',
-    //   'py',
-    //   'java',
-    //   'cpp',
-    //   'c',
-    //   'cs',
-    //   'go',
-    //   'rs',
-    //   'php',
-    //   'rb',
-    //   'sh',
-    //   'bash',
-    //   'sql',
-    //   'env',
-    //   'gitignore',
-    //   'dockerfile',
-    // ];
-    // const ext = filename.split('.').pop()?.toLowerCase() || '';
-    // return editableExts.includes(ext);
-    return true;
   };
 
   if (tabs.length === 0) {
@@ -177,38 +186,71 @@ export function EnhancedEditorTabs({
         className="flex flex-col h-full"
       >
         {/* 标签页列表 */}
-        <div className="border-b bg-muted/20 overflow-x-auto overflow-y-hidden shrink-0 flex items-center">
-          <TabsList className="h-9 bg-transparent inline-flex justify-start rounded-none p-0 w-auto min-w-0 flex-1">
-            {tabs.map((tab) => (
-              <TabsTrigger
-                key={tab.id}
-                value={tab.id}
-                className="h-9 px-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-background shrink-0 relative"
+        <div className="border-b bg-muted/20 shrink-0 flex items-center h-9 relative">
+          {/* 左侧渐变遮罩和滚动按钮 */}
+          {canScrollLeft && (
+            <div className="absolute left-0 top-0 bottom-0 z-10 flex items-center">
+              <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-background to-transparent pointer-events-none" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 shrink-0 relative z-10 ml-0.5"
+                onClick={() => scroll('left')}
               >
-                <span className="truncate max-w-[120px] text-xs">
-                  {tab.title}
-                  {tab.isDirty && <span className="ml-1 text-orange-500">●</span>}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCloseTab(tab);
-                  }}
-                  className="h-3 w-3 ml-1.5 p-0 hover:bg-destructive/20"
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {/* 可滚动的标签区域 */}
+          <div
+            ref={scrollContainerRef}
+            className="overflow-x-auto overflow-y-hidden flex-1 min-w-0 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none]"
+          >
+            <TabsList className="h-9 bg-transparent inline-flex justify-start rounded-none p-0 w-auto min-w-0">
+              {tabs.map((tab) => (
+                <TabsTrigger
+                  key={tab.id}
+                  value={tab.id}
+                  className="group h-9 px-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-background shrink-0 relative"
                 >
-                  <X className="h-2.5 w-2.5" />
-                </Button>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {/* 更多操作菜单 */}
+                  <span className="truncate max-w-[120px] text-xs">
+                    {tab.title}
+                    {tab.isDirty && <span className="ml-1 text-orange-500">●</span>}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCloseTab(tab);
+                    }}
+                    className="h-3 w-3 ml-1.5 p-0 hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </Button>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+          {/* 右侧渐变遮罩和滚动按钮 */}
+          {canScrollRight && (
+            <div className="absolute right-8 top-0 bottom-0 z-10 flex items-center">
+              <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background to-transparent pointer-events-none" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 shrink-0 relative z-10 mr-0.5"
+                onClick={() => scroll('right')}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {/* 更多操作菜单 - 固定在右侧 */}
           {tabs.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0 mr-2">
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0 mx-1">
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -218,9 +260,7 @@ export function EnhancedEditorTabs({
                     <DropdownMenuItem onClick={handleCloseCurrentTab}>
                       关闭当前标签页
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleCloseOthers}>
-                      关闭其他标签页
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleCloseOthers}>关闭其他标签页</DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
                 )}
@@ -240,18 +280,13 @@ export function EnhancedEditorTabs({
               className="h-full m-0 data-[state=inactive]:hidden"
             >
               {tab.type === 'file' && tab.file && device ? (
-                isEditable(tab.file.name) ? (
-                  <FileEditor
-                    key={tab.file.path}
-                    file={tab.file}
-                    device={device}
-                    tabId={tab.id}
-                    isActive={tab.id === activeTabId}
-                    onMarkDirty={onMarkTabDirty}
-                  />
-                ) : (
-                  <FilePreview file={tab.file} deviceId={device.id} onlineUrl={device.online_urls?.[0]} />
-                )
+                <UnifiedFileViewer
+                  file={tab.file}
+                  device={device}
+                  tabId={tab.id}
+                  isActive={tab.id === activeTabId}
+                  onMarkDirty={onMarkTabDirty}
+                />
               ) : tab.type === 'resource' && tab.resource ? (
                 <ResourcePreview resource={tab.resource} />
               ) : (

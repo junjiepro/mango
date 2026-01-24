@@ -29,6 +29,8 @@ interface VSCodeWorkspaceProps {
   deviceId?: string;
   conversationId?: string;
   className?: string;
+  currentWorkingDirectory?: string;
+  onWorkingDirectoryChange?: (path: string) => void;
 }
 
 export function VSCodeWorkspace({
@@ -36,6 +38,8 @@ export function VSCodeWorkspace({
   deviceId,
   conversationId,
   className = '',
+  currentWorkingDirectory,
+  onWorkingDirectoryChange,
 }: VSCodeWorkspaceProps) {
   const [selectedDevice, setSelectedDevice] = useState<DeviceBinding | undefined>(undefined);
   const isInitializedRef = useRef(false);
@@ -58,11 +62,14 @@ export function VSCodeWorkspace({
   >([]);
 
   // 编辑器标签页状态变化回调
-  const handleEditorStateChange = useCallback((tabs: EditorTab[], activeTabId: string | null) => {
-    if (isInitializedRef.current) {
-      saveState({ tabs, activeTabId });
-    }
-  }, [saveState]);
+  const handleEditorStateChange = useCallback(
+    (tabs: EditorTab[], activeTabId: string | null) => {
+      if (isInitializedRef.current) {
+        saveState({ tabs, activeTabId });
+      }
+    },
+    [saveState]
+  );
 
   const {
     tabs,
@@ -72,6 +79,7 @@ export function VSCodeWorkspace({
     closeTab,
     closeAllTabs,
     closeOtherTabs,
+    closeAllFileTabs,
     setActiveTabId,
     markTabDirty,
   } = useEditorTabs({
@@ -100,10 +108,13 @@ export function VSCodeWorkspace({
   }, [showBottomPanel, terminals, activeTerminalId, saveState]);
 
   // 终端状态变化回调
-  const handleTerminalStateChange = useCallback((newTerminals: TerminalSession[], newActiveId: string) => {
-    setTerminals(newTerminals);
-    setActiveTerminalId(newActiveId);
-  }, []);
+  const handleTerminalStateChange = useCallback(
+    (newTerminals: TerminalSession[], newActiveId: string) => {
+      setTerminals(newTerminals);
+      setActiveTerminalId(newActiveId);
+    },
+    []
+  );
 
   // 文件浏览器展开路径状态
   const [fileExplorerExpandedPaths, setFileExplorerExpandedPaths] = useState<string[]>(
@@ -111,12 +122,46 @@ export function VSCodeWorkspace({
   );
 
   // 文件浏览器状态变化回调
-  const handleFileExplorerExpandedPathsChange = useCallback((paths: string[]) => {
-    setFileExplorerExpandedPaths(paths);
-    if (isInitializedRef.current) {
-      saveState({ fileExplorerExpandedPaths: paths });
+  const handleFileExplorerExpandedPathsChange = useCallback(
+    (paths: string[]) => {
+      setFileExplorerExpandedPaths(paths);
+      if (isInitializedRef.current) {
+        saveState({ fileExplorerExpandedPaths: paths });
+      }
+    },
+    [saveState]
+  );
+
+  // 内部工作目录变更处理器（用于清理文件浏览器和编辑器状态）
+  const handleInternalWorkingDirectoryChange = useCallback(
+    (path: string) => {
+      // 清空文件浏览器展开状态
+      setFileExplorerExpandedPaths([]);
+      if (isInitializedRef.current) {
+        saveState({ fileExplorerExpandedPaths: [] });
+      }
+      // 关闭所有从文件浏览器打开的文件标签页
+      closeAllFileTabs();
+      // 调用外部的工作目录变更回调
+      onWorkingDirectoryChange?.(path);
+    },
+    [saveState, closeAllFileTabs, onWorkingDirectoryChange]
+  );
+
+  // 监听外部工作目录变化（当从页面级别切换工作目录时）
+  const prevExternalWorkingDirectoryRef = React.useRef(currentWorkingDirectory);
+  React.useEffect(() => {
+    if (currentWorkingDirectory !== prevExternalWorkingDirectoryRef.current) {
+      prevExternalWorkingDirectoryRef.current = currentWorkingDirectory;
+      // 清空文件浏览器展开状态
+      setFileExplorerExpandedPaths([]);
+      if (isInitializedRef.current) {
+        saveState({ fileExplorerExpandedPaths: [] });
+      }
+      // 关闭所有从文件浏览器打开的文件标签页
+      closeAllFileTabs();
     }
-  }, [saveState]);
+  }, [currentWorkingDirectory, saveState, closeAllFileTabs]);
 
   const loadDevice = async (id: string) => {
     try {
@@ -213,7 +258,9 @@ export function VSCodeWorkspace({
       case 'resources':
         return <ResourceTab resources={resources} onResourceClick={openResourceTab} />;
       case 'devices':
-        return <DeviceTab />;
+        return (
+          <DeviceTab device={selectedDevice} onRefresh={() => deviceId && loadDevice(deviceId)} />
+        );
       case 'files':
         return (
           <FileExplorerTab
@@ -222,6 +269,8 @@ export function VSCodeWorkspace({
             onFileClick={openFileTab}
             initialExpandedPaths={fileExplorerExpandedPaths}
             onExpandedPathsChange={handleFileExplorerExpandedPathsChange}
+            currentWorkingDirectory={currentWorkingDirectory}
+            onWorkingDirectoryChange={handleInternalWorkingDirectoryChange}
           />
         );
       case 'git':
@@ -239,11 +288,11 @@ export function VSCodeWorkspace({
       <div className="flex-1 flex flex-col overflow-hidden">
         <ResizablePanelGroup direction="vertical" className="flex-1">
           {/* 上半部分：侧边栏 + 编辑区 */}
-          <ResizablePanel defaultSize={showBottomPanel ? 70 : 100} minSize={30}>
+          <ResizablePanel defaultSize={showBottomPanel ? 70 : 100} minSize={10}>
             <ResizablePanelGroup direction="horizontal" className="h-full">
               {/* 编辑区/预览区 */}
-              <ResizablePanel defaultSize={showSidebar ? 80 : 100} minSize={30}>
-                <EditorArea className="h-full">
+              <ResizablePanel defaultSize={showSidebar ? 80 : 100} minSize={10}>
+                <EditorArea className="h-full m-2 p-1 shadow-md border rounded-md">
                   <EnhancedEditorTabs
                     tabs={tabs}
                     activeTabId={activeTabId}
@@ -259,14 +308,23 @@ export function VSCodeWorkspace({
 
               {/* 侧边栏 - 始终渲染以保留状态 */}
               <>
-                <ResizableHandle withHandle style={{ display: showSidebar ? 'flex' : 'none' }} />
+                <ResizableHandle
+                  withHandle
+                  className="my-2.5 bg-background hover:bg-border"
+                  style={{ display: showSidebar ? 'flex' : 'none' }}
+                />
                 <ResizablePanel
                   defaultSize={20}
-                  minSize={15}
-                  maxSize={40}
+                  minSize={10}
+                  maxSize={90}
                   style={{ display: showSidebar ? 'flex' : 'none' }}
                 >
-                  <Sidebar title={getSidebarTitle()}>{renderSidebarContent()}</Sidebar>
+                  <Sidebar
+                    className="m-2 mr-1 p-1 shadow-md border rounded-md"
+                    title={getSidebarTitle()}
+                  >
+                    {renderSidebarContent()}
+                  </Sidebar>
                 </ResizablePanel>
               </>
             </ResizablePanelGroup>
@@ -276,15 +334,17 @@ export function VSCodeWorkspace({
           <>
             <ResizableHandle
               withHandle
+              className="mx-2.5"
               style={{ display: showBottomPanel ? 'flex' : 'none' }}
             />
             <ResizablePanel
-              defaultSize={30}
-              minSize={15}
-              maxSize={70}
+              defaultSize={40}
+              minSize={10}
+              maxSize={90}
               style={{ display: showBottomPanel ? 'flex' : 'none' }}
             >
               <BottomPanel
+                className="m-2 p-1 shadow-md border rounded-md"
                 isOpen={showBottomPanel}
                 onClose={() => setShowBottomPanel(false)}
                 deviceId={deviceId}

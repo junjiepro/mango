@@ -5,13 +5,11 @@
 
 'use client';
 
-import React, { use, useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConversationProvider, useConversation } from '@/contexts/ConversationContext';
 import { MessageList } from '@/components/conversation/MessageList';
 import { MessageInput } from '@/components/conversation/MessageInput';
-import { TaskProgressIndicator } from '@/components/task/TaskProgressIndicator';
-import { AppHeader } from '@/components/layouts/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -21,26 +19,20 @@ import {
   ResourcePreviewDialog,
   canPreviewInDialog,
 } from '@/components/conversation/ResourcePreviewDialog';
-import { Package, Laptop } from 'lucide-react';
+import { Package } from 'lucide-react';
 import type { Database } from '@/types/database.types';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { DeviceCache } from '@/lib/deviceCache';
 import { ChatLayout } from '@/components/layouts/ChatLayout';
 import { useResourceSniffer } from '@/hooks/useResourceSniffer';
 import { useSessionManager } from '@/hooks/useSessionManager';
-import { SessionTabs } from '@/components/conversation/SessionTabs';
 import { ACPSessionCreateDialog } from '@/components/conversation/ACPSessionCreateDialog';
 import { ACPChat } from '@/components/acp/ACPChat';
 import { useACPSession } from '@/hooks/useACPSession';
 import { useDeviceClient } from '@/hooks/useDeviceClient';
 import type { ACPAgent } from '@/hooks/useACPSession';
+import { WorkingDirectorySwitchDialog } from '@/components/workspace/WorkingDirectorySwitchDialog';
+import { ConversationHeader } from '@/components/conversation/ConversationHeader';
 
 type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
 type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row'];
@@ -60,6 +52,7 @@ function ConversationDetailContent() {
     tasks,
     isRealtimeConnected,
     error,
+    setCurrentConversation,
   } = useConversation();
 
   const router = useRouter();
@@ -89,9 +82,25 @@ function ConversationDetailContent() {
     removeSession,
     switchSession,
     getActiveSession,
+    updateSessionMessages,
+    getSessionMessages,
+    updateSessionActivation,
+    checkWorkingDirectoryMismatch,
   } = useSessionManager(currentConversation?.id || '');
 
   const [showACPCreateDialog, setShowACPCreateDialog] = useState(false);
+
+  // 工作目录状态
+  const [currentWorkingDirectory, setCurrentWorkingDirectory] = useState<string>('');
+  const [recentPaths, setRecentPaths] = useState<any[]>([]);
+
+  // 工作目录切换提示对话框状态
+  const [showDirSwitchDialog, setShowDirSwitchDialog] = useState(false);
+  const [pendingSessionSwitch, setPendingSessionSwitch] = useState<{
+    sessionId: string;
+    targetDirectory: string;
+    sessionName: string;
+  } | null>(null);
 
   // 获取当前选中的设备对象
   const [selectedDevice, setSelectedDevice] = useState<DeviceBinding | undefined>(undefined);
@@ -259,6 +268,21 @@ function ConversationDetailContent() {
     handleResourceClick(imageResource);
   };
 
+  // 更新对话标题
+  const handleTitleChange = async (newTitle: string) => {
+    if (!currentConversation?.id) return;
+    const response = await fetch(`/api/conversations/${currentConversation.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update title');
+    }
+    // 更新本地状态
+    setCurrentConversation({ ...currentConversation, title: newTitle });
+  };
+
   // 包装 sendMessage 以传递 deviceId
   const handleSendMessage = async (
     content: string,
@@ -276,21 +300,163 @@ function ConversationDetailContent() {
     }
 
     try {
-      const sessionId = await createACPSessionAPI(agent, envVars);
-      await addACPSession(sessionId, selectedDeviceId, agent.name, {
+      // 使用当前工作目录创建会话
+      const result = await createACPSessionAPI(
+        agent,
+        envVars,
+        currentWorkingDirectory || undefined
+      );
+      const actualWorkingDir = result.workingDirectory || currentWorkingDirectory;
+
+      await addACPSession(result.sessionId, selectedDeviceId, agent.name, {
         agentCommand: agent.command,
         agentArgs: agent.args,
         envVars,
         sessionConfig: {
-          cwd: agent.session?.cwd || process.cwd(),
+          cwd: actualWorkingDir,
           mcpServers: agent.session?.mcpServers || [],
         },
+        workingDirectory: actualWorkingDir,
       });
     } catch (error) {
       console.error('Failed to create ACP session:', error);
       throw error;
     }
   };
+
+  // 处理会话切换（不自动切换工作目录，让用户通过会话内提示自行决定）
+  const handleSessionSwitch = async (sessionId: string) => {
+    // 直接切换会话，不检查工作目录
+    await switchSession(sessionId);
+    // 自动激活未激活的 ACP 会话
+    await autoActivateSession(sessionId);
+  };
+
+  // 自动激活未激活的 ACP 会话
+  const autoActivateSession = async (sessionId: string) => {
+    const targetSession = sessions.find((s) => s.id === sessionId);
+    // 检查设备是否匹配，不匹配则不激活
+    if (targetSession?.type === 'acp' && targetSession.deviceId !== selectedDeviceId) {
+      return; // 设备不一致，不自动激活
+    }
+    if (targetSession?.type === 'acp' && !targetSession.isActivated && deviceClient) {
+      try {
+        // 先获取历史消息
+        const messagesResult = await deviceClient.acp.getSessionMessages(
+          targetSession.acpSessionId!
+        );
+        if (messagesResult.messages?.length > 0) {
+          updateSessionMessages(sessionId, messagesResult.messages);
+        }
+        // 激活会话
+        const activateResult = await deviceClient.acp.activateSession(targetSession.acpSessionId!);
+        if (activateResult.success) {
+          updateSessionActivation(sessionId, true);
+        }
+      } catch (err) {
+        console.error('Failed to auto-activate session:', err);
+      }
+    }
+  };
+
+  // 确认切换工作目录
+  const handleConfirmDirSwitch = async () => {
+    if (!pendingSessionSwitch) return;
+
+    // 切换工作目录
+    setCurrentWorkingDirectory(pendingSessionSwitch.targetDirectory);
+    // 切换会话
+    await switchSession(pendingSessionSwitch.sessionId);
+    // 自动激活未激活的 ACP 会话
+    await autoActivateSession(pendingSessionSwitch.sessionId);
+
+    // 清理状态
+    setShowDirSwitchDialog(false);
+    setPendingSessionSwitch(null);
+  };
+
+  // 取消切换（保持当前目录但仍切换会话）
+  const handleCancelDirSwitch = async () => {
+    if (!pendingSessionSwitch) return;
+
+    // 不切换工作目录，但仍切换会话
+    await switchSession(pendingSessionSwitch.sessionId);
+    // 自动激活未激活的 ACP 会话
+    await autoActivateSession(pendingSessionSwitch.sessionId);
+
+    // 清理状态
+    setShowDirSwitchDialog(false);
+    setPendingSessionSwitch(null);
+  };
+
+  // 加载工作目录历史
+  const loadWorkspaceHistory = async () => {
+    if (!selectedDeviceId) return;
+    try {
+      const response = await fetch(`/api/devices/${selectedDeviceId}/workspace-history`);
+      if (response.ok) {
+        const data = await response.json();
+        setRecentPaths(data.history || []);
+      }
+    } catch (err) {
+      console.error('Failed to load workspace history:', err);
+    }
+  };
+
+  // 处理工作目录变更
+  const handleWorkingDirectoryChange = async (path: string) => {
+    setCurrentWorkingDirectory(path);
+    // 保存到对话的 metadata 中
+    if (currentConversation?.id && path) {
+      try {
+        const currentMetadata = (currentConversation as any).metadata || {};
+        await fetch(`/api/conversations/${currentConversation.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            metadata: { ...currentMetadata, workingDirectory: path },
+          }),
+        });
+      } catch (err) {
+        console.error('Failed to save working directory:', err);
+      }
+    }
+    // 记录访问历史
+    if (selectedDeviceId && path) {
+      try {
+        await fetch(`/api/devices/${selectedDeviceId}/workspace-history`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path }),
+        });
+      } catch (err) {
+        console.error('Failed to record path access:', err);
+      }
+    }
+  };
+
+  // 加载工作目录：优先从对话 metadata 读取，否则使用设备默认配置
+  React.useEffect(() => {
+    const loadWorkingDirectory = async () => {
+      // 优先使用对话保存的工作目录
+      const savedDir = (currentConversation as any)?.metadata?.workingDirectory;
+      if (savedDir) {
+        setCurrentWorkingDirectory(savedDir);
+        return;
+      }
+      // 否则使用设备默认工作目录
+      if (!deviceClient) return;
+      try {
+        const result = await deviceClient.config.get();
+        if (result.config?.workspaceDir) {
+          setCurrentWorkingDirectory(result.config.workspaceDir);
+        }
+      } catch (err) {
+        console.error('Failed to load device config:', err);
+      }
+    };
+    loadWorkingDirectory();
+  }, [deviceClient, currentConversation]);
 
   React.useEffect(() => {
     loadInstallations();
@@ -322,113 +488,43 @@ function ConversationDetailContent() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      {/* 对话信息栏 */}
-      <div className="flex-shrink-0 border-b bg-muted/40">
-        <div className="container mx-auto flex h-14 items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => router.push('/conversations')}>
-              ← 返回
-            </Button>
-            <div>
-              <h1 className="font-semibold">{currentConversation.title}</h1>
-              {currentConversation.description && (
-                <p className="text-xs text-muted-foreground">{currentConversation.description}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* 设备选择器 */}
-            <Select value={selectedDeviceId || 'none'} onValueChange={handleDeviceChange}>
-              <SelectTrigger className="w-[180px] h-9">
-                <SelectValue placeholder="选择设备">
-                  {selectedDeviceId ? (
-                    <div className="flex items-center gap-2">
-                      <Laptop className="h-4 w-4" />
-                      <span className="truncate">
-                        {devices.find((d) => d.id === selectedDeviceId)?.binding_name || '设备'}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">无设备</span>
-                  )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">
-                  <span className="text-muted-foreground">不使用设备</span>
-                </SelectItem>
-                {devices.map((device) => (
-                  <SelectItem key={device.id} value={device.id}>
-                    <div className="flex items-center gap-2">
-                      <Laptop className="h-4 w-4" />
-                      <span>{device.binding_name}</span>
-                      {device.status === 'active' && (
-                        <span className="text-xs text-green-600">●</span>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* MiniApp 按钮 */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleOpenMiniAppSelector}
-              className="gap-2"
-            >
-              <Package className="h-4 w-4" />
-              小应用
-            </Button>
-
-            {/* 工作区切换按钮 */}
-            <Button
-              variant={showWorkspace ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setShowWorkspace(!showWorkspace)}
-              className="gap-2"
-            >
-              <Laptop className="h-4 w-4" />
-              工作区
-            </Button>
-
-            {/* 实时连接状态 */}
-            <div className="flex items-center gap-2 text-xs">
-              <div
-                className={`h-2 w-2 rounded-full ${
-                  isRealtimeConnected ? 'bg-green-500' : 'bg-gray-400'
-                }`}
-              />
-              <span className="text-muted-foreground">
-                {isRealtimeConnected ? '已连接' : '未连接'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 会话标签页 */}
-      <SessionTabs
+      {/* 紧凑型顶部栏 - 合并导航、会话信息和标签页 */}
+      <ConversationHeader
+        conversationId={currentConversation.id}
+        conversationTitle={currentConversation.title}
+        conversationDescription={currentConversation.description || undefined}
+        onTitleChange={handleTitleChange}
         sessions={sessions}
         activeSessionId={activeSessionId}
-        onSessionChange={switchSession}
+        onSessionChange={handleSessionSwitch}
         onSessionClose={removeSession}
         onCreateACPSession={() => setShowACPCreateDialog(true)}
+        devices={devices}
+        selectedDeviceId={selectedDeviceId}
+        onDeviceChange={handleDeviceChange}
+        currentWorkingDirectory={currentWorkingDirectory}
+        recentPaths={recentPaths}
+        onWorkingDirectoryChange={handleWorkingDirectoryChange}
+        onLoadWorkspaceHistory={loadWorkspaceHistory}
+        showWorkspace={showWorkspace}
+        onToggleWorkspace={() => setShowWorkspace(!showWorkspace)}
+        isRealtimeConnected={isRealtimeConnected}
+        onOpenMiniAppSelector={handleOpenMiniAppSelector}
       />
 
-      {/* 主要内容区域 */}
+      {/* 主要内容区域 - ChatLayout 在外层，会话内容在内部切换 */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        {getActiveSession()?.type === 'mango' ? (
-          <ChatLayout
-            resources={resources}
-            showWorkspace={showWorkspace}
-            onToggleWorkspace={() => setShowWorkspace(!showWorkspace)}
-            deviceId={selectedDeviceId}
-            conversationId={currentConversation?.id}
-          >
-            {/* 消息列表和输入框容器 */}
+        <ChatLayout
+          resources={resources}
+          showWorkspace={showWorkspace}
+          onToggleWorkspace={() => setShowWorkspace(!showWorkspace)}
+          deviceId={selectedDeviceId}
+          conversationId={currentConversation?.id}
+          currentWorkingDirectory={currentWorkingDirectory}
+          onWorkingDirectoryChange={handleWorkingDirectoryChange}
+        >
+          {/* 根据当前会话类型渲染不同内容 */}
+          {getActiveSession()?.type === 'mango' ? (
             <div className="flex flex-col h-full">
               <MessageList
                 conversationId={currentConversation.id}
@@ -442,7 +538,6 @@ function ConversationDetailContent() {
                 className="flex-1 min-h-0"
               />
 
-              {/* 消息输入框和资源栏容器 */}
               <div className="flex-shrink-0">
                 <div className="bg-background p-4">
                   <div className="container mx-auto max-w-4xl">
@@ -451,7 +546,6 @@ function ConversationDetailContent() {
                       placeholder="输入消息... (Ctrl+Enter 发送)"
                     />
 
-                    {/* 资源快速访问栏 */}
                     {showQuickAccess && resources.length > 0 && (
                       <ResourceQuickAccess
                         resources={resources}
@@ -467,18 +561,35 @@ function ConversationDetailContent() {
                 </div>
               </div>
             </div>
-          </ChatLayout>
-        ) : (
-          <ACPChat
-            deviceId={getActiveSession()?.deviceId || ''}
-            sessionId={getActiveSession()?.acpSessionId || ''}
-            agentName={getActiveSession()?.agentName || ''}
-            deviceClient={deviceClient}
-            showWorkspace={showWorkspace}
-            onToggleWorkspace={() => setShowWorkspace(!showWorkspace)}
-            conversationId={currentConversation?.id}
-          />
-        )}
+          ) : (
+            <ACPChat
+              deviceId={getActiveSession()?.deviceId || ''}
+              sessionId={getActiveSession()?.acpSessionId || ''}
+              agentName={getActiveSession()?.agentName || ''}
+              deviceClient={deviceClient}
+              initialMessages={getSessionMessages(activeSessionId)}
+              onMessagesChange={(messages) => updateSessionMessages(activeSessionId, messages)}
+              isActivated={getActiveSession()?.isActivated ?? true}
+              sessionWorkingDirectory={getActiveSession()?.workingDirectory}
+              currentWorkingDirectory={currentWorkingDirectory}
+              onSwitchToSessionDirectory={() => {
+                const sessionDir = getActiveSession()?.workingDirectory;
+                if (sessionDir) {
+                  handleWorkingDirectoryChange(sessionDir);
+                }
+              }}
+              isDeviceMismatch={
+                getActiveSession()?.type === 'acp' &&
+                !!getActiveSession()?.deviceId &&
+                getActiveSession()?.deviceId !== selectedDeviceId
+              }
+              sessionDeviceName={
+                devices.find((d) => d.id === getActiveSession()?.deviceId)?.device_name || ''
+              }
+              currentDeviceName={devices.find((d) => d.id === selectedDeviceId)?.device_name || ''}
+            />
+          )}
+        </ChatLayout>
       </div>
 
       {/* MiniApp 选择器弹窗 */}
@@ -613,6 +724,17 @@ function ConversationDetailContent() {
         ]}
         onCreateSession={handleCreateACPSession}
       />
+
+      {/* 工作目录切换提示对话框 */}
+      <WorkingDirectorySwitchDialog
+        open={showDirSwitchDialog}
+        onOpenChange={setShowDirSwitchDialog}
+        currentDirectory={currentWorkingDirectory}
+        targetDirectory={pendingSessionSwitch?.targetDirectory || ''}
+        sessionName={pendingSessionSwitch?.sessionName || ''}
+        onConfirm={handleConfirmDirSwitch}
+        onCancel={handleCancelDirSwitch}
+      />
     </div>
   );
 }
@@ -625,11 +747,8 @@ export default function ConversationDetailPage({ params }: { params: { id: strin
 
   return (
     <ConversationProvider conversationId={id}>
-      <div className="flex h-screen flex-col">
-        <AppHeader />
-        <div className="flex-1 overflow-hidden">
-          <ConversationDetailContent />
-        </div>
+      <div className="h-screen overflow-hidden">
+        <ConversationDetailContent />
       </div>
     </ConversationProvider>
   );

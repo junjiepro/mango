@@ -21,7 +21,9 @@ import {
   Copy,
   FolderPlus,
   FilePlus,
-  Edit3
+  Edit3,
+  Download,
+  Upload,
 } from 'lucide-react';
 
 interface FileContextMenuProps {
@@ -31,6 +33,8 @@ interface FileContextMenuProps {
   onDelete?: (node: FileNode) => void;
   onCreateFile?: (parentPath: string) => void;
   onCreateFolder?: (parentPath: string) => void;
+  onDownload?: (node: FileNode) => void;
+  onUpload?: (parentPath: string) => void;
 }
 
 export function FileContextMenu({
@@ -40,6 +44,8 @@ export function FileContextMenu({
   onDelete,
   onCreateFile,
   onCreateFolder,
+  onDownload,
+  onUpload,
 }: FileContextMenuProps) {
   const isDirectory = node.type === 'directory';
 
@@ -58,6 +64,21 @@ export function FileContextMenu({
             <ContextMenuItem onClick={() => onCreateFolder?.(node.path)}>
               <FolderPlus className="mr-2 h-4 w-4" />
               新建文件夹
+            </ContextMenuItem>
+            {onUpload && (
+              <ContextMenuItem onClick={() => onUpload?.(node.path)}>
+                <Upload className="mr-2 h-4 w-4" />
+                上传文件
+              </ContextMenuItem>
+            )}
+            <ContextMenuSeparator />
+          </>
+        )}
+        {!isDirectory && onDownload && (
+          <>
+            <ContextMenuItem onClick={() => onDownload?.(node)}>
+              <Download className="mr-2 h-4 w-4" />
+              下载
             </ContextMenuItem>
             <ContextMenuSeparator />
           </>

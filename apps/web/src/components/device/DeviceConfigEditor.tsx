@@ -14,11 +14,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Save, AlertCircle } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useDeviceClient } from '@/hooks/useDeviceClient';
-import type { DeviceBinding } from '@/services/DeviceService';
 
 interface DeviceConfigEditorProps {
-  device?: DeviceBinding;
+  deviceId: string;
+  bindingCode: string;
   bindingName: string;
+  onlineUrls?: string[];
   onUpdate?: () => void;
 }
 
@@ -31,10 +32,18 @@ type MCPServiceConfig = {
 };
 
 export function DeviceConfigEditor({
-  device,
+  deviceId,
+  bindingCode,
   bindingName,
+  onlineUrls,
   onUpdate,
 }: DeviceConfigEditorProps) {
+  // 构建设备对象供 useDeviceClient 使用
+  const device = {
+    id: deviceId,
+    binding_code: bindingCode,
+    online_urls: onlineUrls,
+  };
   const { client, isReady } = useDeviceClient(device);
 
   const [name, setName] = useState(bindingName);
@@ -60,6 +69,8 @@ export function DeviceConfigEditor({
       const data = await client.config.get();
       const config = {
         mcpServices: data.config?.mcpServices || {},
+        workspaceDir: data.config?.workspaceDir,
+        bindingDataDir: data.config?.bindingDataDir,
       };
 
       setConfig(config);
@@ -84,7 +95,7 @@ export function DeviceConfigEditor({
   };
 
   const handleSave = async () => {
-    if (!client || !device) return;
+    if (!client || !deviceId) return;
 
     setIsSaving(true);
     setError(null);
@@ -103,13 +114,13 @@ export function DeviceConfigEditor({
 
       // 更新设备配置到设备端
       await client.config.update({
-        binding_code: device.binding_code,
+        binding_code: bindingCode,
         ...parsedConfig,
       });
 
       // 更新设备绑定名称（如果名称有变化）
       if (name !== bindingName) {
-        const nameResponse = await fetch(`/api/devices/${device.id}`, {
+        const nameResponse = await fetch(`/api/devices/${deviceId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',

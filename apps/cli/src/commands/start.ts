@@ -13,6 +13,7 @@ import { tempBindingManager } from '../lib/temp-binding-manager.js';
 import { bindingCodeManager } from '../lib/binding-code-manager.js';
 import { urlUpdateManager } from '../lib/url-update-manager.js';
 import { generateDeviceId, getDeviceInfoSummary, getLocalIpAddress } from '../lib/device-id.js';
+import { acpConnector } from '../lib/connectors/acp-connector.js';
 import open from 'open';
 import os from 'os';
 import type { StartCommandOptions } from '../types/index.js';
@@ -237,6 +238,9 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     formatter.newline();
     const serviceSpinner = formatter.spinner('Initializing MCP/ACP services...');
     try {
+      // 初始化 ACP 连接器（还原持久化会话，但不初始化连接）
+      await acpConnector.initialize();
+
       for (const code of bindingCodes) {
         const servers = existingConfig?.[code]?.mcpServices || {};
         if (Object.keys(servers).length > 0) {
