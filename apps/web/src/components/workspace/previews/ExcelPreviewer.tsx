@@ -113,7 +113,7 @@ function convertToLuckySheet(workbook: import('xlsx').WorkBook): LuckySheetData[
   });
 }
 
-export function ExcelPreviewer({ file, deviceId, onlineUrl, className = '' }: PreviewerProps) {
+export function ExcelPreviewer({ file, deviceClient, className = '' }: PreviewerProps) {
   const [rawData, setRawData] = useState<(string | number | boolean | null)[][]>([]);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [luckyData, setLuckyData] = useState<LuckySheetData[] | null>(null);
@@ -124,7 +124,7 @@ export function ExcelPreviewer({ file, deviceId, onlineUrl, className = '' }: Pr
 
   const containerRef = useRef<HTMLDivElement>(null);
   const luckyContainerId = useRef(`luckysheet-${Date.now()}`);
-  const fileUrl = buildFileUrl(deviceId, file.path);
+  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
 
   // 加载 LuckySheet CSS 和 JS
   const loadLuckySheet = useCallback(async () => {
@@ -175,12 +175,18 @@ export function ExcelPreviewer({ file, deviceId, onlineUrl, className = '' }: Pr
 
   // 加载并解析 Excel
   const loadDocument = useCallback(async () => {
+    if (!deviceClient) {
+      setError('设备客户端未就绪');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
       const response = await fetch(fileUrl, {
-        headers: { 'Cli-Url': onlineUrl },
+        headers: { Authorization: `Bearer ${deviceClient.deviceBindingCode}` },
       });
 
       if (!response.ok) throw new Error('文件加载失败');
@@ -209,7 +215,7 @@ export function ExcelPreviewer({ file, deviceId, onlineUrl, className = '' }: Pr
     } finally {
       setIsLoading(false);
     }
-  }, [fileUrl, onlineUrl]);
+  }, [fileUrl, deviceClient]);
 
   // 初始化加载
   useEffect(() => {

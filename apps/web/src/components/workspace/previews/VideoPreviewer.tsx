@@ -30,7 +30,7 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function VideoPreviewer({ file, deviceId, className = '' }: PreviewerProps) {
+export function VideoPreviewer({ file, deviceClient, className = '' }: PreviewerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -43,7 +43,7 @@ export function VideoPreviewer({ file, deviceId, className = '' }: PreviewerProp
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const videoUrl = buildFileUrl(deviceId, file.path);
+  const videoUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
 
   // 播放/暂停
   const togglePlay = useCallback(() => {

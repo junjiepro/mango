@@ -25,13 +25,13 @@ const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
 const SCALE_STEP = 0.25;
 
-export function PDFPreviewer({ file, deviceId, className = '' }: PreviewerProps) {
+export function PDFPreviewer({ file, deviceClient, className = '' }: PreviewerProps) {
   const [scale, setScale] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [key, setKey] = useState(0);
 
-  const pdfUrl = buildFileUrl(deviceId, file.path);
+  const pdfUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
 
   // 缩放
   const handleZoom = useCallback((delta: number) => {

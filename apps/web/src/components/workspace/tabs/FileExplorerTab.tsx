@@ -407,22 +407,13 @@ export function FileExplorerTab({
 
   // 懒加载子文件夹
   const handleDirectoryExpand = async (directory: FileNode): Promise<FileNode[]> => {
+    if (!client) {
+      toast.error('设备客户端未就绪');
+      return [];
+    }
+
     try {
-      const response = await fetch(
-        `/api/devices/${deviceId}/files?path=${encodeURIComponent(directory.path)}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Cli-Url': device?.online_urls?.[0] || '',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('加载子文件失败');
-      }
-
-      const data = await response.json();
+      const data = await client.files.list(directory.path);
       const children = data.files || [];
 
       // 保存加载的子节点到状态中

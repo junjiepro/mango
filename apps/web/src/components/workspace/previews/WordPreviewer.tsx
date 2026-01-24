@@ -15,16 +15,22 @@ import { PreviewContainer, PreviewLoading, PreviewError } from './PreviewContain
 import type { PreviewerProps } from './types';
 import { buildFileUrl } from './types';
 
-export function WordPreviewer({ file, deviceId, onlineUrl, className = '' }: PreviewerProps) {
+export function WordPreviewer({ file, deviceClient, className = '' }: PreviewerProps) {
   const [htmlContent, setHtmlContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const fileUrl = buildFileUrl(deviceId, file.path);
+  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
 
   // 加载并转换文档
   const loadDocument = useCallback(async () => {
+    if (!deviceClient) {
+      setError('设备客户端未就绪');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -32,7 +38,7 @@ export function WordPreviewer({ file, deviceId, onlineUrl, className = '' }: Pre
       // 获取文件内容
       const response = await fetch(fileUrl, {
         headers: {
-          'Cli-Url': onlineUrl,
+          Authorization: `Bearer ${deviceClient.deviceBindingCode}`,
         },
       });
 
@@ -59,7 +65,7 @@ export function WordPreviewer({ file, deviceId, onlineUrl, className = '' }: Pre
     } finally {
       setIsLoading(false);
     }
-  }, [fileUrl, onlineUrl]);
+  }, [fileUrl, deviceClient]);
 
   useEffect(() => {
     loadDocument();

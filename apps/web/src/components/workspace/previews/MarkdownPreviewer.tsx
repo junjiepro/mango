@@ -104,7 +104,7 @@ function parseMarkdown(markdown: string): string {
   return html;
 }
 
-export function MarkdownPreviewer({ file, deviceId, onlineUrl, className = '' }: PreviewerProps) {
+export function MarkdownPreviewer({ file, deviceClient, className = '' }: PreviewerProps) {
   const [content, setContent] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,24 +114,16 @@ export function MarkdownPreviewer({ file, deviceId, onlineUrl, className = '' }:
   // 加载文件内容
   useEffect(() => {
     const loadFile = async () => {
+      if (!deviceClient) {
+        setError('设备客户端未就绪');
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(
-          `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(file.path)}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Cli-Url': onlineUrl,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('读取文件失败');
-        }
-
-        const data = await response.json();
+        const data = await deviceClient.files.read(file.path);
         setContent(data.content || '');
       } catch (err) {
         setError(err instanceof Error ? err.message : '加载失败');
@@ -141,7 +133,7 @@ export function MarkdownPreviewer({ file, deviceId, onlineUrl, className = '' }:
     };
 
     loadFile();
-  }, [file.path, deviceId, onlineUrl]);
+  }, [file.path, deviceClient]);
 
   // 解析 Markdown
   const htmlContent = useMemo(() => parseMarkdown(content), [content]);

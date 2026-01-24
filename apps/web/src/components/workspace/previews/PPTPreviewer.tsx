@@ -21,23 +21,29 @@ interface PPTInfo {
   lastModified?: string;
 }
 
-export function PPTPreviewer({ file, deviceId, onlineUrl, className = '' }: PreviewerProps) {
+export function PPTPreviewer({ file, deviceClient, className = '' }: PreviewerProps) {
   const [info, setInfo] = useState<PPTInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fileUrl = buildFileUrl(deviceId, file.path);
+  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
   const extension = getFileExtension(file.name);
 
   // 尝试解析 PPT 基本信息
   const loadDocument = useCallback(async () => {
+    if (!deviceClient) {
+      setError('设备客户端未就绪');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
       const response = await fetch(fileUrl, {
         headers: {
-          'Cli-Url': onlineUrl,
+          Authorization: `Bearer ${deviceClient.deviceBindingCode}`,
         },
       });
 
@@ -79,7 +85,7 @@ export function PPTPreviewer({ file, deviceId, onlineUrl, className = '' }: Prev
     } finally {
       setIsLoading(false);
     }
-  }, [fileUrl, onlineUrl, extension, file.name]);
+  }, [fileUrl, deviceClient, extension, file.name]);
 
   useEffect(() => {
     loadDocument();

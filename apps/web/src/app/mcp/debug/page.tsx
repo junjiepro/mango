@@ -69,26 +69,40 @@ export default function MCPDebugPage() {
       return;
     }
 
+    const deviceData = devices.find((d) => d.binding_id === selectedDevice);
+    if (!deviceData?.device_url) {
+      setToolResult({
+        success: false,
+        error: '设备 URL 不可用',
+      });
+      return;
+    }
+
     try {
       setExecuting(true);
       setToolResult(null);
 
       const args = JSON.parse(toolArgs);
 
-      const response = await fetch(`/api/devices/${selectedDevice}/mcp/tools/invoke`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          service_name: selectedService,
-          tool_name: selectedTool.name,
-          arguments: args,
-        }),
-      });
+      // 直接调用 CLI 设备的 MCP 工具
+      const response = await fetch(
+        `${deviceData.device_url}/mcp/${selectedService}/tools/${selectedTool.name}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(args),
+        }
+      );
 
       const result = await response.json();
-      setToolResult(result);
+      setToolResult({
+        success: response.ok,
+        service: selectedService,
+        tool: selectedTool.name,
+        result: result.result || result,
+      });
     } catch (error) {
       setToolResult({
         success: false,

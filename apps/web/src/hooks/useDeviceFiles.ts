@@ -1,21 +1,16 @@
 /**
  * useDeviceFiles Hook
- * 管理设备文件系统操作
+ * 管理设备文件系统操作 - 使用 useDeviceClient 直接与 CLI 通信
  */
 
 'use client';
 
 import { DeviceBinding } from '@/services/DeviceService';
 import { useState, useCallback, useEffect } from 'react';
+import { useDeviceClient, DeviceClientAPI } from './useDeviceClient';
 
-export interface FileNode {
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  size?: number;
-  modified?: string;
-  children?: FileNode[];
-}
+// 从 useDeviceClient 重新导出 FileNode 类型
+export type { FileNode } from './useDeviceClient';
 
 export interface WorkspaceHistoryItem {
   id: string;
@@ -24,7 +19,7 @@ export interface WorkspaceHistoryItem {
 }
 
 interface UseDeviceFilesReturn {
-  files: FileNode[];
+  files: import('./useDeviceClient').FileNode[];
   currentPath: string;
   workspaceDir: string | null;
   recentPaths: WorkspaceHistoryItem[];
@@ -41,10 +36,14 @@ interface UseDeviceFilesReturn {
   createDirectory: (path: string) => Promise<void>;
   deleteFile: (path: string) => Promise<void>;
   renameFile: (oldPath: string, newPath: string) => Promise<void>;
+  /** 设备客户端 API（供需要直接访问的组件使用） */
+  deviceClient: DeviceClientAPI | null;
 }
 
 export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
-  const [files, setFiles] = useState<FileNode[]>([]);
+  const { client: deviceClient, isReady } = useDeviceClient(device);
+
+  const [files, setFiles] = useState<import('./useDeviceClient').FileNode[]>([]);
   const [currentPath, setCurrentPath] = useState<string>('');
   const [workspaceDir, setWorkspaceDir] = useState<string | null>(null);
   const [recentPaths, setRecentPaths] = useState<WorkspaceHistoryItem[]>([]);
@@ -52,34 +51,24 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
   const [error, setError] = useState<string | null>(null);
 
   const deviceId = device?.id;
-  const onlineUrl = device?.online_urls?.[0] || '';
 
   // 加载工作空间配置
   const loadWorkspaceConfig = useCallback(async () => {
-    if (!device) return;
+    if (!deviceClient) return;
 
     try {
-      const response = await fetch(`/api/devices/${device.id}/config`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cli-Url': onlineUrl,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setWorkspaceDir(data.config?.workspaceDir || null);
-      }
+      const data = await deviceClient.config.get();
+      setWorkspaceDir(data.config?.workspaceDir || null);
     } catch (err) {
       console.error('Failed to load workspace config:', err);
     }
-  }, [device?.id, onlineUrl]);
+  }, [deviceClient]);
 
   // 加载目录
   const loadDirectory = useCallback(
     async (path?: string) => {
-      if (!deviceId) {
-        setError('未选择设备');
+      if (!deviceClient) {
+        setError('设备客户端未就绪');
         return;
       }
 
@@ -87,25 +76,8 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
       setError(null);
 
       try {
-        // 如果没有提供path,使用空字符串让服务端使用workspaceDir
-        const targetPath = path !== undefined ? (path === '/' ? workspaceDir : path) : '';
-        const url = targetPath
-          ? `/api/devices/${deviceId}/files?path=${encodeURIComponent(targetPath)}`
-          : `/api/devices/${deviceId}/files`;
-
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cli-Url': onlineUrl,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('加载目录失败');
-        }
-
-        const data = await response.json();
+        const targetPath = path !== undefined ? (path === '/' ? workspaceDir || '' : path) : '';
+        const data = await deviceClient.files.list(targetPath);
         setFiles(data.files || []);
         setCurrentPath(data.path || targetPath);
 
@@ -120,7 +92,7 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
         setIsLoading(false);
       }
     },
-    [deviceId, workspaceDir, onlineUrl]
+    [deviceClient, workspaceDir]
   );
 
   // 切换目录
@@ -187,156 +159,82 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
 
   const readFile = useCallback(
     async (path: string): Promise<string> => {
-      if (!deviceId) {
-        throw new Error('未选择设备');
+      if (!deviceClient) {
+        throw new Error('设备客户端未就绪');
       }
 
-      const response = await fetch(
-        `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(path)}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Cli-Url': onlineUrl,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('读取文件失败');
-      }
-
-      const data = await response.json();
+      const data = await deviceClient.files.read(path);
       return data.content;
     },
-    [deviceId, onlineUrl]
+    [deviceClient]
   );
 
   const writeFile = useCallback(
     async (path: string, content: string) => {
-      if (!deviceId) {
-        throw new Error('未选择设备');
+      if (!deviceClient) {
+        throw new Error('设备客户端未就绪');
       }
 
-      const response = await fetch(`/api/devices/${deviceId}/files/write`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cli-Url': onlineUrl,
-        },
-        body: JSON.stringify({ path, content }),
-      });
-
-      if (!response.ok) {
-        throw new Error('写入文件失败');
-      }
+      await deviceClient.files.write(path, content);
     },
-    [deviceId, onlineUrl]
+    [deviceClient]
   );
 
   const createFile = useCallback(
     async (path: string) => {
-      if (!deviceId) {
-        throw new Error('未选择设备');
+      if (!deviceClient) {
+        throw new Error('设备客户端未就绪');
       }
 
-      const response = await fetch(`/api/devices/${deviceId}/files/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cli-Url': onlineUrl,
-        },
-        body: JSON.stringify({ path, type: 'file' }),
-      });
-
-      if (!response.ok) {
-        throw new Error('创建文件失败');
-      }
-
-      // 重新加载当前目录
+      await deviceClient.files.create(path, 'file');
       await loadDirectory(currentPath);
     },
-    [deviceId, currentPath, loadDirectory, onlineUrl]
+    [deviceClient, currentPath, loadDirectory]
   );
 
   const createDirectory = useCallback(
     async (path: string) => {
-      if (!deviceId) {
-        throw new Error('未选择设备');
+      if (!deviceClient) {
+        throw new Error('设备客户端未就绪');
       }
 
-      const response = await fetch(`/api/devices/${deviceId}/files/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cli-Url': onlineUrl,
-        },
-        body: JSON.stringify({ path, type: 'directory' }),
-      });
-
-      if (!response.ok) {
-        throw new Error('创建目录失败');
-      }
-
+      await deviceClient.files.create(path, 'directory');
       await loadDirectory(currentPath);
     },
-    [deviceId, currentPath, loadDirectory, onlineUrl]
+    [deviceClient, currentPath, loadDirectory]
   );
 
   const deleteFile = useCallback(
     async (path: string) => {
-      if (!deviceId) {
-        throw new Error('未选择设备');
+      if (!deviceClient) {
+        throw new Error('设备客户端未就绪');
       }
 
-      const response = await fetch(`/api/devices/${deviceId}/files/delete`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cli-Url': onlineUrl,
-        },
-        body: JSON.stringify({ path }),
-      });
-
-      if (!response.ok) {
-        throw new Error('删除失败');
-      }
-
+      await deviceClient.files.delete(path);
       await loadDirectory(currentPath);
     },
-    [deviceId, currentPath, loadDirectory, onlineUrl]
+    [deviceClient, currentPath, loadDirectory]
   );
 
   const renameFile = useCallback(
     async (oldPath: string, newPath: string) => {
-      if (!deviceId) {
-        throw new Error('未选择设备');
+      if (!deviceClient) {
+        throw new Error('设备客户端未就绪');
       }
 
-      const response = await fetch(`/api/devices/${deviceId}/files/rename`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cli-Url': onlineUrl,
-        },
-        body: JSON.stringify({ oldPath, newPath }),
-      });
-
-      if (!response.ok) {
-        throw new Error('重命名失败');
-      }
-
+      await deviceClient.files.rename(oldPath, newPath);
       await loadDirectory(currentPath);
     },
-    [deviceId, currentPath, loadDirectory, onlineUrl]
+    [deviceClient, currentPath, loadDirectory]
   );
 
   // 初始化加载配置和历史记录
   useEffect(() => {
-    if (deviceId) {
+    if (isReady) {
       loadWorkspaceConfig();
       loadWorkspaceHistory();
     }
-  }, [deviceId, loadWorkspaceConfig, loadWorkspaceHistory]);
+  }, [isReady, loadWorkspaceConfig, loadWorkspaceHistory]);
 
   return {
     files,
@@ -356,5 +254,6 @@ export function useDeviceFiles(device?: DeviceBinding): UseDeviceFilesReturn {
     createDirectory,
     deleteFile,
     renameFile,
+    deviceClient,
   };
 }

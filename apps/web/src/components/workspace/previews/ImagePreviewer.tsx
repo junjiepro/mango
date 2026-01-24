@@ -26,7 +26,7 @@ const MIN_SCALE = 0.1;
 const MAX_SCALE = 5;
 const SCALE_STEP = 0.25;
 
-export function ImagePreviewer({ file, deviceId, className = '' }: PreviewerProps) {
+export function ImagePreviewer({ file, deviceClient, className = '' }: PreviewerProps) {
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -39,7 +39,7 @@ export function ImagePreviewer({ file, deviceId, className = '' }: PreviewerProp
   const imageRef = useRef<HTMLImageElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
 
-  const imageUrl = buildFileUrl(deviceId, file.path);
+  const imageUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
 
   // 重置视图
   const resetView = useCallback(() => {

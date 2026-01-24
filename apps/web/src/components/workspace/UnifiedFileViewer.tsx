@@ -9,8 +9,9 @@ import React, { useState, useCallback } from 'react';
 import { Code, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { FileNode } from '@/hooks/useDeviceFiles';
+import type { FileNode } from '@/hooks/useDeviceClient';
 import type { DeviceBinding } from '@/services/DeviceService';
+import { useDeviceClient } from '@/hooks/useDeviceClient';
 import { getFileCategory, hasPreviewSupport, isBinaryFile } from './previews/types';
 
 // 动态导入预览器组件
@@ -70,6 +71,7 @@ export function UnifiedFileViewer({
   isActive,
   onMarkDirty,
 }: UnifiedFileViewerProps) {
+  const { client: deviceClient } = useDeviceClient(device);
   const isBinary = isBinaryFile(file.name);
   const hasPreview = hasPreviewSupport(file.name);
 
@@ -79,7 +81,6 @@ export function UnifiedFileViewer({
   );
 
   const PreviewerComponent = getPreviewerComponent(file.name);
-  const onlineUrl = device.online_urls?.[0] || '';
 
   // 是否显示模式切换标签
   const showModeTabs = hasPreview && !isBinary;
@@ -152,8 +153,7 @@ export function UnifiedFileViewer({
     return (
       <PreviewerComponent
         file={file}
-        deviceId={device.id}
-        onlineUrl={onlineUrl}
+        deviceClient={deviceClient}
       />
     );
   };

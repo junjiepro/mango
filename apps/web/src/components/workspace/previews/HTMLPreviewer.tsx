@@ -23,7 +23,7 @@ const DEVICE_SIZES: Record<DeviceMode, { width: string; label: string }> = {
   mobile: { width: '375px', label: '手机' },
 };
 
-export function HTMLPreviewer({ file, deviceId, onlineUrl, className = '' }: PreviewerProps) {
+export function HTMLPreviewer({ file, deviceClient, className = '' }: PreviewerProps) {
   const [content, setContent] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export function HTMLPreviewer({ file, deviceId, onlineUrl, className = '' }: Pre
   const [key, setKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const fileUrl = buildFileUrl(deviceId, file.path);
+  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
 
   // 加载文件内容（用于源码视图）
   useEffect(() => {
@@ -43,24 +43,16 @@ export function HTMLPreviewer({ file, deviceId, onlineUrl, className = '' }: Pre
         return;
       }
 
+      if (!deviceClient) {
+        setError('设备客户端未就绪');
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(
-          `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(file.path)}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Cli-Url': onlineUrl,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('读取文件失败');
-        }
-
-        const data = await response.json();
+        const data = await deviceClient.files.read(file.path);
         setContent(data.content || '');
       } catch (err) {
         setError(err instanceof Error ? err.message : '加载失败');
@@ -70,7 +62,7 @@ export function HTMLPreviewer({ file, deviceId, onlineUrl, className = '' }: Pre
     };
 
     loadFile();
-  }, [file.path, deviceId, onlineUrl, viewMode]);
+  }, [file.path, deviceClient, viewMode]);
 
   // 复制内容
   const handleCopy = useCallback(async () => {

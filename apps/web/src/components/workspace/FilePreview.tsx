@@ -9,16 +9,15 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Image as ImageIcon, Video, Music, FileCode } from 'lucide-react';
 import { toast } from 'sonner';
-import type { FileNode } from '@/hooks/useDeviceFiles';
+import type { FileNode, DeviceClientAPI } from '@/hooks/useDeviceClient';
 
 interface FilePreviewProps {
   file: FileNode;
-  deviceId: string;
-  onlineUrl: string;
+  deviceClient: DeviceClientAPI | null;
   className?: string;
 }
 
-export function FilePreview({ file, deviceId, onlineUrl, className = '' }: FilePreviewProps) {
+export function FilePreview({ file, deviceClient, className = '' }: FilePreviewProps) {
   const [content, setContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -46,23 +45,15 @@ export function FilePreview({ file, deviceId, onlineUrl, className = '' }: FileP
   // 加载文件内容
   useEffect(() => {
     const loadFile = async () => {
+      if (!deviceClient) {
+        toast.error('设备客户端未就绪');
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       try {
-        const response = await fetch(
-          `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(file.path)}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Cli-Url': onlineUrl,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('读取文件失败');
-        }
-
-        const data = await response.json();
+        const data = await deviceClient.files.read(file.path);
         setContent(data.content || '');
       } catch (error) {
         toast.error('读取失败', {
@@ -78,7 +69,7 @@ export function FilePreview({ file, deviceId, onlineUrl, className = '' }: FileP
     } else {
       setIsLoading(false);
     }
-  }, [file.path, deviceId, onlineUrl, fileType, toast]);
+  }, [file.path, deviceClient, fileType]);
 
   if (isLoading) {
     return (
@@ -90,7 +81,9 @@ export function FilePreview({ file, deviceId, onlineUrl, className = '' }: FileP
 
   // 图片预览
   if (fileType === 'image') {
-    const imageUrl = `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(file.path)}`;
+    const imageUrl = deviceClient
+      ? `${deviceClient.deviceUrl}/files/download?path=${encodeURIComponent(file.path)}`
+      : '';
     return (
       <div className={`flex flex-col h-full ${className}`}>
         <div className="p-4 border-b bg-muted/20 shrink-0">
@@ -108,7 +101,9 @@ export function FilePreview({ file, deviceId, onlineUrl, className = '' }: FileP
 
   // 视频预览
   if (fileType === 'video') {
-    const videoUrl = `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(file.path)}`;
+    const videoUrl = deviceClient
+      ? `${deviceClient.deviceUrl}/files/download?path=${encodeURIComponent(file.path)}`
+      : '';
     return (
       <div className={`flex flex-col h-full ${className}`}>
         <div className="p-4 border-b bg-muted/20 shrink-0">
@@ -129,7 +124,9 @@ export function FilePreview({ file, deviceId, onlineUrl, className = '' }: FileP
 
   // 音频预览
   if (fileType === 'audio') {
-    const audioUrl = `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(file.path)}`;
+    const audioUrl = deviceClient
+      ? `${deviceClient.deviceUrl}/files/download?path=${encodeURIComponent(file.path)}`
+      : '';
     return (
       <div className={`flex flex-col h-full ${className}`}>
         <div className="p-4 border-b bg-muted/20 shrink-0">
@@ -150,7 +147,9 @@ export function FilePreview({ file, deviceId, onlineUrl, className = '' }: FileP
 
   // PDF 预览
   if (fileType === 'pdf') {
-    const pdfUrl = `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(file.path)}`;
+    const pdfUrl = deviceClient
+      ? `${deviceClient.deviceUrl}/files/download?path=${encodeURIComponent(file.path)}`
+      : '';
     return (
       <div className={`flex flex-col h-full ${className}`}>
         <div className="p-4 border-b bg-muted/20 shrink-0">

@@ -20,7 +20,7 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function AudioPreviewer({ file, deviceId, className = '' }: PreviewerProps) {
+export function AudioPreviewer({ file, deviceClient, className = '' }: PreviewerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -31,7 +31,7 @@ export function AudioPreviewer({ file, deviceId, className = '' }: PreviewerProp
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  const audioUrl = buildFileUrl(deviceId, file.path);
+  const audioUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
 
   // 播放/暂停
   const togglePlay = useCallback(() => {

@@ -318,6 +318,55 @@ class TerminalAPI {
 }
 
 /**
+ * MCP服务信息
+ */
+export interface MCPService {
+  name: string;
+  status?: string;
+}
+
+/**
+ * MCP工具信息
+ */
+export interface MCPTool {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+}
+
+/**
+ * MCP操作API
+ */
+class MCPAPI {
+  constructor(private client: ClientInterface) {}
+
+  /**
+   * 获取MCP服务列表
+   */
+  async listServices(): Promise<{ services: MCPService[] }> {
+    return this.client.get('/mcp/services');
+  }
+
+  /**
+   * 获取指定服务的工具列表
+   */
+  async listTools(serviceName: string): Promise<{ tools: MCPTool[] }> {
+    return this.client.get(`/mcp/${serviceName}/tools`);
+  }
+
+  /**
+   * 调用MCP工具
+   */
+  async invokeTool(
+    serviceName: string,
+    toolName: string,
+    args?: Record<string, unknown>
+  ): Promise<{ result: unknown }> {
+    return this.client.post(`/mcp/${serviceName}/tools/${toolName}`, args || {});
+  }
+}
+
+/**
  * 设备客户端API集合
  */
 export interface DeviceClientAPI {
@@ -325,6 +374,7 @@ export interface DeviceClientAPI {
   acp: ACPAPI;
   config: ConfigAPI;
   terminal: TerminalAPI;
+  mcp: MCPAPI;
   deviceUrl: string;
   deviceBindingCode: string;
   /** 手动重连 */
@@ -434,6 +484,7 @@ export function useDeviceClient(device?: DeviceBinding): UseDeviceClientReturn {
       acp: new ACPAPI(clientInterface),
       config: new ConfigAPI(clientInterface),
       terminal: new TerminalAPI(clientInterface),
+      mcp: new MCPAPI(clientInterface),
       deviceUrl: resilientClient.deviceUrl,
       deviceBindingCode: resilientClient.bindingCode,
       reconnect: () => resilientClient.reconnect(),

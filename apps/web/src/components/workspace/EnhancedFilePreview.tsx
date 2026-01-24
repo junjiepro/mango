@@ -6,8 +6,8 @@
 'use client';
 
 import React from 'react';
-import type { FileNode } from '@/hooks/useDeviceFiles';
-import { getFileCategory, getFileExtension, type FileCategory } from './previews/types';
+import type { FileNode, DeviceClientAPI } from '@/hooks/useDeviceClient';
+import { getFileCategory, getFileExtension, type FileCategory, buildFileUrl } from './previews/types';
 import { ImagePreviewer } from './previews/ImagePreviewer';
 import { VideoPreviewer } from './previews/VideoPreviewer';
 import { AudioPreviewer } from './previews/AudioPreviewer';
@@ -18,12 +18,10 @@ import { PPTPreviewer } from './previews/PPTPreviewer';
 import { MarkdownPreviewer } from './previews/MarkdownPreviewer';
 import { HTMLPreviewer } from './previews/HTMLPreviewer';
 import { UnsupportedPreview } from './previews/PreviewContainer';
-import { buildFileUrl } from './previews/types';
 
 interface EnhancedFilePreviewProps {
   file: FileNode;
-  deviceId: string;
-  onlineUrl: string;
+  deviceClient: DeviceClientAPI | null;
   className?: string;
 }
 
@@ -57,8 +55,7 @@ function getPreviewerComponent(category: FileCategory) {
 
 export function EnhancedFilePreview({
   file,
-  deviceId,
-  onlineUrl,
+  deviceClient,
   className = '',
 }: EnhancedFilePreviewProps) {
   const category = getFileCategory(file.name);
@@ -68,8 +65,9 @@ export function EnhancedFilePreview({
 
   // 下载处理
   const handleDownload = () => {
+    if (!deviceClient) return;
     const link = document.createElement('a');
-    link.href = buildFileUrl(deviceId, file.path);
+    link.href = buildFileUrl(deviceClient.deviceUrl, file.path);
     link.download = file.name;
     link.click();
   };
@@ -90,8 +88,7 @@ export function EnhancedFilePreview({
   return (
     <PreviewerComponent
       file={file}
-      deviceId={deviceId}
-      onlineUrl={onlineUrl}
+      deviceClient={deviceClient}
       className={className}
     />
   );

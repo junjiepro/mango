@@ -3,7 +3,7 @@
  * 文件预览器类型定义
  */
 
-import type { FileNode } from '@/hooks/useDeviceFiles';
+import type { FileNode, DeviceClientAPI } from '@/hooks/useDeviceClient';
 
 // 支持的文件类型分类
 export type FileCategory =
@@ -24,8 +24,7 @@ export type FileCategory =
 // 预览器通用属性
 export interface PreviewerProps {
   file: FileNode;
-  deviceId: string;
-  onlineUrl: string;
+  deviceClient: DeviceClientAPI | null;
   className?: string;
 }
 
@@ -217,8 +216,8 @@ export function isBinaryFile(filename: string): boolean {
 }
 
 /**
- * 构建文件 URL
+ * 构建文件 URL（直接访问 CLI 设备）
  */
-export function buildFileUrl(deviceId: string, filePath: string): string {
-  return `/api/devices/${deviceId}/files/read?path=${encodeURIComponent(filePath)}`;
+export function buildFileUrl(deviceUrl: string, filePath: string): string {
+  return `${deviceUrl}/files/download?path=${encodeURIComponent(filePath)}`;
 }
