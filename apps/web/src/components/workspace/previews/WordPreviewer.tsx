@@ -172,15 +172,114 @@ export function WordPreviewer({ file, deviceClient, className = '' }: PreviewerP
       toolbar={toolbar}
       className={className}
     >
-      <div className="flex-1 overflow-auto p-6 bg-background">
+      <div className="flex-1 overflow-auto p-8 bg-white dark:bg-zinc-900">
         <article
-          className="prose prose-sm dark:prose-invert max-w-none mx-auto
-            prose-headings:font-semibold
-            prose-p:my-3 prose-p:leading-relaxed
-            prose-table:border-collapse prose-th:border prose-th:p-2 prose-th:bg-muted prose-td:border prose-td:p-2
-            prose-img:max-w-full prose-img:rounded"
+          className="max-w-4xl mx-auto word-preview"
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
+        <style jsx global>{`
+          .word-preview {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            font-size: 14px;
+            line-height: 1.8;
+            color: #333;
+          }
+          .dark .word-preview {
+            color: #e5e5e5;
+          }
+          .word-preview h1 {
+            font-size: 2em;
+            font-weight: 700;
+            margin: 1.5em 0 0.8em;
+            padding-bottom: 0.3em;
+            border-bottom: 2px solid #e5e5e5;
+          }
+          .dark .word-preview h1 {
+            border-bottom-color: #404040;
+          }
+          .word-preview h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin: 1.3em 0 0.6em;
+            padding-bottom: 0.2em;
+            border-bottom: 1px solid #e5e5e5;
+          }
+          .dark .word-preview h2 {
+            border-bottom-color: #404040;
+          }
+          .word-preview h3 {
+            font-size: 1.25em;
+            font-weight: 600;
+            margin: 1.2em 0 0.5em;
+          }
+          .word-preview h4, .word-preview h5, .word-preview h6 {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin: 1em 0 0.4em;
+          }
+          .word-preview p {
+            margin: 0.8em 0;
+            text-align: justify;
+          }
+          .word-preview ul, .word-preview ol {
+            margin: 0.8em 0;
+            padding-left: 2em;
+          }
+          .word-preview li {
+            margin: 0.3em 0;
+          }
+          .word-preview table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+          }
+          .word-preview th, .word-preview td {
+            border: 1px solid #d0d0d0;
+            padding: 8px 12px;
+            text-align: left;
+          }
+          .dark .word-preview th, .dark .word-preview td {
+            border-color: #404040;
+          }
+          .word-preview th {
+            background: #f5f5f5;
+            font-weight: 600;
+          }
+          .dark .word-preview th {
+            background: #2a2a2a;
+          }
+          .word-preview img {
+            max-width: 100%;
+            height: auto;
+            margin: 1em 0;
+            border-radius: 4px;
+          }
+          .word-preview blockquote {
+            margin: 1em 0;
+            padding: 0.5em 1em;
+            border-left: 4px solid #ddd;
+            background: #f9f9f9;
+            color: #666;
+          }
+          .dark .word-preview blockquote {
+            border-left-color: #404040;
+            background: #1a1a1a;
+            color: #aaa;
+          }
+          .word-preview a {
+            color: #0066cc;
+            text-decoration: none;
+          }
+          .word-preview a:hover {
+            text-decoration: underline;
+          }
+          .word-preview strong, .word-preview b {
+            font-weight: 600;
+          }
+          .word-preview em, .word-preview i {
+            font-style: italic;
+          }
+        `}</style>
       </div>
     </PreviewContainer>
   );

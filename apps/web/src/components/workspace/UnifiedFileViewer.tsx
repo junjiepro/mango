@@ -171,7 +171,7 @@ export function UnifiedFileViewer({
   return (
     <div className="flex flex-col h-full">
       {renderModeTabs()}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0">
         {viewMode === 'editor' ? renderEditor() : renderPreviewer()}
       </div>
     </div>

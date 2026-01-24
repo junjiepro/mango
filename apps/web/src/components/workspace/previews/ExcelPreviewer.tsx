@@ -114,17 +114,21 @@ function convertToLuckySheet(workbook: import('xlsx').WorkBook): LuckySheetData[
 }
 
 export function ExcelPreviewer({ file, deviceClient, className = '' }: PreviewerProps) {
-  const [rawData, setRawData] = useState<(string | number | boolean | null)[][]>([]);
+  const [allSheetsData, setAllSheetsData] = useState<(string | number | boolean | null)[][][]>([]);
+  const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [luckyData, setLuckyData] = useState<LuckySheetData[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('spreadsheet');
+  const [viewMode, setViewMode] = useState<ViewMode>('raw');
   const [luckyLoaded, setLuckyLoaded] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const luckyContainerId = useRef(`luckysheet-${Date.now()}`);
   const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
+
+  // 当前工作表数据
+  const rawData = allSheetsData[currentSheetIndex] || [];
 
   // 加载 LuckySheet CSS 和 JS
   const loadLuckySheet = useCallback(async () => {
@@ -202,13 +206,16 @@ export function ExcelPreviewer({ file, deviceClient, className = '' }: Previewer
       const luckySheetData = convertToLuckySheet(workbook);
       setLuckyData(luckySheetData);
 
-      // 同时保存原始数据用于简单表格视图
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(
-        firstSheet,
-        { header: 1, defval: null }
-      );
-      setRawData(data);
+      // 保存所有工作表的原始数据用于简单表格视图
+      const allData = workbook.SheetNames.map((sheetName) => {
+        const sheet = workbook.Sheets[sheetName];
+        return XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(
+          sheet,
+          { header: 1, defval: null }
+        );
+      });
+      setAllSheetsData(allData);
+      setCurrentSheetIndex(0);
     } catch (err) {
       console.error('Excel 预览错误:', err);
       setError(err instanceof Error ? err.message : '文件加载失败');
@@ -357,20 +364,20 @@ export function ExcelPreviewer({ file, deviceClient, className = '' }: Previewer
       className={className}
     >
       {viewMode === 'spreadsheet' ? (
-        <div ref={containerRef} className="flex-1 relative">
+        <div ref={containerRef} className="flex-1 relative min-h-0">
           {!luckyLoaded ? (
             <PreviewLoading message="加载表格组件..." />
           ) : (
             <div
               id={luckyContainerId.current}
               className="absolute inset-0"
-              style={{ margin: 0, padding: 0 }}
+              style={{ margin: 0, padding: 0, width: '100%', height: '100%' }}
             />
           )}
         </div>
       ) : (
-        <div className="flex-1 overflow-auto">
-          <table className="w-full border-collapse text-sm">
+        <div className="flex-1 overflow-auto min-h-0">
+          <table className="border-collapse text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-muted">
                 <th className="border border-border px-2 py-1 text-center text-xs text-muted-foreground w-12 bg-muted">
@@ -412,10 +419,32 @@ export function ExcelPreviewer({ file, deviceClient, className = '' }: Previewer
           </table>
         </div>
       )}
-      <div className="shrink-0 px-4 py-1 border-t bg-muted/20 text-xs text-muted-foreground flex items-center gap-4">
-        <span>工作表: {sheetNames.length}</span>
-        <span>行数: {rawData.length}</span>
-        <span>列数: {maxCols}</span>
+      {/* 底部状态栏 */}
+      <div className="shrink-0 border-t bg-muted/20">
+        {/* 简单视图模式下显示工作表切换标签 */}
+        {viewMode === 'raw' && sheetNames.length > 1 && (
+          <div className="flex items-center gap-1 px-2 py-1 border-b overflow-x-auto">
+            {sheetNames.map((name, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentSheetIndex(index)}
+                className={`px-3 py-1 text-xs rounded-t whitespace-nowrap transition-colors ${
+                  index === currentSheetIndex
+                    ? 'bg-background text-foreground border border-b-0 border-border'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                }`}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        )}
+        {/* 统计信息 */}
+        <div className="px-4 py-1 text-xs text-muted-foreground flex items-center gap-4">
+          <span>工作表: {sheetNames.length}</span>
+          <span>行数: {rawData.length}</span>
+          <span>列数: {maxCols}</span>
+        </div>
       </div>
     </PreviewContainer>
   );

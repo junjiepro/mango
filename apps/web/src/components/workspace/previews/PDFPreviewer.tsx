@@ -1,16 +1,13 @@
 /**
  * PDF Previewer Component
- * PDF 预览器 - 支持分页、缩放、搜索等功能
- * 使用 react-pdf 或 PDF.js 实现
+ * PDF 预览器 - 使用浏览器内置 PDF 查看器
  */
 
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   FileText,
-  ZoomIn,
-  ZoomOut,
   Download,
   ExternalLink,
   RefreshCw,
@@ -21,100 +18,97 @@ import { PreviewContainer, PreviewLoading, PreviewError } from './PreviewContain
 import type { PreviewerProps } from './types';
 import { buildFileUrl } from './types';
 
-const MIN_SCALE = 0.5;
-const MAX_SCALE = 3;
-const SCALE_STEP = 0.25;
-
 export function PDFPreviewer({ file, deviceClient, className = '' }: PreviewerProps) {
-  const [scale, setScale] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [key, setKey] = useState(0);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
-  const pdfUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
+  const blobUrlRef = useRef<string | null>(null);
+  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
 
-  // 缩放
-  const handleZoom = useCallback((delta: number) => {
-    setScale((prev) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, prev + delta)));
-  }, []);
+  // 加载 PDF 文件
+  const loadPDF = useCallback(async () => {
+    if (!deviceClient) {
+      setError('设备客户端未就绪');
+      setIsLoading(false);
+      return;
+    }
 
-  // 重置
-  const resetView = useCallback(() => {
-    setScale(1);
+    setIsLoading(true);
+    setError(null);
+
+    // 清理旧的 blob URL
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+
+    try {
+      const response = await fetch(fileUrl, {
+        headers: { Authorization: `Bearer ${deviceClient.deviceBindingCode}` },
+      });
+
+      if (!response.ok) throw new Error('PDF 加载失败');
+
+      const arrayBuffer = await response.arrayBuffer();
+      // 明确指定 MIME 类型为 PDF，确保浏览器使用 PDF 查看器
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      blobUrlRef.current = url;
+      setBlobUrl(url);
+    } catch (err) {
+      console.error('PDF 预览错误:', err);
+      setError(err instanceof Error ? err.message : 'PDF 加载失败');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fileUrl, deviceClient]);
+
+  // 初始化加载
+  useEffect(() => {
+    loadPDF();
+  }, [loadPDF]);
+
+  // 清理 blob URL
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+    };
   }, []);
 
   // 刷新
   const handleRefresh = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
-    setKey((prev) => prev + 1);
-  }, []);
+    loadPDF();
+  }, [loadPDF]);
 
   // 下载
   const handleDownload = useCallback(() => {
+    if (!blobUrl) return;
     const link = document.createElement('a');
-    link.href = pdfUrl;
+    link.href = blobUrl;
     link.download = file.name;
     link.click();
-  }, [pdfUrl, file.name]);
+  }, [blobUrl, file.name]);
 
   // 在新窗口打开
   const handleOpenExternal = useCallback(() => {
-    window.open(pdfUrl, '_blank');
-  }, [pdfUrl]);
-
-  // 构建带参数的 PDF URL
-  const viewerUrl = useMemo(() => {
-    // 使用浏览器内置 PDF 查看器，添加缩放参数
-    return `${pdfUrl}#zoom=${Math.round(scale * 100)}`;
-  }, [pdfUrl, scale]);
+    if (!blobUrl) return;
+    window.open(blobUrl, '_blank');
+  }, [blobUrl]);
 
   const toolbar = (
     <TooltipProvider delayDuration={300}>
       <div className="flex items-center gap-1">
-        {/* 缩放信息 */}
-        <span className="text-xs text-muted-foreground px-2">{Math.round(scale * 100)}%</span>
-
-        {/* 缩小 */}
+        {/* 刷新 */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => handleZoom(-SCALE_STEP)}
-              disabled={scale <= MIN_SCALE}
-            >
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>缩小</TooltipContent>
-        </Tooltip>
-
-        {/* 放大 */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => handleZoom(SCALE_STEP)}
-              disabled={scale >= MAX_SCALE}
-            >
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>放大</TooltipContent>
-        </Tooltip>
-
-        {/* 重置 */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetView}>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleRefresh}>
               <RefreshCw className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>重置缩放</TooltipContent>
+          <TooltipContent>刷新</TooltipContent>
         </Tooltip>
 
         <div className="w-px h-4 bg-border mx-1" />
@@ -162,23 +156,13 @@ export function PDFPreviewer({ file, deviceClient, className = '' }: PreviewerPr
               <PreviewLoading message="正在加载 PDF..." />
             </div>
           )}
-          <iframe
-            key={key}
-            src={viewerUrl}
-            className="w-full h-full border-0"
-            title={file.name}
-            onLoad={() => setIsLoading(false)}
-            onError={() => {
-              setIsLoading(false);
-              setError('PDF 加载失败');
-            }}
-            style={{
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left',
-              width: `${100 / scale}%`,
-              height: `${100 / scale}%`,
-            }}
-          />
+          {blobUrl && (
+            <iframe
+              src={blobUrl}
+              className="w-full h-full border-0"
+              title={file.name}
+            />
+          )}
         </div>
       )}
     </PreviewContainer>
