@@ -1699,7 +1699,395 @@ CREATE POLICY "Users can view their own MCP services"
 
 ---
 
-## 9. 关键指标
+## 9. Context Engineering 优化 (User Story 4 增强)
+
+基于 Context Engineering 最佳实践，对 US4 Agent持续学习与改进进行深度优化。
+
+### 9.1 分层记忆架构
+
+**问题诊断**：
+当前设计仅有 Layer 3 长期记忆（PostgreSQL），缺少完整的记忆层次结构，导致：
+- 学习规则检索效率低
+- 缺少会话级偏好缓存
+- 无法追踪用户意图实体演变
+
+**优化方案：五层记忆架构**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    US4 记忆架构                              │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 1: 工作记忆 (Context Window)                          │
+│   - 当前对话的活跃学习规则 (最多 5 条高置信度规则)            │
+│   - 实时反馈信号                                            │
+│   - 零延迟访问，会话结束即消失                               │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 2: 短期记忆 (Session Cache)                           │
+│   - 会话级用户偏好缓存                                       │
+│   - 本次会话的反馈聚合                                       │
+│   - Redis/内存缓存，会话结束清理                             │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 3: 长期记忆 (PostgreSQL)                              │
+│   - feedback_records: 原始反馈数据                          │
+│   - learning_records: 提取的学习规则                        │
+│   - extension_skills: 扩展 Skill                            │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 4: 实体记忆 (Entity Graph + pgvector)                 │
+│   - 用户意图实体 (user_intent)                              │
+│   - 工具使用模式 (tool_patterns)                            │
+│   - 语义相似度检索                                          │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 5: 时序知识图谱 (Temporal KG)                         │
+│   - 规则有效期 (valid_from, valid_until)                    │
+│   - 偏好演变历史                                            │
+│   - 时间点查询支持                                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 9.2 记忆层实现细节
+
+#### Layer 1: 工作记忆管理
+
+```typescript
+interface WorkingMemory {
+  // 活跃规则（最多5条，按置信度排序）
+  activeRules: LearningRule[];
+  // 当前反馈信号
+  currentFeedback: FeedbackSignal[];
+  // Token 预算
+  tokenBudget: number;
+}
+
+class WorkingMemoryManager {
+  private readonly MAX_RULES = 5;
+  private readonly TOKEN_BUDGET = 1000;
+
+  async loadActiveRules(userId: string, context: ConversationContext): Promise<LearningRule[]> {
+    // 1. 从 Layer 3 检索高置信度规则
+    const rules = await this.learningService.getHighConfidenceRules(userId, {
+      minConfidence: 0.7,
+      limit: this.MAX_RULES * 2
+    });
+
+    // 2. 按当前上下文相关性排序
+    const ranked = this.rankByRelevance(rules, context);
+
+    // 3. 取 Top-K 并压缩
+    return this.compactRules(ranked.slice(0, this.MAX_RULES));
+  }
+}
+```
+
+#### Layer 2: 会话缓存
+
+```typescript
+interface SessionPreferenceCache {
+  userId: string;
+  sessionId: string;
+  // 会话内偏好
+  preferences: {
+    responseStyle: 'concise' | 'detailed' | 'balanced';
+    formatPreference: string[];
+    recentFeedback: FeedbackSummary;
+  };
+  // TTL: 会话结束或 30 分钟无活动
+  expiresAt: Date;
+}
+```
+
+#### Layer 4: 实体记忆（新增表）
+
+```sql
+CREATE TABLE user_intent_entities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  -- 实体信息
+  intent_name TEXT NOT NULL,
+  intent_embedding VECTOR(1536), -- OpenAI text-embedding-3-small
+
+  -- 关联模式
+  associated_tools TEXT[] DEFAULT '{}',
+  success_patterns JSONB DEFAULT '[]',
+  failure_patterns JSONB DEFAULT '[]',
+
+  -- 统计
+  occurrence_count INT DEFAULT 1,
+  avg_satisfaction FLOAT,
+
+  -- 时序
+  first_seen_at TIMESTAMPTZ DEFAULT NOW(),
+  last_seen_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(user_id, intent_name)
+);
+
+-- 向量相似度索引 (pgvector)
+CREATE INDEX idx_intent_embedding ON user_intent_entities
+  USING ivfflat (intent_embedding vector_cosine_ops)
+  WITH (lists = 100);
+```
+
+#### Layer 5: 时序有效性扩展
+
+```sql
+-- 为 learning_records 添加时序字段
+ALTER TABLE learning_records ADD COLUMN IF NOT EXISTS
+  valid_from TIMESTAMPTZ DEFAULT NOW();
+
+ALTER TABLE learning_records ADD COLUMN IF NOT EXISTS
+  valid_until TIMESTAMPTZ; -- NULL 表示当前有效
+
+-- 时序查询索引
+CREATE INDEX idx_learning_temporal ON learning_records(
+  user_id, valid_from, valid_until
+) WHERE is_active = true;
+
+-- 时序查询函数
+CREATE OR REPLACE FUNCTION get_rules_at_time(
+  p_user_id UUID,
+  p_query_time TIMESTAMPTZ DEFAULT NOW()
+)
+RETURNS SETOF learning_records AS $$
+BEGIN
+  RETURN QUERY
+  SELECT * FROM learning_records
+  WHERE user_id = p_user_id
+    AND is_active = true
+    AND valid_from <= p_query_time
+    AND (valid_until IS NULL OR valid_until > p_query_time)
+  ORDER BY confidence DESC;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### 9.3 上下文优化策略
+
+#### 策略 1: 学习规则注入的上下文预算
+
+```typescript
+interface LearningContextBudget {
+  // 总预算: 2000 tokens (约占 8K 上下文的 25%)
+  totalTokens: 2000;
+
+  // 分配策略
+  allocation: {
+    highConfidenceRules: 1000;  // 置信度 > 0.8 的规则
+    mediumConfidenceRules: 600; // 置信度 0.5-0.8
+    extensionSkills: 400;       // 扩展 Skill 指导
+  };
+
+  // 触发压缩的阈值
+  compactionThreshold: 0.8; // 使用率达 80% 时触发压缩
+}
+
+class ContextBudgetManager {
+  async allocateRules(
+    rules: LearningRule[],
+    budget: LearningContextBudget
+  ): Promise<string> {
+    const highConf = rules.filter(r => r.confidence > 0.8);
+    const medConf = rules.filter(r => r.confidence >= 0.5 && r.confidence <= 0.8);
+
+    let result = '';
+    let usedTokens = 0;
+
+    // 优先注入高置信度规则
+    for (const rule of highConf) {
+      const ruleText = this.formatRule(rule);
+      const tokens = this.countTokens(ruleText);
+
+      if (usedTokens + tokens <= budget.allocation.highConfidenceRules) {
+        result += ruleText + '\n';
+        usedTokens += tokens;
+      }
+    }
+
+    // 剩余预算分配给中置信度规则
+    // ...
+
+    return result;
+  }
+}
+```
+
+#### 策略 2: 规则压缩算法
+
+```typescript
+function compactLearningRules(rules: LearningRule[]): string {
+  // 1. 按置信度降序排序
+  const sorted = [...rules].sort((a, b) => b.confidence - a.confidence);
+
+  // 2. 取 Top-5 规则
+  const topK = sorted.slice(0, 5);
+
+  // 3. 生成紧凑摘要格式
+  const compacted = topK.map(rule => {
+    const type = rule.record_type.toUpperCase();
+    const condition = summarizeCondition(rule.rule_content.condition);
+    const action = summarizeAction(rule.rule_content.action);
+    const conf = Math.round(rule.confidence * 100);
+
+    return `[${type}|${conf}%] ${condition} → ${action}`;
+  });
+
+  return compacted.join('\n');
+}
+
+// 示例输出:
+// [FORMAT|92%] 用户请求代码 → 使用 markdown 代码块
+// [ACCURACY|87%] 数据分析任务 → 先确认数据范围
+// [PREFERENCE|85%] 回复风格 → 简洁直接，避免冗余
+```
+
+#### 策略 3: KV-Cache 友好的提示词结构
+
+```typescript
+function buildCacheFriendlyPrompt(
+  systemPrompt: string,
+  toolDefinitions: string,
+  learningRules: string,
+  conversationHistory: Message[],
+  currentMessage: string
+): string {
+  // 稳定内容放前面（可被 KV-Cache 缓存）
+  const stablePrefix = [
+    systemPrompt,           // 永不变
+    toolDefinitions,        // 很少变
+  ].join('\n\n');
+
+  // 半稳定内容（会话级稳定）
+  const semiStable = [
+    '## 用户学习偏好',
+    learningRules,          // 按置信度排序，高置信度在前
+  ].join('\n');
+
+  // 动态内容放最后
+  const dynamic = [
+    '## 对话历史',
+    formatHistory(conversationHistory),
+    '## 当前消息',
+    currentMessage
+  ].join('\n');
+
+  return [stablePrefix, semiStable, dynamic].join('\n\n---\n\n');
+}
+```
+
+### 9.4 性能基准与目标
+
+基于 Deep Memory Retrieval (DMR) Benchmark 的行业数据：
+
+| 记忆系统 | DMR 准确率 | 检索延迟 | 备注 |
+|----------|-----------|----------|------|
+| Zep (Temporal KG) | 94.8% | 2.58s | 行业最佳 |
+| MemGPT | 93.4% | Variable | 通用性能好 |
+| GraphRAG | ~75-85% | Variable | 比基线 RAG 提升 20-35% |
+| Vector RAG | ~60-70% | Fast | 丢失关系结构 |
+| 递归摘要 | 35.3% | Low | 严重信息丢失 |
+
+**Mango US4 目标**：
+
+| 指标 | 当前预期 | 优化后目标 | 达成策略 |
+|------|---------|-----------|----------|
+| 规则检索准确率 | ~65% | 85%+ | 实体记忆 + 时序 KG |
+| 检索延迟 P95 | 未知 | <500ms | 分层缓存 + 索引优化 |
+| 上下文利用率 | 未优化 | <70% | 预算管理 + 压缩 |
+| 规则应用准确率 | 未知 | 80%+ | 置信度过滤 + A/B 测试 |
+| Token 成本降低 | 基线 | -40% | 压缩 + KV-Cache |
+
+### 9.5 扩展 Skill 生成优化
+
+基于 research-us4-extension.md 的设计，增加 Context Engineering 优化：
+
+```typescript
+class OptimizedExtensionSkillGenerator {
+  // 使用实体记忆进行意图聚类
+  async generateExtensionSkills(
+    feedbacks: FeedbackRecord[],
+    threshold: number = 5
+  ): Promise<Skill[]> {
+    // 1. 提取意图实体
+    const intents = await this.extractIntentEntities(feedbacks);
+
+    // 2. 使用向量相似度聚类（而非简单字符串匹配）
+    const clusters = await this.semanticCluster(intents, {
+      similarityThreshold: 0.85,
+      minClusterSize: threshold
+    });
+
+    // 3. 为每个聚类生成 Skill
+    const skills: Skill[] = [];
+    for (const cluster of clusters) {
+      // 4. 添加时序有效性
+      const skill = await this.createSkillWithValidity(cluster, {
+        validFrom: new Date(),
+        // 默认 30 天有效期，可根据反馈延长
+        validUntil: addDays(new Date(), 30)
+      });
+      skills.push(skill);
+    }
+
+    return skills;
+  }
+
+  // 语义聚类（使用 pgvector）
+  private async semanticCluster(
+    intents: IntentEntity[],
+    options: ClusterOptions
+  ): Promise<IntentCluster[]> {
+    // 使用 DBSCAN 或 K-Means 在向量空间聚类
+    const embeddings = intents.map(i => i.embedding);
+    return await this.vectorCluster(embeddings, options);
+  }
+}
+```
+
+### 9.6 记忆整合与清理
+
+```typescript
+interface MemoryConsolidationConfig {
+  // 触发条件
+  triggers: {
+    memoryCount: 1000;      // 记忆数量超过阈值
+    outdatedRatio: 0.3;     // 过时记忆比例超过 30%
+    scheduleInterval: '7d'; // 每周定期整合
+  };
+
+  // 整合策略
+  strategies: {
+    mergeRelated: true;     // 合并相关记忆
+    archiveOutdated: true;  // 归档过时记忆
+    updateValidity: true;   // 更新有效期
+    rebuildIndexes: true;   // 重建索引
+  };
+}
+
+class MemoryConsolidator {
+  async consolidate(userId: string): Promise<ConsolidationResult> {
+    // 1. 识别过时规则
+    const outdated = await this.findOutdatedRules(userId);
+
+    // 2. 合并相似规则
+    const merged = await this.mergeRelatedRules(userId);
+
+    // 3. 更新有效期
+    await this.updateValidityPeriods(userId);
+
+    // 4. 归档或删除
+    await this.archiveOrDelete(outdated);
+
+    // 5. 重建索引
+    await this.rebuildIndexes(userId);
+
+    return { outdatedCount: outdated.length, mergedCount: merged.length };
+  }
+}
+```
+
+---
+
+## 10. 关键指标
 
 ### 技术指标
 
@@ -1707,6 +2095,8 @@ CREATE POLICY "Users can view their own MCP services"
 - **实时消息延迟 P95**：< 200ms
 - **沙箱启动时间**：< 500ms
 - **学习规则应用率**：> 80%（第3个月）
+- **学习规则检索准确率**：> 85%（优化后）
+- **上下文利用率**：< 70%
 
 ### 业务指标
 

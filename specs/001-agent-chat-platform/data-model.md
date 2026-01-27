@@ -43,8 +43,36 @@
                      └─────────────┘
 
 ┌─────────────┐      ┌─────────────┐
-│  Feedback   │─────▶│LearningRec  │ 学习记录
-└─────────────┘ N:M  └─────────────┘
+│  Feedback   │─────▶│LearningRec  │ 学习记录 (时序扩展)
+└─────────────┘ N:M  └──────┬──────┘
+       │                    │
+       │ 1:N                │ superseded_by
+       ▼                    ▼
+┌─────────────┐      ┌─────────────┐
+│IntentEntity │      │ExtensionSkl │ 扩展Skill (向量)
+└─────────────┘      └─────────────┘
+  (pgvector)
+```
+
+### 1.2 记忆层架构图 (Context Engineering)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 5: Temporal Knowledge Graph                           │
+│   └── learning_records (valid_from/valid_until)             │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 4: Entity Memory (pgvector)                           │
+│   └── user_intent_entities, extension_skills.embedding      │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 3: Long-term Memory (PostgreSQL)                      │
+│   └── learning_records, extension_skills, context_budget    │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 2: Short-term Memory (Session Cache)                  │
+│   └── Redis/内存缓存 (不持久化)                               │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 1: Working Memory (Context Window)                    │
+│   └── 运行时上下文 (不持久化)                                 │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -1917,6 +1945,989 @@ supabase/migrations/
 
 ---
 
-**数据模型版本**: 1.0.0
-**最后更新**: 2025-11-24
+## 10. Context Engineering 优化 (User Story 4 增强)
+
+基于 Context Engineering 最佳实践，为 Agent 持续学习系统添加分层记忆架构支持。
+
+### 10.1 实体关系图（记忆层扩展）
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    五层记忆架构                                   │
+├─────────────────────────────────────────────────────────────────┤
+│ Layer 1: Working Memory (Context Window)                        │
+│   └── 运行时上下文，不持久化                                      │
+├─────────────────────────────────────────────────────────────────┤
+│ Layer 2: Short-term Memory (Session Cache)                      │
+│   └── Redis/内存缓存，会话级别                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ Layer 3: Long-term Memory (PostgreSQL)                          │
+│   └── learning_records, extension_skills                        │
+├─────────────────────────────────────────────────────────────────┤
+│ Layer 4: Entity Memory (pgvector)                               │
+│   └── user_intent_entities (语义相似度检索)                      │
+├─────────────────────────────────────────────────────────────────┤
+│ Layer 5: Temporal Knowledge Graph                               │
+│   └── learning_records + valid_from/valid_until                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 10.2 用户意图实体 (user_intent_entities) - Layer 4
+
+**描述**：存储用户意图的向量嵌入，支持语义相似度检索，用于扩展 Skill 生成时的意图聚类。
+
+**前置条件**：
+```sql
+-- 启用 pgvector 扩展
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+**表结构**：
+
+```sql
+CREATE TABLE user_intent_entities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  -- 意图信息
+  intent_text TEXT NOT NULL,           -- 原始意图文本
+  intent_embedding vector(1536),       -- OpenAI text-embedding-3-small 维度
+  intent_category VARCHAR(100),        -- 意图分类（可选）
+
+  -- 关联信息
+  source_feedback_id UUID REFERENCES feedback_records(id) ON DELETE SET NULL,
+  source_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
+
+  -- 聚类信息
+  cluster_id UUID,                     -- 所属聚类（用于扩展 Skill 生成）
+  cluster_confidence FLOAT CHECK (cluster_confidence >= 0 AND cluster_confidence <= 1),
+
+  -- 元数据
+  metadata JSONB DEFAULT '{
+    "tools_used": [],
+    "outcome": null,
+    "rating": null
+  }',
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- 约束
+  CONSTRAINT valid_intent_text CHECK (char_length(intent_text) >= 3)
+);
+
+-- 向量相似度索引（IVFFlat，适合中等规模数据）
+CREATE INDEX idx_intent_embedding ON user_intent_entities
+  USING ivfflat (intent_embedding vector_cosine_ops)
+  WITH (lists = 100);
+
+-- 常规索引
+CREATE INDEX idx_intent_user ON user_intent_entities(user_id, created_at DESC);
+CREATE INDEX idx_intent_cluster ON user_intent_entities(cluster_id) WHERE cluster_id IS NOT NULL;
+CREATE INDEX idx_intent_category ON user_intent_entities(intent_category) WHERE intent_category IS NOT NULL;
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE user_intent_entities ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own intent entities"
+  ON user_intent_entities FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+```
+
+**语义检索示例**：
+
+```sql
+-- 查找与给定意图最相似的 Top 10 意图
+SELECT
+  id,
+  intent_text,
+  intent_category,
+  1 - (intent_embedding <=> $1::vector) as similarity
+FROM user_intent_entities
+WHERE user_id = $2
+ORDER BY intent_embedding <=> $1::vector
+LIMIT 10;
+```
+
+---
+
+### 10.3 学习记录时序扩展 (learning_records 增强) - Layer 5
+
+**描述**：为 learning_records 表添加时序有效性字段，支持时间旅行查询和防止上下文冲突。
+
+**ALTER TABLE 语句**：
+
+```sql
+-- 添加时序有效性字段
+ALTER TABLE learning_records
+  ADD COLUMN IF NOT EXISTS valid_from TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS valid_until TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS superseded_by UUID REFERENCES learning_records(id);
+
+-- 添加时序索引
+CREATE INDEX idx_learning_temporal ON learning_records(user_id, valid_from, valid_until)
+  WHERE is_active = true;
+
+-- 添加 GiST 索引支持时间范围查询
+CREATE INDEX idx_learning_temporal_range ON learning_records
+  USING gist (tstzrange(valid_from, valid_until, '[)'));
+```
+
+**时序查询示例**：
+
+```sql
+-- 查询某时间点有效的学习规则
+SELECT * FROM learning_records
+WHERE user_id = $1
+  AND is_active = true
+  AND valid_from <= $2
+  AND (valid_until IS NULL OR valid_until > $2);
+
+-- 查询规则的历史版本
+SELECT * FROM learning_records
+WHERE user_id = $1
+  AND record_type = $2
+  AND rule_content->>'condition' = $3
+ORDER BY valid_from DESC;
+```
+
+---
+
+### 10.4 记忆整合任务 (memory_consolidation_jobs)
+
+**描述**：记录记忆整合任务的执行状态，用于定期清理过期记忆和合并相似规则。
+
+**表结构**：
+
+```sql
+CREATE TABLE memory_consolidation_jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  -- 任务类型
+  job_type VARCHAR(50) NOT NULL CHECK (
+    job_type IN ('cleanup', 'merge', 'archive', 'reindex')
+  ),
+
+  -- 执行状态
+  status VARCHAR(20) DEFAULT 'pending' CHECK (
+    status IN ('pending', 'running', 'completed', 'failed')
+  ),
+
+  -- 执行结果
+  result JSONB DEFAULT '{
+    "records_processed": 0,
+    "records_merged": 0,
+    "records_archived": 0,
+    "errors": []
+  }',
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+
+  -- 调度信息
+  scheduled_for TIMESTAMPTZ DEFAULT NOW(),
+  retry_count INT DEFAULT 0
+);
+
+CREATE INDEX idx_consolidation_user ON memory_consolidation_jobs(user_id, created_at DESC);
+CREATE INDEX idx_consolidation_status ON memory_consolidation_jobs(status, scheduled_for)
+  WHERE status IN ('pending', 'running');
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE memory_consolidation_jobs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own consolidation jobs"
+  ON memory_consolidation_jobs FOR SELECT
+  USING (auth.uid() = user_id);
+```
+
+---
+
+### 10.5 上下文预算配置 (context_budget_configs)
+
+**描述**：存储用户级别的上下文预算配置，用于优化 Token 使用。
+
+**表结构**：
+
+```sql
+CREATE TABLE context_budget_configs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  -- 预算配置
+  config JSONB NOT NULL DEFAULT '{
+    "total_budget": 8000,
+    "allocation": {
+      "system_prompt": 1000,
+      "tool_definitions": 500,
+      "learning_rules": 2000,
+      "message_history": 3500,
+      "reserved_buffer": 1000
+    },
+    "compaction_threshold": 0.8,
+    "rule_priority_weights": {
+      "confidence": 0.4,
+      "recency": 0.3,
+      "success_rate": 0.3
+    }
+  }',
+
+  -- 状态
+  is_active BOOLEAN DEFAULT true,
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- 约束
+  UNIQUE (user_id)
+);
+
+CREATE INDEX idx_context_budget_user ON context_budget_configs(user_id) WHERE is_active = true;
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE context_budget_configs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own context budget config"
+  ON context_budget_configs FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+```
+
+---
+
+### 10.6 扩展 Skills 向量索引 (extension_skills 增强)
+
+**描述**：为 extension_skills 表添加向量嵌入支持，实现语义聚类。
+
+**ALTER TABLE 语句**：
+
+```sql
+-- 添加向量嵌入字段
+ALTER TABLE extension_skills
+  ADD COLUMN IF NOT EXISTS intent_embedding vector(1536);
+
+-- 添加向量相似度索引
+CREATE INDEX idx_extension_skills_embedding ON extension_skills
+  USING ivfflat (intent_embedding vector_cosine_ops)
+  WITH (lists = 50)
+  WHERE intent_embedding IS NOT NULL;
+```
+
+**语义聚类查询示例**：
+
+```sql
+-- 查找与当前意图相似的扩展 Skill
+SELECT
+  id,
+  skill_type,
+  user_intent,
+  confidence,
+  1 - (intent_embedding <=> $1::vector) as similarity
+FROM extension_skills
+WHERE user_id = $2
+  AND is_active = true
+  AND intent_embedding IS NOT NULL
+ORDER BY intent_embedding <=> $1::vector
+LIMIT 5;
+```
+
+---
+
+### 10.7 性能基准与监控视图
+
+**描述**：创建视图用于监控记忆系统性能。
+
+```sql
+-- 用户记忆系统健康度视图
+CREATE VIEW user_memory_health AS
+SELECT
+  u.id as user_id,
+  -- 学习规则统计
+  COUNT(DISTINCT lr.id) FILTER (WHERE lr.is_active = true) as active_rules,
+  COUNT(DISTINCT lr.id) FILTER (WHERE lr.valid_until IS NOT NULL) as superseded_rules,
+  AVG(lr.confidence) FILTER (WHERE lr.is_active = true) as avg_confidence,
+  -- 意图实体统计
+  COUNT(DISTINCT uie.id) as total_intents,
+  COUNT(DISTINCT uie.cluster_id) as intent_clusters,
+  -- 扩展 Skill 统计
+  COUNT(DISTINCT es.id) FILTER (WHERE es.is_active = true) as active_extension_skills,
+  -- 最近活动
+  MAX(lr.updated_at) as last_rule_update,
+  MAX(uie.created_at) as last_intent_capture
+FROM auth.users u
+LEFT JOIN learning_records lr ON u.id = lr.user_id
+LEFT JOIN user_intent_entities uie ON u.id = uie.user_id
+LEFT JOIN extension_skills es ON u.id = es.user_id
+GROUP BY u.id;
+
+-- 记忆整合效率视图
+CREATE VIEW memory_consolidation_stats AS
+SELECT
+  user_id,
+  job_type,
+  COUNT(*) as total_jobs,
+  COUNT(*) FILTER (WHERE status = 'completed') as completed_jobs,
+  AVG(EXTRACT(EPOCH FROM (completed_at - started_at))) as avg_duration_seconds,
+  SUM((result->>'records_processed')::int) as total_records_processed,
+  SUM((result->>'records_merged')::int) as total_records_merged
+FROM memory_consolidation_jobs
+WHERE created_at > NOW() - INTERVAL '30 days'
+GROUP BY user_id, job_type;
+```
+
+---
+
+### 10.8 数据迁移脚本
+
+**迁移文件**: `20250126000001_context_engineering_optimization.sql`
+
+```sql
+-- 1. 启用 pgvector 扩展
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- 2. 创建 user_intent_entities 表
+-- (完整 DDL 见 10.2)
+
+-- 3. 扩展 learning_records 表
+ALTER TABLE learning_records
+  ADD COLUMN IF NOT EXISTS valid_from TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS valid_until TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS superseded_by UUID REFERENCES learning_records(id);
+
+-- 4. 扩展 extension_skills 表
+ALTER TABLE extension_skills
+  ADD COLUMN IF NOT EXISTS intent_embedding vector(1536);
+
+-- 5. 创建 memory_consolidation_jobs 表
+-- (完整 DDL 见 10.4)
+
+-- 6. 创建 context_budget_configs 表
+-- (完整 DDL 见 10.5)
+
+-- 7. 创建索引
+-- (见各节索引定义)
+
+-- 8. 创建视图
+-- (见 10.7)
+
+-- 9. 回填现有数据的 valid_from
+UPDATE learning_records
+SET valid_from = created_at
+WHERE valid_from IS NULL;
+```
+
+---
+
+## 11. Skill 架构优化 (v2)
+
+基于 skill-creator 最佳实践，优化三层 Skill 架构，支持语义匹配、版本管理和 Skill 组合。
+
+### 11.1 统一 Skills 表（优化版）
+
+**描述**：整合 User Skills、MiniApp Skills、Extension Skills 到统一表结构，支持版本管理和语义搜索。
+
+**表结构**：
+
+```sql
+CREATE TABLE skills (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- 基本信息
+  name TEXT NOT NULL,
+  description TEXT,
+  skill_type TEXT NOT NULL CHECK (
+    skill_type IN ('user', 'miniapp', 'extension')
+  ),
+
+  -- 所有者
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  miniapp_id UUID REFERENCES mini_apps(id) ON DELETE CASCADE,
+
+  -- 版本管理
+  version TEXT NOT NULL DEFAULT '1.0.0',
+
+  -- Skill 内容（Markdown 格式）
+  skill_content TEXT NOT NULL,
+
+  -- 语义向量（用于智能匹配）
+  description_embedding vector(1536),
+
+  -- 触发条件
+  trigger_conditions JSONB DEFAULT '{
+    "keywords": [],
+    "intentPatterns": [],
+    "contextRequirements": {}
+  }',
+
+  -- 依赖声明
+  dependencies JSONB DEFAULT '{
+    "required": [],
+    "optional": [],
+    "conflicts": []
+  }',
+
+  -- 元数据
+  priority INT DEFAULT 5 CHECK (priority >= 1 AND priority <= 10),
+  tags TEXT[] DEFAULT '{}',
+
+  -- 使用统计
+  usage_stats JSONB DEFAULT '{
+    "callCount": 0,
+    "successCount": 0,
+    "avgExecutionTimeMs": 0,
+    "lastUsedAt": null
+  }',
+
+  -- 状态
+  is_active BOOLEAN DEFAULT true,
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- 约束
+  CONSTRAINT valid_skill_owner CHECK (
+    (skill_type = 'user' AND user_id IS NOT NULL) OR
+    (skill_type = 'miniapp' AND miniapp_id IS NOT NULL) OR
+    (skill_type = 'extension' AND user_id IS NOT NULL)
+  )
+);
+
+-- 语义搜索索引
+CREATE INDEX idx_skills_embedding ON skills
+  USING ivfflat (description_embedding vector_cosine_ops)
+  WITH (lists = 100)
+  WHERE description_embedding IS NOT NULL;
+
+-- 常规索引
+CREATE INDEX idx_skills_user ON skills(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX idx_skills_miniapp ON skills(miniapp_id) WHERE miniapp_id IS NOT NULL;
+CREATE INDEX idx_skills_type ON skills(skill_type);
+CREATE INDEX idx_skills_active ON skills(is_active) WHERE is_active = true;
+CREATE INDEX idx_skills_tags ON skills USING gin(tags);
+CREATE INDEX idx_skills_priority ON skills(priority DESC) WHERE is_active = true;
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE skills ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own skills"
+  ON skills FOR SELECT
+  USING (
+    auth.uid() = user_id OR
+    miniapp_id IN (
+      SELECT id FROM mini_apps WHERE is_public = true OR creator_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can manage own skills"
+  ON skills FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+```
+
+---
+
+### 11.2 Skill 版本历史表
+
+**描述**：记录 Skill 的版本变更历史，支持回滚。
+
+**表结构**：
+
+```sql
+CREATE TABLE skill_versions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+
+  -- 版本信息
+  version TEXT NOT NULL,
+  skill_content TEXT NOT NULL,
+  change_summary TEXT,
+
+  -- 元数据
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id),
+
+  -- 约束
+  UNIQUE (skill_id, version)
+);
+
+CREATE INDEX idx_skill_versions_skill ON skill_versions(skill_id, created_at DESC);
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE skill_versions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own skill versions"
+  ON skill_versions FOR SELECT
+  USING (
+    skill_id IN (SELECT id FROM skills WHERE user_id = auth.uid())
+  );
+```
+
+---
+
+### 11.3 Skill 执行日志表
+
+**描述**：记录 Skill 执行历史，用于统计和优化。
+
+**表结构**：
+
+```sql
+CREATE TABLE skill_execution_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- 关联信息
+  skill_id UUID REFERENCES skills(id) ON DELETE SET NULL,
+  skill_category TEXT NOT NULL CHECK (
+    skill_category IN ('edge', 'remote', 'device')
+  ),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+
+  -- 执行信息
+  trigger_type TEXT NOT NULL CHECK (
+    trigger_type IN ('semantic', 'rule', 'manual', 'preload')
+  ),
+  match_score FLOAT CHECK (match_score >= 0 AND match_score <= 1),
+  match_reason TEXT,
+
+  -- 结果
+  success BOOLEAN NOT NULL,
+  execution_time_ms INT NOT NULL,
+  error_message TEXT,
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_skill_logs_skill ON skill_execution_logs(skill_id, created_at DESC);
+CREATE INDEX idx_skill_logs_user ON skill_execution_logs(user_id, created_at DESC);
+CREATE INDEX idx_skill_logs_category ON skill_execution_logs(skill_category);
+CREATE INDEX idx_skill_logs_success ON skill_execution_logs(success);
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE skill_execution_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own skill logs"
+  ON skill_execution_logs FOR SELECT
+  USING (auth.uid() = user_id);
+```
+
+---
+
+### 11.4 Skill 语义匹配查询
+
+**描述**：基于 pgvector 的语义匹配查询示例。
+
+```sql
+-- 根据用户意图语义匹配 Skill
+SELECT
+  id,
+  name,
+  description,
+  skill_type,
+  priority,
+  1 - (description_embedding <=> $1::vector) as similarity
+FROM skills
+WHERE user_id = $2
+  AND is_active = true
+  AND description_embedding IS NOT NULL
+ORDER BY
+  priority DESC,
+  description_embedding <=> $1::vector
+LIMIT 5;
+
+-- 查找依赖某 Skill 的其他 Skill
+SELECT * FROM skills
+WHERE is_active = true
+  AND (
+    dependencies->'required' ? $1 OR
+    dependencies->'optional' ? $1
+  );
+
+-- 查找与某 Skill 冲突的 Skill
+SELECT * FROM skills
+WHERE is_active = true
+  AND dependencies->'conflicts' ? $1;
+```
+
+---
+
+### 11.5 Skill 统计视图
+
+**描述**：Skill 使用统计和健康度监控。
+
+```sql
+-- Skill 使用统计视图
+CREATE VIEW skill_usage_stats AS
+SELECT
+  s.id,
+  s.name,
+  s.skill_type,
+  s.priority,
+  (s.usage_stats->>'callCount')::int as call_count,
+  (s.usage_stats->>'successCount')::int as success_count,
+  CASE
+    WHEN (s.usage_stats->>'callCount')::int > 0
+    THEN (s.usage_stats->>'successCount')::float / (s.usage_stats->>'callCount')::float
+    ELSE 0
+  END as success_rate,
+  (s.usage_stats->>'avgExecutionTimeMs')::int as avg_execution_time_ms,
+  (s.usage_stats->>'lastUsedAt')::timestamptz as last_used_at,
+  s.created_at,
+  s.updated_at
+FROM skills s
+WHERE s.is_active = true;
+
+-- Skill 执行趋势视图（最近 30 天）
+CREATE VIEW skill_execution_trends AS
+SELECT
+  skill_id,
+  skill_category,
+  DATE(created_at) as execution_date,
+  COUNT(*) as total_executions,
+  COUNT(*) FILTER (WHERE success = true) as successful_executions,
+  AVG(execution_time_ms) as avg_execution_time_ms
+FROM skill_execution_logs
+WHERE created_at > NOW() - INTERVAL '30 days'
+GROUP BY skill_id, skill_category, DATE(created_at)
+ORDER BY execution_date DESC;
+```
+
+---
+
+### 11.6 数据迁移脚本
+
+**迁移文件**: `20250126000002_skill_architecture_v2.sql`
+
+```sql
+-- 1. 创建 skills 表
+-- (完整 DDL 见 11.1)
+
+-- 2. 创建 skill_versions 表
+-- (完整 DDL 见 11.2)
+
+-- 3. 创建 skill_execution_logs 表
+-- (完整 DDL 见 11.3)
+
+-- 4. 迁移 extension_skills 数据到 skills 表
+INSERT INTO skills (
+  user_id,
+  name,
+  description,
+  skill_type,
+  skill_content,
+  trigger_conditions,
+  priority,
+  tags,
+  is_active,
+  created_at,
+  updated_at
+)
+SELECT
+  user_id,
+  CASE skill_type
+    WHEN 'good_practice' THEN '推荐做法: ' || user_intent
+    WHEN 'bad_practice' THEN '避免做法: ' || user_intent
+  END as name,
+  user_intent as description,
+  'extension' as skill_type,
+  -- 生成 Markdown 内容
+  '# ' || user_intent || E'\n\n' ||
+  '## When to Use\n\n' ||
+  CASE skill_type
+    WHEN 'good_practice' THEN '推荐在以下场景使用此做法。'
+    WHEN 'bad_practice' THEN '避免在以下场景使用此做法。'
+  END as skill_content,
+  jsonb_build_object(
+    'keywords', '[]'::jsonb,
+    'intentPatterns', jsonb_build_array(user_intent),
+    'contextRequirements', '{}'::jsonb
+  ) as trigger_conditions,
+  CASE skill_type
+    WHEN 'good_practice' THEN 7
+    WHEN 'bad_practice' THEN 9
+  END as priority,
+  ARRAY['extension', skill_type] as tags,
+  is_active,
+  created_at,
+  updated_at
+FROM extension_skills;
+
+-- 5. 创建视图
+-- (见 11.5)
+
+-- 6. 添加 RLS 策略
+-- (见各节 RLS 定义)
+```
+
+---
+
+## 12. Skill 统一注册架构 (v3)
+
+基于 Supabase Edge Function 环境限制，设计统一的 Skill 注册与缓存架构。
+
+### 12.1 Skill 注册表 (skill_registry)
+
+**描述**：统一存储所有三层 Skill 的元数据，作为单一数据源。
+
+**表结构**：
+
+```sql
+CREATE TABLE skill_registry (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- 标识（格式: edge:a2ui, remote:uuid, device:file-ops）
+  skill_id TEXT NOT NULL UNIQUE,
+
+  -- 基本信息
+  name TEXT NOT NULL,
+  description TEXT,
+  version TEXT NOT NULL DEFAULT '1.0.0',
+
+  -- 分类
+  category TEXT NOT NULL CHECK (category IN ('edge', 'remote', 'device')),
+  skill_type TEXT CHECK (skill_type IN ('system', 'user', 'miniapp', 'extension')),
+
+  -- 内容位置引用
+  content_ref JSONB NOT NULL,
+  -- edge:   {"path": "skills/a2ui-skill.md"}
+  -- remote: {"table": "skills", "id": "uuid"}
+  -- device: {"device_id": "uuid", "path": "file-ops-skill.md"}
+
+  -- 触发条件
+  trigger_keywords TEXT[] DEFAULT '{}',
+  trigger_patterns TEXT[] DEFAULT '{}',
+
+  -- 依赖声明
+  dependencies TEXT[] DEFAULT '{}',
+  conflicts TEXT[] DEFAULT '{}',
+
+  -- 优先级和标签
+  priority INT DEFAULT 5 CHECK (priority >= 1 AND priority <= 10),
+  tags TEXT[] DEFAULT '{}',
+
+  -- 语义向量
+  embedding vector(1536),
+
+  -- 内容哈希（用于缓存失效）
+  content_hash TEXT,
+
+  -- 状态
+  is_active BOOLEAN DEFAULT true,
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**索引**：
+
+```sql
+CREATE INDEX idx_registry_category ON skill_registry(category);
+CREATE INDEX idx_registry_active ON skill_registry(is_active) WHERE is_active = true;
+CREATE INDEX idx_registry_keywords ON skill_registry USING gin(trigger_keywords);
+CREATE INDEX idx_registry_tags ON skill_registry USING gin(tags);
+CREATE INDEX idx_registry_embedding ON skill_registry
+  USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)
+  WHERE embedding IS NOT NULL;
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE skill_registry ENABLE ROW LEVEL SECURITY;
+
+-- 所有用户可查看活跃的 Skill 元数据
+CREATE POLICY "Anyone can view active skills"
+  ON skill_registry FOR SELECT
+  USING (is_active = true);
+```
+
+---
+
+### 12.2 Skill 内容缓存表 (skill_content_cache)
+
+**描述**：缓存 Skill 内容，减少重复加载，适配 Edge Function 无状态特性。
+
+**表结构**：
+
+```sql
+CREATE TABLE skill_content_cache (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  skill_id TEXT NOT NULL REFERENCES skill_registry(skill_id) ON DELETE CASCADE,
+
+  -- 缓存内容
+  content TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+
+  -- 缓存元数据
+  cached_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '30 minutes'),
+  hit_count INT DEFAULT 0,
+
+  UNIQUE(skill_id)
+);
+```
+
+**索引**：
+
+```sql
+CREATE INDEX idx_cache_skill ON skill_content_cache(skill_id);
+CREATE INDEX idx_cache_expires ON skill_content_cache(expires_at);
+```
+
+**RLS策略**：
+
+```sql
+ALTER TABLE skill_content_cache ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can read cache"
+  ON skill_content_cache FOR SELECT
+  USING (true);
+
+-- 仅系统可写入缓存（通过 service_role）
+CREATE POLICY "System can manage cache"
+  ON skill_content_cache FOR ALL
+  USING (auth.role() = 'service_role');
+```
+
+---
+
+### 12.3 设备 Skill 同步表 (device_skill_sync)
+
+**描述**：记录设备 Skill 的同步状态，支持离线降级。
+
+**表结构**：
+
+```sql
+CREATE TABLE device_skill_sync (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  device_binding_id UUID NOT NULL REFERENCES device_bindings(id) ON DELETE CASCADE,
+  skill_id TEXT NOT NULL,
+
+  -- 同步状态
+  last_sync_at TIMESTAMPTZ DEFAULT NOW(),
+  content_hash TEXT,
+
+  -- 离线缓存内容
+  cached_content TEXT,
+
+  UNIQUE(device_binding_id, skill_id)
+);
+
+CREATE INDEX idx_device_sync_binding ON device_skill_sync(device_binding_id);
+CREATE INDEX idx_device_sync_skill ON device_skill_sync(skill_id);
+```
+
+---
+
+### 12.4 统一查询示例
+
+```sql
+-- 列出所有可用 Skill（元数据）
+SELECT skill_id, name, description, category, priority
+FROM skill_registry
+WHERE is_active = true
+ORDER BY priority DESC;
+
+-- 按关键词搜索 Skill
+SELECT * FROM skill_registry
+WHERE is_active = true
+  AND trigger_keywords && ARRAY['表单', '图表'];
+
+-- 语义搜索 Skill
+SELECT
+  skill_id, name, description,
+  1 - (embedding <=> $1::vector) as similarity
+FROM skill_registry
+WHERE is_active = true
+  AND embedding IS NOT NULL
+ORDER BY embedding <=> $1::vector
+LIMIT 5;
+
+-- 获取缓存内容（带命中计数更新）
+UPDATE skill_content_cache
+SET hit_count = hit_count + 1
+WHERE skill_id = $1
+  AND expires_at > NOW()
+RETURNING content;
+
+-- 清理过期缓存
+DELETE FROM skill_content_cache
+WHERE expires_at < NOW();
+```
+
+---
+
+### 12.5 数据迁移脚本
+
+```sql
+-- 从 v2 skills 表迁移到 v3 skill_registry
+INSERT INTO skill_registry (
+  skill_id, name, description, version, category, skill_type,
+  content_ref, trigger_keywords, priority, tags, embedding,
+  is_active, created_at, updated_at
+)
+SELECT
+  CASE
+    WHEN source = 'edge' THEN 'edge:' || skill_name
+    WHEN source = 'remote' THEN 'remote:' || id::text
+    ELSE 'device:' || skill_name
+  END as skill_id,
+  skill_name as name,
+  description,
+  version,
+  source as category,
+  skill_type,
+  CASE
+    WHEN source = 'edge' THEN jsonb_build_object('path', 'skills/' || skill_name || '-skill.md')
+    WHEN source = 'remote' THEN jsonb_build_object('table', 'skills', 'id', id::text)
+    ELSE jsonb_build_object('device_id', device_id, 'path', skill_name || '-skill.md')
+  END as content_ref,
+  trigger_keywords,
+  priority,
+  tags,
+  embedding,
+  is_active,
+  created_at,
+  updated_at
+FROM skills
+ON CONFLICT (skill_id) DO UPDATE SET
+  name = EXCLUDED.name,
+  description = EXCLUDED.description,
+  updated_at = NOW();
+```
+
+---
+
+**数据模型版本**: 1.3.0
+**最后更新**: 2026-01-27
+**变更说明**:
+- v1.3.0: 添加 Skill 统一注册架构 v3（skill_registry、skill_content_cache、device_skill_sync）
+- v1.2.0: 添加 Skill 架构优化 v2（统一 Skills 表、版本管理、语义匹配、执行日志）
 **下一步**: Phase 1 - 生成API契约（contracts/）
