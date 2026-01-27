@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   FolderIcon,
   Plus,
@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useDeviceClient, type FileNode } from '@/hooks/useDeviceClient';
+import { useFileWatcher, type FileChangeEvent } from '@/hooks/useFileWatcher';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FileTree } from '@/components/workspace/FileTree';
@@ -85,6 +86,37 @@ export function FileExplorerTab({
   const [loadedChildren, setLoadedChildren] = useState<Map<string, FileNode[]>>(new Map());
   const isInitializedRef = React.useRef(false);
 
+  // 标记初始化完成（必须在所有条件返回之前调用）
+  React.useEffect(() => {
+    isInitializedRef.current = true;
+  }, []);
+
+  // 当 initialExpandedPaths 变化时，更新展开状态
+  const prevInitialExpandedPathsRef = useRef<string[] | undefined>(undefined);
+  useEffect(() => {
+    if (
+      initialExpandedPaths &&
+      initialExpandedPaths.length > 0 &&
+      JSON.stringify(initialExpandedPaths) !== JSON.stringify(prevInitialExpandedPathsRef.current)
+    ) {
+      prevInitialExpandedPathsRef.current = initialExpandedPaths;
+      setExpandedPaths(new Set(initialExpandedPaths));
+    }
+  }, [initialExpandedPaths]);
+
+  // 监听展开状态变化，通知外部
+  const prevExpandedPathsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (isInitializedRef.current && onExpandedPathsChange) {
+      const prevArray = Array.from(prevExpandedPathsRef.current).sort();
+      const currentArray = Array.from(expandedPaths).sort();
+      if (JSON.stringify(prevArray) !== JSON.stringify(currentArray)) {
+        prevExpandedPathsRef.current = expandedPaths;
+        onExpandedPathsChange(Array.from(expandedPaths));
+      }
+    }
+  }, [expandedPaths, onExpandedPathsChange]);
+
   // 对话框状态
   const [createFileDialog, setCreateFileDialog] = useState<{ open: boolean; parentPath: string }>({
     open: false,
@@ -104,6 +136,47 @@ export function FileExplorerTab({
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; node: FileNode | null }>({
     open: false,
     node: null,
+  });
+
+  // 文件变化处理回调
+  const handleFileChange = useCallback((event: FileChangeEvent) => {
+    // 获取变化文件的父目录路径
+    const getParentPath = (filePath: string) => {
+      const separator = filePath.includes('\\') ? '\\' : '/';
+      const lastIndex = filePath.lastIndexOf(separator);
+      return lastIndex > 0 ? filePath.substring(0, lastIndex) : currentWorkingDirectory || '/';
+    };
+
+    const parentPath = getParentPath(event.path);
+
+    // 刷新受影响的目录
+    if (client) {
+      client.files.list(parentPath).then((result) => {
+        const children = result.files || [];
+
+        // 如果是根目录，更新 files 状态
+        if (parentPath === currentPath || parentPath === currentWorkingDirectory) {
+          setFiles(children);
+        }
+
+        // 更新缓存中的子节点
+        setLoadedChildren((prev) => {
+          const next = new Map(prev);
+          next.set(parentPath, children);
+          return next;
+        });
+      }).catch((err) => {
+        console.error('[FileExplorer] Failed to refresh directory:', err);
+      });
+    }
+  }, [client, currentPath, currentWorkingDirectory]);
+
+  // 使用文件监听 Hook
+  useFileWatcher({
+    device,
+    watchPath: currentWorkingDirectory,
+    onFileChange: handleFileChange,
+    enabled: !!device && !!currentWorkingDirectory,
   });
 
   // 加载目录函数
@@ -392,18 +465,9 @@ export function FileExplorerTab({
       } else {
         next.add(path);
       }
-      // 通知外部状态变化
-      if (isInitializedRef.current && onExpandedPathsChange) {
-        onExpandedPathsChange(Array.from(next));
-      }
       return next;
     });
   };
-
-  // 标记初始化完成
-  React.useEffect(() => {
-    isInitializedRef.current = true;
-  }, []);
 
   // 懒加载子文件夹
   const handleDirectoryExpand = async (directory: FileNode): Promise<FileNode[]> => {

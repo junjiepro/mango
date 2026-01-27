@@ -26,8 +26,9 @@ import { DeviceCache } from '@/lib/deviceCache';
 import { ChatLayout } from '@/components/layouts/ChatLayout';
 import { useResourceSniffer } from '@/hooks/useResourceSniffer';
 import { useSessionManager } from '@/hooks/useSessionManager';
+import { useWorkspaceState } from '@/hooks/useWorkspaceState';
 import { ACPSessionCreateDialog } from '@/components/conversation/ACPSessionCreateDialog';
-import { ACPChat } from '@/components/acp/ACPChat';
+import { ACPChatWrapper } from '@/components/acp/ACPChatWrapper';
 import { useACPSession } from '@/hooks/useACPSession';
 import { useDeviceClient } from '@/hooks/useDeviceClient';
 import type { ACPAgent } from '@/hooks/useACPSession';
@@ -63,14 +64,23 @@ function ConversationDetailContent() {
   } | null>(null);
   const [installations, setInstallations] = useState<any[]>([]);
   const [loadingInstallations, setLoadingInstallations] = useState(false);
-  const [showQuickAccess, setShowQuickAccess] = useState(true);
   const [devices, setDevices] = useState<DeviceBinding[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [loadingDevices, setLoadingDevices] = useState(false);
-  const [showWorkspace, setShowWorkspace] = useState(false);
   // 资源预览状态
   const [previewResource, setPreviewResource] = useState<DetectedResource | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+
+  // 工作区状态持久化
+  const { getInitialState, saveState } = useWorkspaceState(currentConversation?.id);
+  const initialLayoutState = React.useRef(getInitialState());
+  const isLayoutInitializedRef = React.useRef(false);
+  const isLayoutRestoringRef = React.useRef(false);
+
+  // 使用持久化的初始值
+  const [showQuickAccess, setShowQuickAccess] = useState(initialLayoutState.current.showQuickAccess);
+  const [showWorkspace, setShowWorkspace] = useState(initialLayoutState.current.showWorkspace);
+  const [workspacePanelSize, setWorkspacePanelSize] = useState(initialLayoutState.current.workspacePanelSize);
 
   // ACP 会话管理
   const {
@@ -85,6 +95,7 @@ function ConversationDetailContent() {
     updateSessionMessages,
     getSessionMessages,
     updateSessionActivation,
+    updateSessionRunningStatus,
     checkWorkingDirectoryMismatch,
   } = useSessionManager(currentConversation?.id || '');
 
@@ -126,6 +137,37 @@ function ConversationDetailContent() {
   React.useEffect(() => {
     if (selectedDeviceId) loadDevice(selectedDeviceId);
   }, [selectedDeviceId]);
+
+  // 标记布局初始化完成
+  React.useEffect(() => {
+    isLayoutInitializedRef.current = true;
+  }, []);
+
+  // 当 conversationId 变化时，恢复布局状态
+  const prevConversationIdRef = React.useRef<string | undefined>(undefined);
+  React.useEffect(() => {
+    const convId = currentConversation?.id;
+    if (convId && convId !== prevConversationIdRef.current) {
+      prevConversationIdRef.current = convId;
+      isLayoutRestoringRef.current = true;
+
+      const savedState = getInitialState();
+      setShowWorkspace(savedState.showWorkspace);
+      setShowQuickAccess(savedState.showQuickAccess);
+      setWorkspacePanelSize(savedState.workspacePanelSize);
+
+      setTimeout(() => {
+        isLayoutRestoringRef.current = false;
+      }, 500);
+    }
+  }, [currentConversation?.id, getInitialState]);
+
+  // 保存布局状态
+  React.useEffect(() => {
+    if (isLayoutInitializedRef.current && !isLayoutRestoringRef.current) {
+      saveState({ showWorkspace, showQuickAccess, workspacePanelSize });
+    }
+  }, [showWorkspace, showQuickAccess, workspacePanelSize, saveState]);
 
   // 初始化设备客户端
   const { client: deviceClient } = useDeviceClient(selectedDevice);
@@ -522,73 +564,78 @@ function ConversationDetailContent() {
           conversationId={currentConversation?.id}
           currentWorkingDirectory={currentWorkingDirectory}
           onWorkingDirectoryChange={handleWorkingDirectoryChange}
+          workspacePanelSize={workspacePanelSize}
+          onWorkspacePanelSizeChange={setWorkspacePanelSize}
         >
-          {/* 根据当前会话类型渲染不同内容 */}
-          {getActiveSession()?.type === 'mango' ? (
-            <div className="flex flex-col h-full">
-              <MessageList
-                conversationId={currentConversation.id}
-                messages={messages}
-                installations={installations}
-                isLoading={isLoadingMessages}
-                hasMore={hasMoreMessages}
-                onLoadMore={loadMoreMessages}
-                onOpenMiniApp={handleOpenMiniApp}
-                onImageClick={handleImageClick}
-                className="flex-1 min-h-0"
-              />
+          {/* 同时渲染所有会话，使用 CSS 控制显示/隐藏，保持后台会话运行 */}
 
-              <div className="flex-shrink-0">
-                <div className="bg-background p-4">
-                  <div className="container mx-auto max-w-4xl">
-                    <MessageInput
-                      onSendMessage={handleSendMessage}
-                      placeholder="输入消息... (Ctrl+Enter 发送)"
+          {/* Mango 主会话 */}
+          <div className={getActiveSession()?.type === 'mango' ? 'flex flex-col h-full' : 'hidden'}>
+            <MessageList
+              conversationId={currentConversation.id}
+              messages={messages}
+              installations={installations}
+              isLoading={isLoadingMessages}
+              hasMore={hasMoreMessages}
+              onLoadMore={loadMoreMessages}
+              onOpenMiniApp={handleOpenMiniApp}
+              onImageClick={handleImageClick}
+              className="flex-1 min-h-0"
+            />
+
+            <div className="flex-shrink-0">
+              <div className="bg-background p-4">
+                <div className="container mx-auto max-w-4xl">
+                  <MessageInput
+                    onSendMessage={handleSendMessage}
+                    placeholder="输入消息... (Ctrl+Enter 发送)"
+                  />
+
+                  {showQuickAccess && resources.length > 0 && (
+                    <ResourceQuickAccess
+                      resources={resources}
+                      installations={installations}
+                      onOpenMiniApp={handleOpenMiniApp}
+                      onOpenWorkspace={() => setShowWorkspace(true)}
+                      onClose={() => setShowQuickAccess(false)}
+                      onResourceClick={handleResourceClick}
+                      isWorkspaceActive={showWorkspace}
                     />
-
-                    {showQuickAccess && resources.length > 0 && (
-                      <ResourceQuickAccess
-                        resources={resources}
-                        installations={installations}
-                        onOpenMiniApp={handleOpenMiniApp}
-                        onOpenWorkspace={() => setShowWorkspace(true)}
-                        onClose={() => setShowQuickAccess(false)}
-                        onResourceClick={handleResourceClick}
-                        isWorkspaceActive={showWorkspace}
-                      />
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
-          ) : (
-            <ACPChat
-              deviceId={getActiveSession()?.deviceId || ''}
-              sessionId={getActiveSession()?.acpSessionId || ''}
-              agentName={getActiveSession()?.agentName || ''}
-              deviceClient={deviceClient}
-              initialMessages={getSessionMessages(activeSessionId)}
-              onMessagesChange={(messages) => updateSessionMessages(activeSessionId, messages)}
-              isActivated={getActiveSession()?.isActivated ?? true}
-              sessionWorkingDirectory={getActiveSession()?.workingDirectory}
-              currentWorkingDirectory={currentWorkingDirectory}
-              onSwitchToSessionDirectory={() => {
-                const sessionDir = getActiveSession()?.workingDirectory;
-                if (sessionDir) {
-                  handleWorkingDirectoryChange(sessionDir);
+          </div>
+
+          {/* ACP 会话列表 - 所有会话保持挂载，支持后台运行 */}
+          {sessions
+            .filter((session) => session.type === 'acp')
+            .map((session) => (
+              <ACPChatWrapper
+                key={session.id}
+                sessionId={session.id}
+                acpSessionId={session.acpSessionId || ''}
+                deviceId={session.deviceId || ''}
+                agentName={session.agentName || ''}
+                initialMessages={getSessionMessages(session.id)}
+                onMessagesChange={(msgs) => updateSessionMessages(session.id, msgs)}
+                onStatusChange={(status) => updateSessionRunningStatus(session.id, status)}
+                isActivated={session.isActivated ?? true}
+                isVisible={activeSessionId === session.id}
+                sessionWorkingDirectory={session.workingDirectory}
+                currentWorkingDirectory={currentWorkingDirectory}
+                onSwitchToSessionDirectory={() => {
+                  if (session.workingDirectory) {
+                    handleWorkingDirectoryChange(session.workingDirectory);
+                  }
+                }}
+                isDeviceMismatch={!!session.deviceId && session.deviceId !== selectedDeviceId}
+                sessionDeviceName={
+                  devices.find((d) => d.id === session.deviceId)?.device_name || ''
                 }
-              }}
-              isDeviceMismatch={
-                getActiveSession()?.type === 'acp' &&
-                !!getActiveSession()?.deviceId &&
-                getActiveSession()?.deviceId !== selectedDeviceId
-              }
-              sessionDeviceName={
-                devices.find((d) => d.id === getActiveSession()?.deviceId)?.device_name || ''
-              }
-              currentDeviceName={devices.find((d) => d.id === selectedDeviceId)?.device_name || ''}
-            />
-          )}
+                currentDeviceName={devices.find((d) => d.id === selectedDeviceId)?.device_name || ''}
+              />
+            ))}
         </ChatLayout>
       </div>
 

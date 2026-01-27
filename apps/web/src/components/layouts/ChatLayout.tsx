@@ -22,6 +22,8 @@ interface ChatLayoutProps {
   conversationId?: string;
   currentWorkingDirectory?: string;
   onWorkingDirectoryChange?: (path: string) => void;
+  workspacePanelSize?: number;
+  onWorkspacePanelSizeChange?: (size: number) => void;
 }
 
 export function ChatLayout({
@@ -33,6 +35,8 @@ export function ChatLayout({
   conversationId,
   currentWorkingDirectory,
   onWorkingDirectoryChange,
+  workspacePanelSize = 50,
+  onWorkspacePanelSizeChange,
 }: ChatLayoutProps) {
   const { config, isFullscreenMode } = useWorkspaceLayout();
 
@@ -40,23 +44,21 @@ export function ChatLayout({
   const chatPanelRef = useRef<ImperativePanelHandle>(null);
   const workspacePanelRef = useRef<ImperativePanelHandle>(null);
 
-  // 保存用户调整后的工作区尺寸
-  const savedWorkspaceSizeRef = useRef<number>(50);
-
-  // 处理面板尺寸变化，保存工作区尺寸
+  // 处理面板尺寸变化，通知外部保存
   const handleLayout = useCallback(
     (sizes: number[]) => {
       if (showWorkspace && sizes.length === 2) {
-        const workspaceSize = sizes[1];
-        if (workspaceSize > 0) {
-          savedWorkspaceSizeRef.current = Math.min(
-            Math.max(workspaceSize, config.workspace.min),
+        const newSize = sizes[1];
+        if (newSize > 0) {
+          const clampedSize = Math.min(
+            Math.max(newSize, config.workspace.min),
             config.workspace.max
           );
+          onWorkspacePanelSizeChange?.(clampedSize);
         }
       }
     },
-    [showWorkspace, config.workspace.min, config.workspace.max]
+    [showWorkspace, config.workspace.min, config.workspace.max, onWorkspacePanelSizeChange]
   );
 
   // 当 showWorkspace 变化时，动态调整面板尺寸（仅分屏模式）
@@ -64,21 +66,21 @@ export function ChatLayout({
     if (isFullscreenMode) return;
 
     if (showWorkspace) {
-      const workspaceSize = Math.min(
-        Math.max(savedWorkspaceSizeRef.current, config.workspace.min),
+      const size = Math.min(
+        Math.max(workspacePanelSize, config.workspace.min),
         config.workspace.max
       );
-      chatPanelRef.current?.resize(100 - workspaceSize);
-      workspacePanelRef.current?.resize(workspaceSize);
+      chatPanelRef.current?.resize(100 - size);
+      workspacePanelRef.current?.resize(size);
     } else {
       chatPanelRef.current?.resize(100);
       workspacePanelRef.current?.resize(0);
     }
-  }, [showWorkspace, config.workspace.min, config.workspace.max, isFullscreenMode]);
+  }, [showWorkspace, workspacePanelSize, config.workspace.min, config.workspace.max, isFullscreenMode]);
 
   // 计算初始尺寸
   const initialWorkspaceSize = Math.min(
-    Math.max(savedWorkspaceSizeRef.current, config.workspace.min),
+    Math.max(workspacePanelSize, config.workspace.min),
     config.workspace.max
   );
 

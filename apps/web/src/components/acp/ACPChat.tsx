@@ -37,6 +37,7 @@ import {
   MessageAction,
 } from '@/components/ai-elements/message';
 import { renderACPMessagePart } from './ACPMessageRenderer';
+import type { SessionRunningStatus } from '@/types/session.types';
 import { cn } from '@/lib/utils';
 
 interface ACPChatProps {
@@ -46,7 +47,9 @@ interface ACPChatProps {
   deviceClient?: DeviceClientAPI;
   initialMessages?: UIMessage[];
   onMessagesChange?: (messages: UIMessage[]) => void;
+  onStatusChange?: (status: SessionRunningStatus) => void;
   isActivated?: boolean;
+  isVisible?: boolean;
   // 工作目录相关
   sessionWorkingDirectory?: string;
   currentWorkingDirectory?: string;
@@ -64,7 +67,9 @@ export function ACPChat({
   deviceClient,
   initialMessages = [],
   onMessagesChange,
+  onStatusChange,
   isActivated = true,
+  isVisible = true,
   sessionWorkingDirectory,
   currentWorkingDirectory,
   onSwitchToSessionDirectory,
@@ -77,14 +82,22 @@ export function ACPChat({
   const isInitializedRef = useRef(false);
   const prevIsActivatedRef = useRef(isActivated);
 
+  // 创建 transport，只在 deviceClient 有效时创建
+  const transport = useMemo(() => {
+    if (!deviceClient?.deviceUrl) {
+      return undefined;
+    }
+    return new DefaultChatTransport({
+      api: `${deviceClient.deviceUrl}/acp/chat`,
+      headers: {
+        Authorization: `Bearer ${deviceClient.deviceBindingCode}`,
+      },
+    });
+  }, [deviceClient?.deviceUrl, deviceClient?.deviceBindingCode]);
+
   // 使用 useChat hook
   const { messages, sendMessage, status, stop, error, regenerate, setMessages } = useChat({
-    transport: new DefaultChatTransport({
-      api: `${deviceClient?.deviceUrl}/acp/chat`,
-      headers: {
-        Authorization: `Bearer ${deviceClient?.deviceBindingCode}`,
-      },
-    }),
+    transport,
   });
 
   // 初始化消息（组件挂载时设置初始消息）
@@ -119,6 +132,20 @@ export function ACPChat({
 
   const isLoading = status === 'streaming' || status === 'submitted';
 
+  // 保存回调引用，避免依赖变化导致无限循环
+  const onStatusChangeRef = useRef(onStatusChange);
+  onStatusChangeRef.current = onStatusChange;
+
+  // 当状态变化时通知父组件
+  useEffect(() => {
+    if (onStatusChangeRef.current) {
+      const runningStatus: SessionRunningStatus =
+        status === 'streaming' ? 'streaming' :
+        status === 'submitted' ? 'submitted' : 'idle';
+      onStatusChangeRef.current(runningStatus);
+    }
+  }, [status]);
+
   // 判断工作目录是否不一致
   const isWorkingDirectoryMismatch = useMemo(() => {
     if (!sessionWorkingDirectory || !currentWorkingDirectory) return false;
@@ -136,16 +163,19 @@ export function ACPChat({
     return `${start}/.../${end}`;
   }, []);
 
+  // 检查是否可以发送消息
+  const canSendMessage = !!transport && !isDeviceMismatch && isActivated;
+
   // 处理提交
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      if (input.trim() && !isLoading) {
+      if (input.trim() && !isLoading && canSendMessage) {
         sendMessage({ text: input }, { body: { sessionId } });
         setInput('');
       }
     },
-    [input, isLoading, sendMessage, sessionId]
+    [input, isLoading, sendMessage, sessionId, canSendMessage]
   );
 
   // 处理键盘事件
@@ -153,13 +183,13 @@ export function ACPChat({
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
-        if (input.trim() && !isLoading) {
+        if (input.trim() && !isLoading && canSendMessage) {
           sendMessage({ text: input }, { body: { sessionId } });
           setInput('');
         }
       }
     },
-    [input, isLoading, sendMessage, sessionId]
+    [input, isLoading, sendMessage, sessionId, canSendMessage]
   );
 
   // 自动调整文本框高度
@@ -182,7 +212,7 @@ export function ACPChat({
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className={cn('flex flex-col h-full', !isVisible && 'hidden')}>
       {/* 设备不一致提示横幅 */}
       {isDeviceMismatch && (
         <div className="flex-shrink-0 bg-background/10 px-4 py-3">

@@ -23,6 +23,7 @@ import {
   Check,
   MoreVertical,
   FolderOpen,
+  Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -557,38 +558,50 @@ export function ConversationHeader({
               {sessions.length > 0 && (
                 <>
                   <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">会话</div>
-                  {sessions.map((session) => (
-                    <DropdownMenuItem
-                      key={session.id}
-                      onClick={() => onSessionChange(session.id)}
-                      className={cn(
-                        'flex items-center justify-between',
-                        session.id === activeSessionId && 'bg-accent'
-                      )}
-                    >
-                      <span className="truncate">{session.label}</span>
-                      {session.type !== 'mango' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 ml-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSessionClose(session.id);
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
+                  {sessions.map((session) => {
+                    const isActive = session.id === activeSessionId;
+                    const isRunning =
+                      session.runningStatus === 'streaming' ||
+                      session.runningStatus === 'submitted';
+                    return (
+                      <DropdownMenuItem
+                        key={session.id}
+                        onClick={() => onSessionChange(session.id)}
+                        className={cn('flex items-center justify-between', isActive && 'bg-accent')}
+                      >
+                        <div className="flex items-center gap-2">
+                          {/* 图标：运行中显示加载动画，否则显示类型图标 */}
+                          {isRunning && !isActive ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          ) : session.type === 'mango' ? (
+                            <MessageSquare className="h-4 w-4" />
+                          ) : (
+                            <Bot className="h-4 w-4" />
+                          )}
+                          <span className="truncate">{session.label}</span>
+                        </div>
+                        {session.type !== 'mango' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 ml-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSessionClose(session.id);
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
                 </>
               )}
 
               {/* 新建会话 */}
               <DropdownMenuItem onClick={onCreateACPSession} disabled={!selectedDeviceId}>
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4" />
                 新建 Agent 会话
               </DropdownMenuItem>
 
@@ -598,7 +611,7 @@ export function ConversationHeader({
               {selectedDeviceId && onWorkingDirectoryChange && (
                 <>
                   <DropdownMenuItem onClick={() => setShowMobileWorkingDir(true)}>
-                    <FolderOpen className="h-4 w-4 mr-2" />
+                    <FolderOpen className="h-4 w-4" />
                     <span className="truncate flex-1">
                       {currentWorkingDirectory || '选择工作目录'}
                     </span>
@@ -610,7 +623,7 @@ export function ConversationHeader({
               {/* MiniApp */}
               {onOpenMiniAppSelector && (
                 <DropdownMenuItem onClick={onOpenMiniAppSelector}>
-                  <Package className="h-4 w-4 mr-2" />
+                  <Package className="h-4 w-4" />
                   小应用
                 </DropdownMenuItem>
               )}

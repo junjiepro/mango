@@ -29,17 +29,24 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
   const { initialTabs, initialActiveTabId, onStateChange } = options;
   const isInitializedRef = useRef(false);
 
-  const [tabs, setTabs] = useState<EditorTab[]>(initialTabs || []);
-  const [activeTabId, setActiveTabId] = useState<string | null>(initialActiveTabId ?? null);
+  // 使用函数初始化，确保只在首次渲染时读取 initialTabs
+  const [tabs, setTabs] = useState<EditorTab[]>(() => {
+    return initialTabs || [];
+  });
+  const [activeTabId, setActiveTabId] = useState<string | null>(() => {
+    return initialActiveTabId ?? null;
+  });
 
-  // 初始化时设置状态
+  // 标记初始化完成
   useEffect(() => {
-    if (!isInitializedRef.current && initialTabs !== undefined) {
-      setTabs(initialTabs);
-      setActiveTabId(initialActiveTabId ?? null);
-      isInitializedRef.current = true;
-    }
-  }, [initialTabs, initialActiveTabId]);
+    isInitializedRef.current = true;
+  }, []);
+
+  // 重置状态（用于 conversationId 变化后恢复状态）
+  const resetState = useCallback((newTabs: EditorTab[], newActiveTabId: string | null) => {
+    setTabs(newTabs || []);
+    setActiveTabId(newActiveTabId ?? null);
+  }, []);
 
   // 状态变化时通知外部
   useEffect(() => {
@@ -172,5 +179,6 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
     closeOtherTabs,
     closeAllFileTabs,
     setActiveTabId,
+    resetState,
   };
 }

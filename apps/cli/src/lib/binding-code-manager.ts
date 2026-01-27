@@ -102,11 +102,35 @@ export class BindingCodeManager {
 
   /**
    * 获取 binding 的数据目录
+   * 优先使用用户配置的 bindingDataDir，否则使用默认目录
    * @param bindingCode 绑定码
    * @returns data 子目录路径
    */
   getBindingDataDir(bindingCode: string): string {
+    // 直接读取配置文件，避免调用 readConfig() 导致循环调用
+    const customDataDir = this.getCustomBindingDataDir(bindingCode);
+    if (customDataDir) {
+      return customDataDir;
+    }
+    // 使用默认目录
     return join(this.getBindingDir(bindingCode), 'data');
+  }
+
+  /**
+   * 直接从配置文件读取用户自定义的 bindingDataDir
+   * 避免调用 readConfig() 导致循环调用
+   */
+  private getCustomBindingDataDir(bindingCode: string): string | null {
+    if (!existsSync(this.bindingConfigPath)) {
+      return null;
+    }
+    try {
+      const configJson = readFileSync(this.bindingConfigPath, 'utf-8');
+      const raw = JSON.parse(configJson) as Record<string, BindingConfig>;
+      return raw[bindingCode]?.bindingDataDir || null;
+    } catch {
+      return null;
+    }
   }
 
   /**

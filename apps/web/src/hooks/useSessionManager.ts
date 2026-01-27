@@ -6,7 +6,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import type { SessionTab, SessionType } from '@/types/session.types';
+import type { SessionTab, SessionType, SessionRunningStatus } from '@/types/session.types';
 import type { UIMessage } from 'ai';
 
 export function useSessionManager(conversationId: string) {
@@ -258,6 +258,27 @@ export function useSessionManager(conversationId: string) {
   );
 
   /**
+   * 更新会话运行状态
+   */
+  const updateSessionRunningStatus = useCallback(
+    (sessionId: string, runningStatus: SessionRunningStatus) => {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId ? { ...s, runningStatus } : s
+        )
+      );
+    },
+    []
+  );
+
+  /**
+   * 获取正在运行的会话列表
+   */
+  const getRunningSessions = useCallback(() => {
+    return sessions.filter((s) => s.runningStatus === 'streaming' || s.runningStatus === 'submitted');
+  }, [sessions]);
+
+  /**
    * 获取会话的工作目录
    */
   const getSessionWorkingDirectory = useCallback(
@@ -317,6 +338,8 @@ export function useSessionManager(conversationId: string) {
     updateSessionMessages,
     getSessionMessages,
     updateSessionActivation,
+    updateSessionRunningStatus,
+    getRunningSessions,
     getSessionWorkingDirectory,
     updateSessionWorkingDirectory,
     checkWorkingDirectoryMismatch,

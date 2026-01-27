@@ -43,6 +43,7 @@ export function VSCodeWorkspace({
 }: VSCodeWorkspaceProps) {
   const [selectedDevice, setSelectedDevice] = useState<DeviceBinding | undefined>(undefined);
   const isInitializedRef = useRef(false);
+  const isRestoringRef = useRef(false); // 标记是否正在恢复状态
 
   // 工作区状态持久化
   const { getInitialState, saveState } = useWorkspaceState(conversationId);
@@ -64,7 +65,7 @@ export function VSCodeWorkspace({
   // 编辑器标签页状态变化回调
   const handleEditorStateChange = useCallback(
     (tabs: EditorTab[], activeTabId: string | null) => {
-      if (isInitializedRef.current) {
+      if (isInitializedRef.current && !isRestoringRef.current) {
         saveState({ tabs, activeTabId });
       }
     },
@@ -82,6 +83,7 @@ export function VSCodeWorkspace({
     closeAllFileTabs,
     setActiveTabId,
     markTabDirty,
+    resetState: resetEditorState,
   } = useEditorTabs({
     initialTabs: initialState.current.tabs,
     initialActiveTabId: initialState.current.activeTabId,
@@ -93,16 +95,59 @@ export function VSCodeWorkspace({
     isInitializedRef.current = true;
   }, []);
 
+  // 当 conversationId 变化时，恢复工作区状态
+  const prevConversationIdRef = useRef<string | undefined>(undefined);
+  const hasRestoredRef = useRef(false);
+  useEffect(() => {
+    // 首次有效 conversationId 或 conversationId 变化时恢复状态
+    if (conversationId && (!hasRestoredRef.current || conversationId !== prevConversationIdRef.current)) {
+      prevConversationIdRef.current = conversationId;
+      hasRestoredRef.current = true;
+      isRestoringRef.current = true; // 开始恢复，禁止保存
+
+      const savedState = getInitialState();
+      console.log('[VSCodeWorkspace] 恢复状态:', {
+        conversationId,
+        tabs: savedState.tabs?.length,
+        activeTabId: savedState.activeTabId,
+        fileExplorerExpandedPaths: savedState.fileExplorerExpandedPaths,
+      });
+
+      // 恢复编辑器标签页状态
+      if (savedState.tabs && savedState.tabs.length > 0) {
+        resetEditorState(savedState.tabs, savedState.activeTabId);
+      }
+
+      // 恢复侧边栏状态
+      setActiveItem(savedState.activeItem);
+      setShowSidebar(savedState.showSidebar);
+
+      // 恢复底部面板状态
+      setShowBottomPanel(savedState.showBottomPanel);
+      setTerminals(savedState.terminals);
+      setActiveTerminalId(savedState.activeTerminalId);
+
+      // 恢复文件浏览器展开状态
+      setFileExplorerExpandedPaths(savedState.fileExplorerExpandedPaths || []);
+
+      // 延迟解除恢复标记，需要大于保存防抖时间(300ms)
+      setTimeout(() => {
+        isRestoringRef.current = false;
+      }, 500);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]); // 只依赖 conversationId，其他函数通过 ref 或闭包访问
+
   // 保存侧边栏状态
   useEffect(() => {
-    if (isInitializedRef.current) {
+    if (isInitializedRef.current && !isRestoringRef.current) {
       saveState({ activeItem, showSidebar });
     }
   }, [activeItem, showSidebar, saveState]);
 
   // 保存底部面板状态
   useEffect(() => {
-    if (isInitializedRef.current) {
+    if (isInitializedRef.current && !isRestoringRef.current) {
       saveState({ showBottomPanel, terminals, activeTerminalId });
     }
   }, [showBottomPanel, terminals, activeTerminalId, saveState]);
@@ -125,7 +170,7 @@ export function VSCodeWorkspace({
   const handleFileExplorerExpandedPathsChange = useCallback(
     (paths: string[]) => {
       setFileExplorerExpandedPaths(paths);
-      if (isInitializedRef.current) {
+      if (isInitializedRef.current && !isRestoringRef.current) {
         saveState({ fileExplorerExpandedPaths: paths });
       }
     },
@@ -297,6 +342,7 @@ export function VSCodeWorkspace({
                     tabs={tabs}
                     activeTabId={activeTabId}
                     device={selectedDevice}
+                    currentWorkingDirectory={currentWorkingDirectory}
                     onTabChange={setActiveTabId}
                     onTabClose={closeTab}
                     onCloseAll={closeAllTabs}

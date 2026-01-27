@@ -20,9 +20,10 @@ import { tempBindingManager } from '../lib/temp-binding-manager.js';
 import { tunnelManager } from '../lib/tunnel-manager.js';
 import { randomBytes } from 'crypto';
 import { actualPort } from '../commands/start.js';
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from 'node-pty';
 import { existsSync, mkdirSync } from 'fs';
+import { fileWatcherManager, type FileChangeEvent } from '../lib/file-watcher.js';
 import { convertToModelMessages, streamText } from 'ai';
 import { planEntrySchema } from '@agentclientprotocol/sdk';
 import z from 'zod';
@@ -1104,8 +1105,30 @@ export async function startServer(config: CLIConfig): Promise<number> {
           port: availablePort,
         },
         (info) => {
-          // 创建 WebSocket 服务器
-          const wss = new WebSocketServer({ server: server as any, path: '/terminal' });
+          // 创建终端 WebSocket 服务器 (noServer 模式)
+          const terminalWss = new WebSocketServer({ noServer: true });
+          // 创建文件监听 WebSocket 服务器 (noServer 模式)
+          const fileWss = new WebSocketServer({ noServer: true });
+
+          // 手动处理 upgrade 请求
+          (server as any).on('upgrade', (request: any, socket: any, head: any) => {
+            const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
+
+            if (pathname === '/terminal') {
+              terminalWss.handleUpgrade(request, socket, head, (ws) => {
+                terminalWss.emit('connection', ws, request);
+              });
+            } else if (pathname === '/ws/files') {
+              fileWss.handleUpgrade(request, socket, head, (ws) => {
+                fileWss.emit('connection', ws, request);
+              });
+            } else {
+              socket.destroy();
+            }
+          });
+
+          // 终端 WebSocket 连接处理
+          const wss = terminalWss;
 
           wss.on('connection', (ws, req) => {
             console.log('[Server] Terminal WebSocket connected');
@@ -1226,6 +1249,89 @@ export async function startServer(config: CLIConfig): Promise<number> {
                 } catch {
                   // 忽略
                 }
+              }
+            });
+          });
+
+          // 文件监听 WebSocket 连接处理
+          fileWss.on('connection', (ws, req) => {
+            console.log('[Server] Files WebSocket connected');
+
+            let authenticated = false;
+            let bindingCode = '';
+            let watchPath = '';
+            let unsubscribe: (() => void) | null = null;
+
+            const sendMessage = (msg: object) => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(msg));
+              }
+            };
+
+            ws.on('message', (data) => {
+              try {
+                const message = JSON.parse(data.toString());
+
+                if (message.type === 'auth') {
+                  const config = bindingCodeManager.readConfig();
+                  if (config && config[message.token]) {
+                    authenticated = true;
+                    bindingCode = message.token;
+                    sendMessage({ type: 'auth', success: true });
+                    console.log('[Server] Files WebSocket authenticated');
+                  } else {
+                    sendMessage({ type: 'auth', success: false });
+                    ws.close();
+                  }
+                } else if (message.type === 'subscribe' && authenticated) {
+                  // 订阅目录变化
+                  const config = bindingCodeManager.readConfig();
+                  const bindingConfig = config?.[bindingCode];
+                  watchPath = message.path || bindingConfig?.workspaceDir || process.cwd();
+
+                  // 取消之前的订阅
+                  if (unsubscribe) {
+                    unsubscribe();
+                  }
+
+                  // 创建新订阅
+                  unsubscribe = fileWatcherManager.subscribe(watchPath, (event: FileChangeEvent) => {
+                    sendMessage({
+                      type: 'file_change',
+                      event: {
+                        changeType: event.type,
+                        path: event.path,
+                        relativePath: event.relativePath,
+                        timestamp: event.timestamp,
+                      },
+                    });
+                  });
+
+                  sendMessage({ type: 'subscribed', path: watchPath });
+                  console.log(`[Server] Files WebSocket subscribed to: ${watchPath}`);
+                } else if (message.type === 'unsubscribe' && authenticated) {
+                  if (unsubscribe) {
+                    unsubscribe();
+                    unsubscribe = null;
+                  }
+                  sendMessage({ type: 'unsubscribed' });
+                }
+              } catch (error) {
+                console.error('[Server] Files WebSocket message error:', error);
+              }
+            });
+
+            ws.on('close', () => {
+              console.log('[Server] Files WebSocket disconnected');
+              if (unsubscribe) {
+                unsubscribe();
+              }
+            });
+
+            ws.on('error', (error) => {
+              console.error('[Server] Files WebSocket error:', error);
+              if (unsubscribe) {
+                unsubscribe();
               }
             });
           });

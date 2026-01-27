@@ -31,6 +31,7 @@ import { clearFileCache } from './FileEditor.optimized';
 import { UnifiedFileViewer } from './UnifiedFileViewer';
 import { ResourcePreview } from './ResourcePreview';
 import { clearModelCache } from './MonacoEditor';
+import { useFileWatcher, type FileChangeEvent } from '@/hooks/useFileWatcher';
 import type { EditorTab } from '@/hooks/useEditorTabs';
 import type { DeviceBinding } from '@/services/DeviceService';
 
@@ -38,6 +39,7 @@ interface EnhancedEditorTabsProps {
   tabs: EditorTab[];
   activeTabId: string | null;
   device?: DeviceBinding;
+  currentWorkingDirectory?: string;
   onTabChange: (tabId: string) => void;
   onTabClose: (tabId: string) => void;
   onCloseAll?: () => void;
@@ -50,6 +52,7 @@ export function EnhancedEditorTabs({
   tabs,
   activeTabId,
   device,
+  currentWorkingDirectory,
   onTabChange,
   onTabClose,
   onCloseAll,
@@ -59,6 +62,36 @@ export function EnhancedEditorTabs({
 }: EnhancedEditorTabsProps) {
   // 关闭确认对话框状态
   const [closeConfirmTab, setCloseConfirmTab] = useState<EditorTab | null>(null);
+
+  // 文件刷新 key（用于强制刷新编辑器）
+  const [fileRefreshKeys, setFileRefreshKeys] = useState<Map<string, number>>(new Map());
+
+  // 文件变化处理
+  const handleFileChange = useCallback((event: FileChangeEvent) => {
+    // 检查变化的文件是否在打开的标签页中
+    const changedPath = event.path;
+    const matchingTab = tabs.find(tab =>
+      tab.type === 'file' && tab.file?.path === changedPath
+    );
+
+    if (matchingTab && event.changeType === 'change') {
+      console.log('[EnhancedEditorTabs] File changed, refreshing:', changedPath);
+      // 更新刷新 key 强制重新加载
+      setFileRefreshKeys(prev => {
+        const next = new Map(prev);
+        next.set(changedPath, Date.now());
+        return next;
+      });
+    }
+  }, [tabs]);
+
+  // 使用文件监听 Hook
+  useFileWatcher({
+    device,
+    watchPath: currentWorkingDirectory,
+    onFileChange: handleFileChange,
+    enabled: !!device && !!currentWorkingDirectory,
+  });
 
   // 滚动相关状态
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -286,6 +319,7 @@ export function EnhancedEditorTabs({
                   tabId={tab.id}
                   isActive={tab.id === activeTabId}
                   onMarkDirty={onMarkTabDirty}
+                  externalChangeTimestamp={fileRefreshKeys.get(tab.file.path)}
                 />
               ) : tab.type === 'resource' && tab.resource ? (
                 <ResourcePreview resource={tab.resource} />

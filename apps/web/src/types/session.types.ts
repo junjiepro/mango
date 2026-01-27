@@ -7,6 +7,8 @@ import type { UIMessage } from 'ai';
 
 export type SessionType = 'mango' | 'acp';
 
+export type SessionRunningStatus = 'idle' | 'streaming' | 'submitted';
+
 export interface SessionTab {
   id: string;
   type: SessionType;
@@ -24,6 +26,8 @@ export interface SessionTab {
   workingDirectory?: string;
   // 消息缓存（用于标签页切换时保留消息）
   cachedMessages?: UIMessage[];
+  // 运行状态（用于显示后台会话是否正在运行）
+  runningStatus?: SessionRunningStatus;
 }
 
 export interface SessionState {

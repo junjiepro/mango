@@ -33,6 +33,7 @@ interface UnifiedFileViewerProps {
   tabId: string;
   isActive: boolean;
   onMarkDirty?: (tabId: string, isDirty: boolean) => void;
+  externalChangeTimestamp?: number;
 }
 
 /**
@@ -70,6 +71,7 @@ export function UnifiedFileViewer({
   tabId,
   isActive,
   onMarkDirty,
+  externalChangeTimestamp,
 }: UnifiedFileViewerProps) {
   const { client: deviceClient } = useDeviceClient(device);
   const isBinary = isBinaryFile(file.name);
@@ -137,6 +139,7 @@ export function UnifiedFileViewer({
         tabId={tabId}
         isActive={isActive}
         onMarkDirty={onMarkDirty}
+        externalChangeTimestamp={externalChangeTimestamp}
       />
     );
   };

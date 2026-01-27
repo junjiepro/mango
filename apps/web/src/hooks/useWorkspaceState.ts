@@ -39,6 +39,11 @@ export interface WorkspaceState {
   // 文件浏览器状态
   fileExplorerExpandedPaths: string[];
 
+  // ChatLayout 状态
+  showWorkspace: boolean;
+  workspacePanelSize: number;
+  showQuickAccess: boolean;
+
   // 时间戳
   savedAt: number;
 }
@@ -53,6 +58,9 @@ const DEFAULT_STATE: WorkspaceState = {
   tabs: [],
   activeTabId: null,
   fileExplorerExpandedPaths: [],
+  showWorkspace: false,
+  workspacePanelSize: 50,
+  showQuickAccess: true,
   savedAt: 0,
 };
 
@@ -117,7 +125,7 @@ export function useWorkspaceState(conversationId: string | undefined) {
         };
 
         localStorage.setItem(key, JSON.stringify(newState));
-        console.log(`[WorkspaceState] 保存状态: ${conversationId}`);
+        console.log(`[WorkspaceState] 保存状态:`, state);
       } catch (error) {
         console.error('[WorkspaceState] 保存状态失败:', error);
       }

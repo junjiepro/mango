@@ -5,7 +5,7 @@
 
 'use client';
 
-import { MessageSquare, Bot, X, Plus } from 'lucide-react';
+import { MessageSquare, Bot, X, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { SessionTab } from '@/types/session.types';
@@ -37,19 +37,24 @@ export function SessionTabs({
       <div className="flex items-center gap-0.5">
         {sessions.map((session) => {
           const isActive = session.id === activeSessionId;
+          const isRunning =
+            session.runningStatus === 'streaming' || session.runningStatus === 'submitted';
           return (
             <div key={session.id} className="relative group flex items-center">
               <button
                 onClick={() => onSessionChange(session.id)}
                 className={cn(
-                  'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm transition-colors',
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm transition-all',
                   compact ? 'h-7' : 'h-8',
                   isActive
                     ? 'bg-primary text-primary-foreground'
                     : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                 )}
               >
-                {session.type === 'mango' ? (
+                {/* 图标：运行中显示加载动画，否则显示类型图标 */}
+                {isRunning && !isActive ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                ) : session.type === 'mango' ? (
                   <MessageSquare className="h-3.5 w-3.5" />
                 ) : (
                   <Bot className="h-3.5 w-3.5" />

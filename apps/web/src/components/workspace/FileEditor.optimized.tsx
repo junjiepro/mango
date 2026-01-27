@@ -37,10 +37,11 @@ interface FileEditorProps {
   isActive?: boolean;
   onSave?: (path: string, content: string) => void;
   onMarkDirty?: (tabId: string, isDirty: boolean) => void;
+  externalChangeTimestamp?: number;
   className?: string;
 }
 
-export function FileEditor({ file, device, tabId, isActive = false, onSave, onMarkDirty, className = '' }: FileEditorProps) {
+export function FileEditor({ file, device, tabId, isActive = false, onSave, onMarkDirty, externalChangeTimestamp, className = '' }: FileEditorProps) {
   const { client, isReady } = useDeviceClient(device);
   const fileCache = useFileContentCache();
 
@@ -55,6 +56,8 @@ export function FileEditor({ file, device, tabId, isActive = false, onSave, onMa
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
   // 标记是否已完成首次加载
   const hasInitialLoadRef = useRef(false);
+  // 标记是否正在进行外部更新（跳过 onChange 触发的 dirty 检测）
+  const isExternalUpdateRef = useRef(false);
 
   // 使用ref存储回调和tabId,避免loadFile依赖变化
   const onMarkDirtyRef = useRef(onMarkDirty);
@@ -64,6 +67,41 @@ export function FileEditor({ file, device, tabId, isActive = false, onSave, onMa
     onMarkDirtyRef.current = onMarkDirty;
     tabIdRef.current = tabId;
   }, [onMarkDirty, tabId]);
+
+  // 监听外部文件变化，平滑更新内容
+  const prevExternalChangeRef = useRef(externalChangeTimestamp);
+  useEffect(() => {
+    if (
+      externalChangeTimestamp &&
+      externalChangeTimestamp !== prevExternalChangeRef.current &&
+      client &&
+      !isDirty
+    ) {
+      prevExternalChangeRef.current = externalChangeTimestamp;
+      // 标记正在进行外部更新
+      isExternalUpdateRef.current = true;
+      // 静默重新加载文件内容
+      (async () => {
+        try {
+          const data = await client.files.read(file.path);
+          // 先同步更新 ref，确保 handleChange 比较时使用新值
+          originalContentRef.current = data.content;
+          setOriginalContent(data.content);
+          setContent(data.content);
+          setLastModified(data.modified);
+          globalLoadedFiles.set(file.path, data.modified);
+          console.log(`[FileEditor] 文件已平滑更新: ${file.path}`);
+        } catch (err) {
+          console.error('[FileEditor] 平滑更新失败:', err);
+        } finally {
+          // 延迟重置标志，确保 onChange 已处理完
+          setTimeout(() => {
+            isExternalUpdateRef.current = false;
+          }, 100);
+        }
+      })();
+    }
+  }, [externalChangeTimestamp, client, file.path, isDirty]);
 
   // 加载文件内容
   const loadFile = useCallback(async (forceReload = false) => {
@@ -242,6 +280,12 @@ export function FileEditor({ file, device, tabId, isActive = false, onSave, onMa
   const handleChange = useCallback((value: string | undefined) => {
     const newContent = value || '';
     setContent(newContent);
+
+    // 如果是外部更新触发的变化，跳过 dirty 检测
+    if (isExternalUpdateRef.current) {
+      return;
+    }
+
     const dirty = newContent !== originalContentRef.current;
     setIsDirty(dirty);
 
