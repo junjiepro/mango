@@ -304,48 +304,85 @@ Based on plan.md monorepo structure:
 
 ---
 
-## Phase 6: User Story 4 - Agent持续学习与改进 (Priority: P4)
+## Phase 6: User Story 4 - Agent持续学习与上下文工程优化 (Priority: P4)
 
-**Goal**: Agent学习用户反馈,优化后续任务执行
+**Goal**: Agent学习用户反馈,优化后续任务执行;实现统一Skill架构,支持语义匹配和版本管理
 
-**Independent Test**: 多次执行同类任务并提供反馈,观察Agent是否改进
+**Independent Test**: 多次执行同类任务并提供反馈,观察Agent是否改进;验证Skill语义搜索和缓存机制
+
+### Database Schema for Skill Architecture v3
+
+- [ ] T151 [P] [US4] Create `skill_registry` table migration in `supabase/migrations/20260127000001_skill_registry.sql` (统一元数据注册表,支持pgvector语义搜索)
+- [ ] T152 [P] [US4] Create `skill_content_cache` table migration in `supabase/migrations/20260127000002_skill_content_cache.sql` (数据库级内容缓存)
+- [ ] T153 [P] [US4] Create `device_skill_sync` table migration in `supabase/migrations/20260127000003_device_skill_sync.sql` (设备Skill同步状态)
+- [ ] T154 [P] [US4] Create `skill_versions` table migration in `supabase/migrations/20260127000004_skill_versions.sql` (Skill版本历史)
+- [ ] T155 [P] [US4] Create `skill_execution_logs` table migration in `supabase/migrations/20260127000005_skill_execution_logs.sql` (执行日志统计)
+- [ ] T156 [US4] Add RLS policies and indexes for all Skill tables
+- [ ] T157 [US4] Apply Skill migrations using `supabase db push`
+
+### Skill Registry Infrastructure
+
+- [ ] T158 [P] [US4] Create Skill types in `packages/shared/types/skill.types.ts` (SkillCategory, SkillMetadata, ContentRef)
+- [ ] T159 [P] [US4] Create UnifiedSkillLoader in `supabase/functions/_shared/skill-loader.ts` (请求级缓存→数据库缓存→源)
+- [ ] T160 [P] [US4] Create skill-manifest.json build script in `scripts/build-skill-manifest.ts` (构建时生成)
+- [ ] T161 [US4] Integrate build script into CI/CD workflow in `.github/workflows/ci.yml`
+
+### Edge Function Skills
+
+- [ ] T162 [P] [US4] Create Edge Skill Markdown template in `supabase/functions/skills/_template-skill.md`
+- [ ] T163 [P] [US4] Create SkillMarkdownParser in `supabase/functions/_shared/skill-parser.ts` (Markdown自解析)
+- [ ] T164 [US4] Migrate existing skills to new Markdown format
+
+### Skill Semantic Search
+
+- [ ] T165 [P] [US4] Enable pgvector extension in Supabase
+- [ ] T166 [P] [US4] Create embedding generation service in `supabase/functions/generate-skill-embedding/index.ts`
+- [ ] T167 [US4] Create semantic skill search API in `apps/web/src/app/api/skills/search/route.ts`
+- [ ] T168 [US4] Integrate semantic search into Agent tool selection
 
 ### Feedback Collection
 
-- [ ] T127 [P] [US4] Create Feedback service in `apps/web/src/services/FeedbackService.ts`
-- [ ] T128 [P] [US4] Create Learning service in `apps/web/src/services/LearningService.ts`
-- [ ] T129 [P] [US4] Create API route for submitting feedback in `apps/web/src/app/api/feedback/route.ts`
-- [ ] T130 [P] [US4] Create API route for learning rules in `apps/web/src/app/api/learning/rules/route.ts`
+- [ ] T169 [P] [US4] Create Feedback service in `apps/web/src/services/FeedbackService.ts`
+- [ ] T170 [P] [US4] Create Learning service in `apps/web/src/services/LearningService.ts`
+- [ ] T171 [P] [US4] Create API route for submitting feedback in `apps/web/src/app/api/feedback/route.ts`
+- [ ] T172 [P] [US4] Create API route for learning rules in `apps/web/src/app/api/learning/rules/route.ts`
 
 ### Feedback UI Components
 
-- [ ] T131 [P] [US4] Create FeedbackButton component in `apps/web/src/components/feedback/FeedbackButton.tsx`
-- [ ] T132 [P] [US4] Create FeedbackDialog component in `apps/web/src/components/feedback/FeedbackDialog.tsx`
-- [ ] T133 [US4] Integrate FeedbackButton in MessageItem component
-- [ ] T134 [US4] Integrate FeedbackButton in TaskProgressIndicator component
+- [ ] T173 [P] [US4] Create FeedbackButton component in `apps/web/src/components/feedback/FeedbackButton.tsx`
+- [ ] T174 [P] [US4] Create FeedbackDialog component in `apps/web/src/components/feedback/FeedbackDialog.tsx`
+- [ ] T175 [US4] Integrate FeedbackButton in MessageItem component
+- [ ] T176 [US4] Integrate FeedbackButton in TaskProgressIndicator component
 
 ### Learning Rule Extraction
 
-- [ ] T135 [US4] Create Supabase Edge Function for rule extraction in `supabase/functions/extract-learning-rules/index.ts`
-- [ ] T136 [US4] Implement signal aggregation logic (feedback, behavior, implicit signals)
-- [ ] T137 [US4] Implement pattern recognition using clustering
-- [ ] T138 [US4] Implement rule confidence scoring
+- [ ] T177 [US4] Create Supabase Edge Function for rule extraction in `supabase/functions/extract-learning-rules/index.ts`
+- [ ] T178 [US4] Implement signal aggregation logic (feedback, behavior, implicit signals)
+- [ ] T179 [US4] Implement pattern recognition using clustering
+- [ ] T180 [US4] Implement rule confidence scoring
 
 ### Learning Rule Application
 
-- [ ] T139 [P] [US4] Create prompt engineering service in `apps/web/src/services/PromptService.ts`
-- [ ] T140 [US4] Integrate learning rules into Agent request context
-- [ ] T141 [US4] Create RAG knowledge base in `supabase/functions/rag-search/index.ts`
-- [ ] T142 [US4] Add rule application tracking in Task execution
+- [ ] T181 [P] [US4] Create prompt engineering service in `apps/web/src/services/PromptService.ts`
+- [ ] T182 [US4] Integrate learning rules into Agent request context
+- [ ] T183 [US4] Create RAG knowledge base in `supabase/functions/rag-search/index.ts`
+- [ ] T184 [US4] Add rule application tracking in Task execution
 
 ### User Learning Data Management
 
-- [ ] T143 [P] [US4] Create learning summary page in `apps/web/src/app/learning/page.tsx`
-- [ ] T144 [P] [US4] Create learning rules list component in `apps/web/src/components/learning/RulesList.tsx`
-- [ ] T145 [US4] Create API route for deleting learning data in `apps/web/src/app/api/learning/cleanup/route.ts`
-- [ ] T146 [US4] Create data export functionality in `apps/web/src/app/api/learning/export/route.ts`
+- [ ] T185 [P] [US4] Create learning summary page in `apps/web/src/app/learning/page.tsx`
+- [ ] T186 [P] [US4] Create learning rules list component in `apps/web/src/components/learning/RulesList.tsx`
+- [ ] T187 [US4] Create API route for deleting learning data in `apps/web/src/app/api/learning/cleanup/route.ts`
+- [ ] T188 [US4] Create data export functionality in `apps/web/src/app/api/learning/export/route.ts`
 
-**Checkpoint**: User Story 4 complete - Agent learns from feedback and improves over time
+### Device Skill Sync (CLI Integration)
+
+- [ ] T189 [P] [US4] Create skill sync service in `apps/cli/src/lib/skill-sync.ts` (设备Skill同步逻辑)
+- [ ] T190 [P] [US4] Create /skills endpoint in `apps/cli/src/server/routes/skills.ts` (设备Skill列表和内容)
+- [ ] T191 [US4] Implement offline skill cache in CLI for degradation support
+- [ ] T192 [US4] Add skill sync status to device management page
+
+**Checkpoint**: User Story 4 complete - Agent learns from feedback, Skill architecture unified with semantic search and version management
 
 ---
 
@@ -649,7 +686,7 @@ With multiple developers:
 
 ---
 
-**Total Tasks**: 274
+**Total Tasks**: 296
 
 **Task Distribution by Story**:
 
@@ -658,17 +695,17 @@ With multiple developers:
 - User Story 1 (P1): 35 tasks
 - User Story 2 (P2): 28 tasks
 - User Story 3 (P3): 39 tasks
-- User Story 4 (P4): 20 tasks
-- User Story 5 (P5): 44 tasks (更新: A2UI + 资源嗅探 + 工作区 + Monaco Editor + Git + 终端)
+- User Story 4 (P4): 42 tasks (更新: Skill架构v3 + 语义搜索 + 设备Skill同步 + 学习反馈)
+- User Story 5 (P5): 44 tasks (A2UI + 资源嗅探 + 工作区 + Monaco Editor + Git + 终端)
 - User Story 6 (P6): 17 tasks
 - Polish: 50 tasks
 
-**Parallel Opportunities**: ~140 tasks marked [P] can run concurrently within their phase
+**Parallel Opportunities**: ~160 tasks marked [P] can run concurrently within their phase
 
 **Suggested MVP Scope**: Phases 1-3 (Setup + Foundational + User Story 1) = 76 tasks (unchanged)
 
 ---
 
 **Generated**: 2026-01-01 (Updated User Story 5)
-**Last Modified**: 2026-01-01
+**Last Modified**: 2026-01-29 (Updated User Story 4 with Skill Architecture v3)
 **Based on**: spec.md, plan.md, research.md, data-model.md, contracts/
