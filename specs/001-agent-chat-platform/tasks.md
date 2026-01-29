@@ -382,7 +382,26 @@ Based on plan.md monorepo structure:
 - [ ] T191 [US4] Implement offline skill cache in CLI for degradation support
 - [ ] T192 [US4] Add skill sync status to device management page
 
-**Checkpoint**: User Story 4 complete - Agent learns from feedback, Skill architecture unified with semantic search and version management
+### MiniApp 改造为 Skill + MCP Server
+
+- [ ] T193 [P] [US4] Update mini_apps table schema: add `skill_content` and `code` columns in `supabase/migrations/20260127000006_miniapp_skill_mcp.sql`
+- [ ] T194 [P] [US4] Create MiniApp MCP Edge Function in `supabase/functions/miniapp-mcp/index.ts` (Hono + @hono/mcp)
+- [ ] T195 [P] [US4] Create MiniApp sandbox context in `supabase/functions/miniapp-mcp/context.ts` (storage, notification APIs)
+- [ ] T196 [P] [US4] Create MiniApp code executor in `supabase/functions/miniapp-mcp/executor.ts` (安全沙箱执行)
+- [ ] T197 [US4] Implement unified UI Resource URI `ui://mango/main` in MiniApp MCP Server
+- [ ] T198 [P] [US4] Install @mcp-ui/server and @mcp-ui/client dependencies
+- [ ] T199 [P] [US4] Create UIResourceRenderer component in `apps/web/src/components/miniapp/UIResourceRenderer.tsx`
+- [ ] T200 [US4] Update MiniAppContainer to use MCP protocol for tool calls
+- [ ] T201 [US4] Create MiniApp Skill template in `supabase/functions/skills/miniapp-template-skill.md`
+
+### Extension Skill Generation (自动化扩展 Skill)
+
+- [ ] T202 [P] [US4] Create ExtensionSkillGenerator in `supabase/functions/_shared/extension-skill-generator.ts`
+- [ ] T203 [US4] Implement feedback clustering algorithm for pattern extraction
+- [ ] T204 [US4] Create extension skill injection into Agent prompt
+- [ ] T205 [US4] Add extension skill management UI in learning summary page
+
+**Checkpoint**: User Story 4 complete - Agent learns from feedback, Skill architecture unified, MiniApp transformed to Skill + MCP Server
 
 ---
 
@@ -686,7 +705,7 @@ With multiple developers:
 
 ---
 
-**Total Tasks**: 296
+**Total Tasks**: 309
 
 **Task Distribution by Story**:
 
@@ -695,17 +714,17 @@ With multiple developers:
 - User Story 1 (P1): 35 tasks
 - User Story 2 (P2): 28 tasks
 - User Story 3 (P3): 39 tasks
-- User Story 4 (P4): 42 tasks (更新: Skill架构v3 + 语义搜索 + 设备Skill同步 + 学习反馈)
+- User Story 4 (P4): 55 tasks (更新: Skill架构v3 + MiniApp改造 + 扩展Skill生成 + 学习反馈)
 - User Story 5 (P5): 44 tasks (A2UI + 资源嗅探 + 工作区 + Monaco Editor + Git + 终端)
 - User Story 6 (P6): 17 tasks
 - Polish: 50 tasks
 
-**Parallel Opportunities**: ~160 tasks marked [P] can run concurrently within their phase
+**Parallel Opportunities**: ~170 tasks marked [P] can run concurrently within their phase
 
 **Suggested MVP Scope**: Phases 1-3 (Setup + Foundational + User Story 1) = 76 tasks (unchanged)
 
 ---
 
 **Generated**: 2026-01-01 (Updated User Story 5)
-**Last Modified**: 2026-01-29 (Updated User Story 4 with Skill Architecture v3)
+**Last Modified**: 2026-01-29 (Updated User Story 4 with MiniApp MCP transformation)
 **Based on**: spec.md, plan.md, research.md, data-model.md, contracts/
