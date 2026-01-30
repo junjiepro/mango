@@ -620,6 +620,16 @@ CREATE TABLE mini_apps (
   metadata JSONB DEFAULT '{}',
   tags TEXT[] DEFAULT '{}',
 
+  -- ========== v1.3.0 新增: Skill + MCP 架构 ==========
+  -- Skill 定义 (Markdown 格式，遵循 Claude Agent Skill 规格)
+  skill_content TEXT,
+
+  -- 架构版本标识
+  architecture_version VARCHAR(10) DEFAULT 'v1' CHECK (
+    architecture_version IN ('v1', 'v2-mcp')
+  ),
+  -- ===================================================
+
   -- 时间戳
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -635,6 +645,7 @@ CREATE INDEX idx_mini_apps_creator ON mini_apps(creator_id, created_at DESC);
 CREATE INDEX idx_mini_apps_status ON mini_apps(status) WHERE status = 'active';
 CREATE INDEX idx_mini_apps_public ON mini_apps(is_public) WHERE is_public = true;
 CREATE INDEX idx_mini_apps_tags ON mini_apps USING gin(tags);
+CREATE INDEX idx_mini_apps_architecture ON mini_apps(architecture_version);
 
 -- 全文搜索
 CREATE INDEX idx_mini_apps_search ON mini_apps USING gin(
@@ -659,6 +670,12 @@ CREATE POLICY "Users can manage own mini apps"
 - `manifest`：声明式配置（版本、权限、API、触发器）
 - `runtime_config`：运行时限制（内存、执行时间、网络域名）
 - `security_review`：安全审核状态
+- `skill_content`：Skill 定义（Markdown 格式，v2-mcp 架构使用）
+- `architecture_version`：架构版本（v1=原有架构，v2-mcp=MCP 协议架构）
+
+**架构版本说明**：
+- `v1`: 原有架构，使用 code 字段存储 UI 和逻辑
+- `v2-mcp`: 新架构，使用 skill_content + code 字段，通过 MCP 协议提供服务
 
 ---
 
@@ -2335,9 +2352,15 @@ WHERE valid_from IS NULL;
 
 ## 11. Skill 架构优化 (v2)
 
+> ⚠️ **DEPRECATED**: 此架构已被 §12 Skill 统一注册架构 (v3) 取代。
+> v3 架构针对 Supabase Edge Function 无状态环境进行了优化，采用数据库缓存替代内存缓存。
+> 新项目请直接使用 §12 架构，现有项目请参考 §12.5 迁移脚本。
+
 基于 skill-creator 最佳实践，优化三层 Skill 架构，支持语义匹配、版本管理和 Skill 组合。
 
 ### 11.1 统一 Skills 表（优化版）
+
+> ⚠️ **DEPRECATED**: 请使用 §12.1 `skill_registry` 表替代。
 
 **描述**：整合 User Skills、MiniApp Skills、Extension Skills 到统一表结构，支持版本管理和语义搜索。
 
@@ -2690,6 +2713,17 @@ FROM extension_skills;
 
 基于 Supabase Edge Function 环境限制，设计统一的 Skill 注册与缓存架构。
 
+**与 v2 的主要区别**：
+
+| 方面 | v2 架构 (§11) | v3 架构 (§12) |
+|------|---------------|---------------|
+| 缓存策略 | 内存缓存 | 数据库缓存 (skill_content_cache) |
+| Manifest | 运行时扫描 | 构建时生成 (skill-manifest.json) |
+| 设备同步 | 无 | device_skill_sync 表支持离线降级 |
+| 主表 | skills | skill_registry |
+
+**迁移路径**: v2 `skills` 表 → v3 `skill_registry` 表（见 §12.5）
+
 ### 12.1 Skill 注册表 (skill_registry)
 
 **描述**：统一存储所有三层 Skill 的元数据，作为单一数据源。
@@ -2846,7 +2880,69 @@ CREATE INDEX idx_device_sync_skill ON device_skill_sync(skill_id);
 
 ---
 
-### 12.4 统一查询示例
+### 12.4 Skill 版本历史表 (skill_versions)
+
+**描述**：记录 Skill 的版本变更历史，支持版本回滚。
+
+**表结构**：
+
+```sql
+CREATE TABLE skill_versions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  skill_id TEXT NOT NULL REFERENCES skill_registry(skill_id) ON DELETE CASCADE,
+
+  -- 版本信息
+  version TEXT NOT NULL,
+  content_snapshot TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+
+  -- 变更说明
+  change_summary TEXT,
+  changed_by UUID REFERENCES auth.users(id),
+
+  -- 时间戳
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(skill_id, version)
+);
+
+CREATE INDEX idx_skill_versions_skill ON skill_versions(skill_id, created_at DESC);
+```
+
+---
+
+### 12.5 Skill 执行日志表 (skill_execution_logs)
+
+**描述**：记录 Skill 执行统计，用于分析和优化。
+
+**表结构**：
+
+```sql
+CREATE TABLE skill_execution_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  skill_id TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id),
+
+  -- 执行信息
+  execution_time_ms INT,
+  success BOOLEAN DEFAULT true,
+  error_message TEXT,
+
+  -- 上下文
+  conversation_id UUID,
+  task_id UUID,
+
+  -- 时间戳
+  executed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_exec_logs_skill ON skill_execution_logs(skill_id, executed_at DESC);
+CREATE INDEX idx_exec_logs_user ON skill_execution_logs(user_id, executed_at DESC);
+```
+
+---
+
+### 12.6 统一查询示例
 
 ```sql
 -- 列出所有可用 Skill（元数据）

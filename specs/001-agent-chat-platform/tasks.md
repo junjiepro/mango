@@ -358,7 +358,7 @@ Based on plan.md monorepo structure:
 
 - [ ] T177 [US4] Create Supabase Edge Function for rule extraction in `supabase/functions/extract-learning-rules/index.ts`
 - [ ] T178 [US4] Implement signal aggregation logic (feedback, behavior, implicit signals)
-- [ ] T179 [US4] Implement pattern recognition using clustering
+- [ ] T179 [US4] Implement pattern recognition using clustering (DBSCAN for feedback grouping, cosine similarity for embedding)
 - [ ] T180 [US4] Implement rule confidence scoring
 
 ### Learning Rule Application
