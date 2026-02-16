@@ -107,3 +107,116 @@ export function createMockTaskList(count = 3): Task[] {
     })
   )
 }
+
+// ============ US4 Learning & Feedback Test Data ============
+
+export interface FeedbackRecord {
+  id: string
+  user_id: string
+  conversation_id?: string
+  message_id?: string
+  task_id?: string
+  feedback_type: 'satisfaction' | 'accuracy' | 'usefulness' | 'safety'
+  rating: 'positive' | 'negative' | 'neutral'
+  comment?: string
+  context?: Record<string, unknown>
+  created_at: string
+}
+
+export interface LearningRecord {
+  id: string
+  user_id: string
+  record_type: 'preference' | 'correction' | 'pattern' | 'skill'
+  content: Record<string, unknown>
+  confidence: number
+  is_active: boolean
+  applied_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface SkillSearchResult {
+  id: string
+  name: string
+  description: string
+  similarity: number
+}
+
+export function createMockFeedback(
+  overrides?: Partial<FeedbackRecord>
+): FeedbackRecord {
+  const now = new Date().toISOString()
+  return {
+    id: 'feedback-123',
+    user_id: 'user-123',
+    conversation_id: 'conv-123',
+    message_id: 'msg-123',
+    feedback_type: 'satisfaction',
+    rating: 'positive',
+    comment: 'Great response!',
+    context: {},
+    created_at: now,
+    ...overrides,
+  }
+}
+
+export function createMockFeedbackList(count = 3): FeedbackRecord[] {
+  return Array.from({ length: count }, (_, i) =>
+    createMockFeedback({
+      id: `feedback-${i + 1}`,
+      rating: i % 2 === 0 ? 'positive' : 'negative',
+      comment: `Feedback ${i + 1}`,
+    })
+  )
+}
+
+export function createMockLearningRecord(
+  overrides?: Partial<LearningRecord>
+): LearningRecord {
+  const now = new Date().toISOString()
+  return {
+    id: 'learning-123',
+    user_id: 'user-123',
+    record_type: 'preference',
+    content: { format: 'table', language: 'zh-CN' },
+    confidence: 0.5,
+    is_active: true,
+    applied_count: 0,
+    created_at: now,
+    updated_at: now,
+    ...overrides,
+  }
+}
+
+export function createMockLearningRecordList(count = 3): LearningRecord[] {
+  return Array.from({ length: count }, (_, i) =>
+    createMockLearningRecord({
+      id: `learning-${i + 1}`,
+      confidence: 0.5 + i * 0.1,
+      record_type: i % 2 === 0 ? 'preference' : 'skill',
+    })
+  )
+}
+
+export function createMockSkillSearchResult(
+  overrides?: Partial<SkillSearchResult>
+): SkillSearchResult {
+  return {
+    id: 'skill-123',
+    name: 'todo-manager',
+    description: '待办事项管理工具',
+    similarity: 0.85,
+    ...overrides,
+  }
+}
+
+export function createMockSkillSearchResults(count = 5): SkillSearchResult[] {
+  return Array.from({ length: count }, (_, i) =>
+    createMockSkillSearchResult({
+      id: `skill-${i + 1}`,
+      name: `skill-${i + 1}`,
+      description: `Skill description ${i + 1}`,
+      similarity: 0.9 - i * 0.1,
+    })
+  )
+}

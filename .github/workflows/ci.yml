@@ -82,11 +82,15 @@ jobs:
       - name: Build all packages
         run: pnpm build
 
+      - name: Build skill manifest
+        run: pnpm --filter @mango/shared exec ts-node ../../scripts/build-skill-manifest.ts
+
       - name: Check build artifacts
         run: |
           test -d apps/web/.next || exit 1
           test -d apps/cli/dist || exit 1
           test -d packages/shared/dist || exit 1
+          test -f supabase/functions/process-agent-message/skill-manifest.json || echo "Warning: skill-manifest.json not found"
 
   e2e-tests:
     runs-on: ubuntu-latest

@@ -1,5 +1,8 @@
 # MCP 浏览器客户端技术调研
 
+> **⚠️ 注意**：本文档中引用的 `UIResourceRenderer`（`@mcp-ui/client`）+ JSON 组件树方案已废弃。
+> 当前架构使用 `MiniAppContainer` + HTML iframe 渲染。本文档保留作为技术调研历史记录。
+
 **调研日期**: 2026-01-06
 **目标**: 调研 mcp-use/browser 和 mcp-ui 客户端技术
 

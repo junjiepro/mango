@@ -12,8 +12,9 @@ const deviceUrlsSchema = z.object({
   cloudflare_url: z.string().url('Invalid cloudflare URL').nullable(),
   localhost_url: z.string().url('Invalid localhost URL').nullable(),
   hostname_url: z.string().url('Invalid hostname URL').nullable(),
+  tailscale_url: z.string().url('Invalid tailscale URL').nullable().optional(),
 }).refine(
-  (data) => data.cloudflare_url || data.localhost_url || data.hostname_url,
+  (data) => data.cloudflare_url || data.localhost_url || data.hostname_url || data.tailscale_url,
   { message: 'At least one URL must be provided' }
 );
 
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
     // 尝试通过任一可用 URL 调用设备的 /health 端点验证
     const urlsToTry = [
       device_urls.cloudflare_url,
+      device_urls.tailscale_url,
       device_urls.hostname_url,
       device_urls.localhost_url,
     ].filter(Boolean) as string[];

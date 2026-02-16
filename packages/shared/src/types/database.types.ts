@@ -607,7 +607,7 @@ export type Database = {
           creator_id: string;
           description: string;
           display_name: string;
-          html: string | null;
+          html: Record<string, string> | null;
           icon_url: string | null;
           id: string;
           is_public: boolean | null;
@@ -630,7 +630,7 @@ export type Database = {
           creator_id: string;
           description: string;
           display_name: string;
-          html?: string | null;
+          html?: Record<string, string> | null;
           icon_url?: string | null;
           id?: string;
           is_public?: boolean | null;
@@ -653,7 +653,7 @@ export type Database = {
           creator_id?: string;
           description?: string;
           display_name?: string;
-          html?: string | null;
+          html?: Record<string, string> | null;
           icon_url?: string | null;
           id?: string;
           is_public?: boolean | null;

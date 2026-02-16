@@ -223,3 +223,77 @@ export function getDeviceInfoSummary(): {
     macAddress: getMacAddress(),
   };
 }
+
+/**
+ * 判断 IP 是否属于 Tailscale CGNAT 地址段 100.64.0.0/10
+ */
+export function isTailscaleIp(ip: string): boolean {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return false;
+  const first = parseInt(parts[0], 10);
+  const second = parseInt(parts[1], 10);
+  // 100.64.0.0/10 => first octet = 100, second octet 64-127
+  return first === 100 && second >= 64 && second <= 127;
+}
+
+/**
+ * 获取 Tailscale 地址（MagicDNS 域名优先，IP 回退）
+ *
+ * 检测优先级：
+ * 1. `tailscale status --json` → Self.DNSName（MagicDNS 域名）
+ * 2. 同一 JSON → Self.TailscaleIPs[0]（IPv4）
+ * 3. 网络接口名称含 "tailscale" 的 IPv4 地址
+ * 4. 所有接口中匹配 CGNAT 100.64.0.0/10 的 IPv4 地址
+ * 5. 未安装/未运行时返回 null
+ */
+export function getTailscaleAddress(): string | null {
+  // 策略 1 & 2: 通过 tailscale CLI 获取
+  try {
+    const output = execSync('tailscale status --json', {
+      encoding: 'utf-8',
+      timeout: 3000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const status = JSON.parse(output);
+
+    // 优先使用 MagicDNS 域名
+    if (status.Self?.DNSName) {
+      const dnsName = status.Self.DNSName.replace(/\.$/, '');
+      if (dnsName) return dnsName;
+    }
+
+    // 回退到 Tailscale IP
+    const ips: string[] = status.Self?.TailscaleIPs || [];
+    const ipv4 = ips.find((ip: string) => ip.includes('.'));
+    if (ipv4) return ipv4;
+  } catch {
+    // tailscale 未安装或未运行，继续尝试网络接口检测
+  }
+
+  // 策略 3: 通过网络接口名称检测
+  const networkInterfaces = os.networkInterfaces();
+  for (const name of Object.keys(networkInterfaces)) {
+    if (name.toLowerCase().includes('tailscale')) {
+      const interfaces = networkInterfaces[name];
+      if (!interfaces) continue;
+      for (const iface of interfaces) {
+        if (!iface.internal && iface.family === 'IPv4') {
+          return iface.address;
+        }
+      }
+    }
+  }
+
+  // 策略 4: 扫描所有接口匹配 CGNAT 地址段
+  for (const name of Object.keys(networkInterfaces)) {
+    const interfaces = networkInterfaces[name];
+    if (!interfaces) continue;
+    for (const iface of interfaces) {
+      if (!iface.internal && iface.family === 'IPv4' && isTailscaleIp(iface.address)) {
+        return iface.address;
+      }
+    }
+  }
+
+  return null;
+}

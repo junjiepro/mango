@@ -12,7 +12,7 @@ import { serviceInitializer } from '../lib/service-initializer.js';
 import { tempBindingManager } from '../lib/temp-binding-manager.js';
 import { bindingCodeManager } from '../lib/binding-code-manager.js';
 import { urlUpdateManager } from '../lib/url-update-manager.js';
-import { generateDeviceId, getDeviceInfoSummary, getLocalIpAddress } from '../lib/device-id.js';
+import { generateDeviceId, getDeviceInfoSummary, getLocalIpAddress, getTailscaleAddress } from '../lib/device-id.js';
 import { acpConnector } from '../lib/connectors/acp-connector.js';
 import open from 'open';
 import os from 'os';
@@ -94,6 +94,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     formatter.newline();
     let tunnelUrl: string | null = null;
     const localIp = getLocalIpAddress();
+    const tailscaleAddr = getTailscaleAddress();
 
     const cloudflaredInstalled = await tunnelManager.checkCloudflared();
     if (!cloudflaredInstalled) {
@@ -124,6 +125,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
               cloudflare_url: newTunnelUrl,
               localhost_url: `http://localhost:${actualPort}`,
               hostname_url: `http://${localIp}:${actualPort}`,
+              ...(tailscaleAddr ? { tailscale_url: `http://${tailscaleAddr}:${actualPort}` } : {}),
             };
 
             const existingConfig = bindingCodeManager.readConfig();
@@ -164,6 +166,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
         cloudflare_url: tunnelUrl,
         localhost_url: `http://localhost:${actualPort}`,
         hostname_url: `http://${localIp}:${actualPort}`,
+        ...(tailscaleAddr ? { tailscale_url: `http://${tailscaleAddr}:${actualPort}` } : {}),
       };
 
       for (const bindingCode of bindingCodes) {
@@ -203,6 +206,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
           cloudflare_url: tunnelUrl,
           localhost_url: `http://localhost:${actualPort}`,
           hostname_url: `http://${localIp}:${actualPort}`,
+          ...(tailscaleAddr ? { tailscale_url: `http://${tailscaleAddr}:${actualPort}` } : {}),
         };
 
         // 准备设备信息
@@ -234,27 +238,32 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
       formatter.dim('Set --device-secret parameter to enable /new-binding endpoint');
     }
 
-    // 8. 初始化 MCP/ACP 服务
+    // 8. 初始化 MCP/ACP 服务（后台非阻塞）
     formatter.newline();
-    const serviceSpinner = formatter.spinner('Initializing MCP/ACP services...');
-    try {
-      // 初始化 ACP 连接器（还原持久化会话，但不初始化连接）
-      await acpConnector.initialize();
-
-      for (const code of bindingCodes) {
-        const servers = existingConfig?.[code]?.mcpServices || {};
-        if (Object.keys(servers).length > 0) {
-          await serviceInitializer.initializeServices(Object.values(servers), code);
-        }
-      }
-
-      serviceSpinner.succeed('MCP/ACP services initialized');
-    } catch (error) {
-      serviceSpinner.fail('Failed to initialize services');
-      if (error instanceof Error) {
-        formatter.warning(error.message);
-      }
-      formatter.info('Continuing without MCP/ACP services...');
+    if (hasBindingCode) {
+      formatter.info('MCP/ACP services initializing in background...');
+      acpConnector
+        .initialize()
+        .then(() => {
+          const initPromises = bindingCodes.map((code) => {
+            const servers = existingConfig?.[code]?.mcpServices || {};
+            if (Object.keys(servers).length > 0) {
+              return serviceInitializer.initializeServices(Object.values(servers), code);
+            }
+            return Promise.resolve();
+          });
+          return Promise.all(initPromises);
+        })
+        .then(() => {
+          formatter.success('All MCP/ACP services initialized');
+        })
+        .catch((error) => {
+          formatter.warning(
+            `MCP/ACP initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        });
+    } else {
+      formatter.dim('No binding codes found, skipping MCP/ACP initialization');
     }
 
     // 9. 显示绑定信息
@@ -267,6 +276,9 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     }
     formatter.labeled('Localhost URL', `http://localhost:${actualPort}`);
     formatter.labeled('Hostname URL', `http://${localIp}:${actualPort}`);
+    if (tailscaleAddr) {
+      formatter.labeled('Tailscale URL', `http://${tailscaleAddr}:${actualPort}`);
+    }
 
     // 只在未绑定时显示绑定 URL
     if (!hasBindingCode && tempCode) {

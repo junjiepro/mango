@@ -99,11 +99,10 @@ mango/
 │
 ├── packages/
 │   ├── shared/                 # 共享类型和工具
-│   ├── protocols/              # MCP/ACP/A2A适配器
-│   │   ├── mcp/
-│   │   ├── acp/
-│   │   └── a2a/
-│   └── miniapp-runtime/        # 小应用运行时
+│   └── protocols/              # MCP/ACP/A2A适配器
+│       ├── mcp/
+│       ├── acp/
+│       └── a2a/
 │
 ├── supabase/
 │   ├── migrations/            # 数据库迁移
@@ -980,13 +979,13 @@ function TerminalPanel({ deviceId, bindingCode }) {
 ```javascript
 // MiniApp 代码示例：TodoList
 // 注册工具
-mcpServer.tool({
-  name: 'add_todo',
-  description: '添加待办事项',
-  parameters: z.object({
+registerAppTool(
+  'add_todo',
+  '添加待办事项',
+  z.object({
     title: z.string().describe('待办事项标题'),
   }),
-  execute: async ({ title }) => {
+  async ({ title }) => {
     const todos = await storage.get('todos') || [];
     todos.push({
       id: crypto.randomUUID(),
@@ -995,58 +994,41 @@ mcpServer.tool({
     });
     await storage.set('todos', todos);
     return { success: true };
-  },
-});
+  }
+);
 
-// 注册统一的 UI Resource
-const uiResource = createUIResource({
-  uri: 'ui://mango/main',
-  content: {
-    type: 'container',
-    children: [
-      { type: 'input', id: 'title' },
-      { type: 'button', label: '添加' },
-    ],
-  },
-  encoding: 'json',
-});
-
-mcpServer.resource(uiResource);
+// 注册 UI Resource（HTML 格式）
+registerAppResource('ui://mango/main', `
+  <!DOCTYPE html>
+  <html>
+  <head><title>TodoList</title></head>
+  <body>
+    <h2>待办事项</h2>
+    <input type="text" id="title" placeholder="输入标题" />
+    <button onclick="addTodo()">添加</button>
+    <div id="todo-list"></div>
+  </body>
+  </html>
+`);
 ```
 
 ---
 
 ### 14.2 前端集成 MiniApp
 
-**安装依赖**：
-```bash
-npm install @mcp-ui/client
-```
-
-**使用 UIResourceRenderer**：
+**使用 MiniAppContainer**：
 ```tsx
-import { UIResourceRenderer } from '@mcp-ui/client';
+import { MiniAppContainer } from '@/components/miniapp/MiniAppContainer';
 
 function MiniAppViewer({ miniAppId }) {
-  const [resource, setResource] = useState(null);
-
-  useEffect(() => {
-    fetch(`/api/miniapp-mcp/${miniAppId}`, {
-      method: 'POST',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'resources/read',
-        params: { uri: 'ui://mango/main' },
-        id: 1,
-      }),
-    })
-      .then(r => r.json())
-      .then(data => setResource(data.result.contents[0]));
-  }, [miniAppId]);
-
-  return resource ? (
-    <UIResourceRenderer resource={resource} onUIAction={handleAction} />
-  ) : null;
+  // MiniAppContainer 内部通过 MCP 协议获取 HTML 资源
+  // 并使用 iframe 沙箱渲染
+  return (
+    <MiniAppContainer
+      miniAppId={miniAppId}
+      resourceUri="ui://mango/main"
+    />
+  );
 }
 ```
 

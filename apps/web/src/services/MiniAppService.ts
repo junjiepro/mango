@@ -42,7 +42,7 @@ export class MiniAppService {
     display_name: string;
     description: string;
     code: string;
-    html?: string;
+    html?: Record<string, string>;
     icon_url?: string;
     manifest?: MiniAppManifest;
     runtime_config?: MiniAppRuntimeConfig;
@@ -195,6 +195,64 @@ export class MiniAppService {
   }
 
   /**
+   * 获取用户拥有的小应用（创建的 + 安装的）
+   */
+  async getOwnedMiniApps(options?: {
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ data: MiniApp[]; count: number }> {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
+    }
+
+    // 获取用户安装的应用 ID
+    const { data: installations } = await supabase
+      .from('mini_app_installations')
+      .select('mini_app_id')
+      .eq('user_id', user.id)
+      .eq('status', 'active');
+
+    const installedIds = (installations || []).map(i => i.mini_app_id);
+
+    // 查询用户创建的或已安装的应用
+    let query = supabase
+      .from('mini_apps')
+      .select('*', { count: 'exact' })
+      .or(`creator_id.eq.${user.id},id.in.(${installedIds.join(',')})`)
+      .order('created_at', { ascending: false });
+
+    if (options?.status) {
+      query = query.eq('status', options.status);
+    }
+
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+
+    if (options?.offset) {
+      query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      throw new AppError(
+        `Failed to get owned mini apps: ${error.message}`,
+        ErrorType.DATABASE_ERROR,
+        500
+      );
+    }
+
+    return { data: data || [], count: count || 0 };
+  }
+
+  /**
    * 获取公开的小应用列表
    */
   async getPublicMiniApps(options?: {
@@ -243,6 +301,73 @@ export class MiniAppService {
   }
 
   /**
+   * 创建版本快照
+   * 保存当前 app 状态到 mini_app_versions 表
+   */
+  async createVersionSnapshot(id: string, changeSummary?: string): Promise<{ version: string; created: boolean }> {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
+    }
+
+    const app = await this.getMiniApp(id);
+
+    // 计算内容哈希，用于去重
+    const raw = `${app.code || ''}|${(app as any).skill_content || ''}|${JSON.stringify(app.html || {})}`;
+    const contentHash = crypto.createHash('sha256').update(raw).digest('hex');
+
+    // 检查是否已有相同哈希的版本
+    const { data: existing } = await supabase
+      .from('mini_app_versions')
+      .select('version')
+      .eq('mini_app_id', id)
+      .eq('content_hash', contentHash)
+      .single();
+
+    if (existing) {
+      return { version: existing.version, created: false };
+    }
+
+    // 生成新版本号
+    const { data: nextVersion } = await supabase
+      .rpc('generate_next_mini_app_version', { p_mini_app_id: id });
+
+    const version = nextVersion || '1.0.1';
+
+    // 插入版本记录
+    const { error } = await supabase.from('mini_app_versions').insert({
+      mini_app_id: id,
+      version,
+      code_snapshot: app.code,
+      skill_snapshot: (app as any).skill_content,
+      html_snapshot: app.html,
+      manifest_snapshot: app.manifest,
+      content_hash: contentHash,
+      change_summary: changeSummary || '保存版本',
+      changed_by: user.id,
+    });
+
+    if (error) {
+      console.error('Failed to create version snapshot:', error);
+    }
+
+    // 回写 manifest.version 到 mini_apps 表
+    if (!error) {
+      const currentManifest = (app.manifest as Record<string, unknown>) || {};
+      await supabase
+        .from('mini_apps')
+        .update({ manifest: { ...currentManifest, version } })
+        .eq('id', id);
+    }
+
+    return { version, created: true };
+  }
+
+  /**
    * 更新小应用
    */
   async updateMiniApp(
@@ -251,7 +376,8 @@ export class MiniAppService {
       display_name?: string;
       description?: string;
       code?: string;
-      html?: string;
+      skill_content?: string;
+      html?: Record<string, string>;
       icon_url?: string;
       manifest?: MiniAppManifest;
       runtime_config?: MiniAppRuntimeConfig;

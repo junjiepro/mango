@@ -56,7 +56,15 @@ export async function PATCH(
   try {
     const body = await request.json()
 
-    const miniApp = await miniAppService.updateMiniApp(params.id, body)
+    // 提取 change_summary，不传给 updateMiniApp
+    const { change_summary, ...updateData } = body
+
+    // 如果更新了 code、skill_content 或 html，先创建版本快照
+    if (updateData.code || updateData.skill_content || updateData.html) {
+      await miniAppService.createVersionSnapshot(params.id, change_summary)
+    }
+
+    const miniApp = await miniAppService.updateMiniApp(params.id, updateData)
 
     return NextResponse.json({
       success: true,

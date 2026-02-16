@@ -22,6 +22,7 @@ interface MiniAppCardProps {
   onUninstall?: (miniApp: MiniApp) => void
   onOpen?: (miniApp: MiniApp) => void
   onShare?: (miniApp: MiniApp) => void
+  onChatWithAgent?: (miniApp: MiniApp) => void
 }
 
 /**
@@ -36,6 +37,7 @@ export function MiniAppCard({
   onUninstall,
   onOpen,
   onShare,
+  onChatWithAgent,
 }: MiniAppCardProps) {
   const stats = miniApp.stats as any || {}
   const manifest = miniApp.manifest as any || {}
@@ -197,14 +199,44 @@ export function MiniAppCard({
             </svg>
           </Button>
         )}
+
+        {installed && onChatWithAgent && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onChatWithAgent(miniApp)}
+            title="Chat with Agent"
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
+            </svg>
+          </Button>
+        )}
       </div>
 
       {/* 状态标识 */}
-      {miniApp.status === 'draft' && (
-        <div className="absolute top-4 right-4">
-          <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
-            Draft
-          </span>
+      {(miniApp.status === 'draft' || !installed) && (
+        <div className="absolute top-4 right-4 flex gap-1.5">
+          {miniApp.status === 'draft' && (
+            <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+              Draft
+            </span>
+          )}
+          {!installed && (
+            <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+              未安装
+            </span>
+          )}
         </div>
       )}
     </div>

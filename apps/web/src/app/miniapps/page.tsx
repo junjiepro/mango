@@ -6,8 +6,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppHeader } from '@/components/layouts/AppHeader';
 import { MiniAppList } from '@/components/miniapp/MiniAppList';
+import { EditWithAgentDialog } from '@/components/miniapp/EditWithAgentDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -21,11 +23,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Database } from '@/types/database.types';
 
 type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
 
 export default function MiniAppsPage() {
+  const router = useRouter();
   const [miniApps, setMiniApps] = useState<MiniApp[]>([]);
   const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -42,6 +47,15 @@ export default function MiniAppsPage() {
     open: false,
     miniApp: null,
     step: 'confirm',
+  });
+
+  // Chat with Agent 对话框状态
+  const [chatDialog, setChatDialog] = useState<{
+    open: boolean;
+    miniApp: MiniApp | null;
+  }>({
+    open: false,
+    miniApp: null,
   });
 
   // 加载小应用列表
@@ -98,7 +112,7 @@ export default function MiniAppsPage() {
           setMiniApps(mergedApps);
 
           // 设置已安装的 ID 集合
-          const ids = new Set(installedResult.data.map((inst: any) => inst.mini_app_id));
+          const ids = new Set<string>(installedResult.data.map((inst: any) => inst.mini_app_id));
           setInstalledIds(ids);
         }
       } else {
@@ -142,7 +156,7 @@ export default function MiniAppsPage() {
       const result = await response.json();
 
       if (result.success) {
-        const ids = new Set(result.data.map((inst: any) => inst.mini_app_id));
+        const ids = new Set<string>(result.data.map((inst: any) => inst.mini_app_id));
         setInstalledIds(ids);
       }
     } catch (error) {
@@ -165,6 +179,7 @@ export default function MiniAppsPage() {
         toast.success('安装成功', {
           description: `${miniApp.display_name} 已成功安装`,
         });
+        loadMiniApps();
       } else {
         toast.error('安装失败', {
           description: result.error || '安装小应用时出现错误',
@@ -250,7 +265,7 @@ export default function MiniAppsPage() {
   };
 
   const handleOpen = (miniApp: MiniApp) => {
-    window.location.href = `/miniapps/${miniApp.id}`;
+    router.push(`/miniapps/${miniApp.id}`);
   };
 
   const handleShare = async (miniApp: MiniApp) => {
@@ -278,6 +293,11 @@ export default function MiniAppsPage() {
         description: '无法生成分享链接，请稍后重试',
       });
     }
+  };
+
+  // 处理 Chat with Agent
+  const handleChatWithAgent = (miniApp: MiniApp) => {
+    setChatDialog({ open: true, miniApp });
   };
 
   return (
@@ -317,6 +337,15 @@ export default function MiniAppsPage() {
             >
               My Apps
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => loadMiniApps()}
+              disabled={loading}
+              title="刷新列表"
+            >
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            </Button>
           </div>
         </div>
 
@@ -329,6 +358,7 @@ export default function MiniAppsPage() {
           onUninstall={handleUninstall}
           onOpen={handleOpen}
           onShare={handleShare}
+          onChatWithAgent={handleChatWithAgent}
         />
       </div>
 
@@ -390,6 +420,16 @@ export default function MiniAppsPage() {
           )}
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Chat with Agent 对话框 */}
+      {chatDialog.miniApp && (
+        <EditWithAgentDialog
+          open={chatDialog.open}
+          onOpenChange={(open) => setChatDialog({ ...chatDialog, open })}
+          miniAppId={chatDialog.miniApp.id}
+          miniAppName={chatDialog.miniApp.display_name}
+        />
+      )}
     </>
   );
 }

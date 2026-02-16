@@ -16,6 +16,7 @@ import { ResourceTab } from './tabs/ResourceTab';
 import { DeviceTab } from './tabs/DeviceTab';
 import { FileExplorerTab } from './tabs/FileExplorerTab';
 import { GitTab } from './tabs/GitTab';
+import { MiniAppTab } from './tabs/MiniAppTab';
 import { Terminal } from './Terminal';
 import { EditorTabs } from './EditorTabs';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
@@ -77,6 +78,8 @@ export function VSCodeWorkspace({
     activeTabId,
     openFileTab,
     openResourceTab,
+    openMiniAppTab,
+    openCreateMiniAppTab,
     closeTab,
     closeAllTabs,
     closeOtherTabs,
@@ -84,6 +87,7 @@ export function VSCodeWorkspace({
     setActiveTabId,
     markTabDirty,
     resetState: resetEditorState,
+    updateMiniAppInTab,
   } = useEditorTabs({
     initialTabs: initialState.current.tabs,
     initialActiveTabId: initialState.current.activeTabId,
@@ -100,7 +104,10 @@ export function VSCodeWorkspace({
   const hasRestoredRef = useRef(false);
   useEffect(() => {
     // 首次有效 conversationId 或 conversationId 变化时恢复状态
-    if (conversationId && (!hasRestoredRef.current || conversationId !== prevConversationIdRef.current)) {
+    if (
+      conversationId &&
+      (!hasRestoredRef.current || conversationId !== prevConversationIdRef.current)
+    ) {
       prevConversationIdRef.current = conversationId;
       hasRestoredRef.current = true;
       isRestoringRef.current = true; // 开始恢复，禁止保存
@@ -116,6 +123,23 @@ export function VSCodeWorkspace({
       // 恢复编辑器标签页状态
       if (savedState.tabs && savedState.tabs.length > 0) {
         resetEditorState(savedState.tabs, savedState.activeTabId);
+
+        // 异步刷新 miniapp 标签页的数据，确保内容是最新的
+        const miniAppTabs = savedState.tabs.filter(
+          (t) => t.type === 'miniapp' && t.miniApp?.id
+        );
+        for (const tab of miniAppTabs) {
+          fetch(`/api/miniapps/${tab.miniApp!.id}`)
+            .then((res) => res.json())
+            .then((result) => {
+              if (result.success && result.data) {
+                updateMiniAppInTab(tab.miniApp!.id, result.data);
+              }
+            })
+            .catch((err) => {
+              console.error('[VSCodeWorkspace] 刷新 MiniApp 数据失败:', tab.miniApp!.id, err);
+            });
+        }
       }
 
       // 恢复侧边栏状态
@@ -245,6 +269,8 @@ export function VSCodeWorkspace({
         return '终端';
       case 'settings':
         return '设置';
+      case 'apps':
+        return '应用管理';
       default:
         return '';
     }
@@ -320,6 +346,14 @@ export function VSCodeWorkspace({
         );
       case 'git':
         return <GitTab deviceId={deviceId} />;
+      case 'apps':
+        return (
+          <MiniAppTab
+            conversationId={conversationId}
+            onMiniAppClick={(miniApp, isOwner) => openMiniAppTab(miniApp, isOwner)}
+            onCreateNew={openCreateMiniAppTab}
+          />
+        );
       case 'settings':
         return <div className="p-4 text-sm text-muted-foreground">设置功能开发中...</div>;
       default:

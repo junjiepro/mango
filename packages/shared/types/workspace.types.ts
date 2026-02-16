@@ -3,7 +3,10 @@
  * 工作区类型定义
  */
 
-export type WorkspaceTab = 'resources' | 'devices' | 'files' | 'terminal' | 'git';
+export type WorkspaceTab = 'resources' | 'devices' | 'files' | 'terminal' | 'git' | 'apps';
+
+/** MiniApp 编辑模式 */
+export type MiniAppEditMode = 'code' | 'resources' | 'skill' | 'mcp' | 'interact' | 'history';
 
 export type LayoutDirection = 'horizontal' | 'vertical';
 
@@ -36,6 +39,10 @@ export interface WorkspaceState {
     };
     git: {
       current_repo: string | null;
+    };
+    apps: {
+      selected_app_id: string | null;
+      edit_mode: MiniAppEditMode;
     };
   };
 }

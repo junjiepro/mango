@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationProvider, useConversation } from '@/contexts/ConversationContext';
 import { MessageList } from '@/components/conversation/MessageList';
 import { MessageInput } from '@/components/conversation/MessageInput';
@@ -57,6 +57,12 @@ function ConversationDetailContent() {
   } = useConversation();
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // URL 参数：workspace=apps&miniAppId=xxx
+  const urlWorkspace = searchParams.get('workspace');
+  const urlMiniAppId = searchParams.get('miniAppId');
+
   const [miniAppDialogOpen, setMiniAppDialogOpen] = useState(false);
   const [selectedMiniApp, setSelectedMiniApp] = useState<{
     miniApp: MiniApp;
@@ -67,6 +73,8 @@ function ConversationDetailContent() {
   const [devices, setDevices] = useState<DeviceBinding[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [loadingDevices, setLoadingDevices] = useState(false);
+  // 工作区应用管理状态
+  const [selectedWorkspaceMiniAppId, setSelectedWorkspaceMiniAppId] = useState<string | null>(urlMiniAppId);
   // 资源预览状态
   const [previewResource, setPreviewResource] = useState<DetectedResource | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
@@ -505,6 +513,16 @@ function ConversationDetailContent() {
     loadDevices();
   }, []);
 
+  // 处理 URL 参数：自动打开工作区和选中 MiniApp
+  React.useEffect(() => {
+    if (urlWorkspace === 'apps') {
+      setShowWorkspace(true);
+    }
+    if (urlMiniAppId) {
+      setSelectedWorkspaceMiniAppId(urlMiniAppId);
+    }
+  }, [urlWorkspace, urlMiniAppId]);
+
   if (error) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -716,7 +734,6 @@ function ConversationDetailContent() {
           <DialogContent className="sm:max-w-[900px] max-h-[80vh] p-0">
             <MiniAppWindow
               miniApp={selectedMiniApp.miniApp}
-              installation={selectedMiniApp.installation}
               onClose={() => setSelectedMiniApp(null)}
               className="h-[70vh]"
             />

@@ -30,6 +30,7 @@ import {
 import { clearFileCache } from './FileEditor.optimized';
 import { UnifiedFileViewer } from './UnifiedFileViewer';
 import { ResourcePreview } from './ResourcePreview';
+import { MiniAppViewer } from './MiniAppViewer';
 import { clearModelCache } from './MonacoEditor';
 import { useFileWatcher, type FileChangeEvent } from '@/hooks/useFileWatcher';
 import type { EditorTab } from '@/hooks/useEditorTabs';
@@ -323,6 +324,12 @@ export function EnhancedEditorTabs({
                 />
               ) : tab.type === 'resource' && tab.resource ? (
                 <ResourcePreview resource={tab.resource} />
+              ) : tab.type === 'miniapp' && (tab.miniApp || tab.isCreateMode) ? (
+                <MiniAppViewer
+                  miniApp={tab.miniApp}
+                  isCreateMode={tab.isCreateMode}
+                  isOwner={tab.isOwner}
+                />
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
                   <p className="text-sm">无法显示此内容</p>

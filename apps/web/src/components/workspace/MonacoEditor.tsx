@@ -39,6 +39,7 @@ interface MonacoEditorProps {
   onMount?: (currentValue: string) => void; // 挂载时返回当前内容
   className?: string;
   isVisible?: boolean; // 新增：标识编辑器是否可见
+  extraLibs?: Array<{ content: string; filePath?: string }>;
 }
 
 export function MonacoEditor({
@@ -51,6 +52,7 @@ export function MonacoEditor({
   onMount,
   isVisible = true,
   className = '',
+  extraLibs,
 }: MonacoEditorProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
@@ -113,6 +115,22 @@ export function MonacoEditor({
         'editor.background': '#faf9f5', // --mango-light
       },
     });
+
+    // 注入额外的类型声明（用于沙盒 API 自动补全）
+    if (extraLibs?.length) {
+      monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+        target: monaco.languages.typescript.ScriptTarget.ES2020,
+        allowJs: true,
+        checkJs: true,
+        allowNonTsExtensions: true,
+      });
+      for (const lib of extraLibs) {
+        monaco.languages.typescript.javascriptDefaults.addExtraLib(
+          lib.content,
+          lib.filePath || `ts:extra-${Date.now()}.d.ts`
+        );
+      }
+    }
   };
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {

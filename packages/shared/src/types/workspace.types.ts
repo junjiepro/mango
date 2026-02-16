@@ -5,6 +5,9 @@
 
 export type WorkspaceTab = 'resources' | 'devices' | 'files' | 'terminal' | 'git';
 
+/** MiniApp 编辑模式 */
+export type MiniAppEditMode = 'code' | 'resources' | 'skill' | 'mcp' | 'interact' | 'history';
+
 export type LayoutDirection = 'horizontal' | 'vertical';
 
 export type Breakpoint = 'mobile' | 'tablet' | 'desktop';

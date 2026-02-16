@@ -1,51 +1,51 @@
 /**
  * MiniApp Detail Page
- * T093: Create MiniApp detail page
+ * 交互模式 - 通过 MCP 资源发现加载 HTML iframe 渲染，工具调用通过 AppBridge 转发
  */
 
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { AppHeader } from '@/components/layouts/AppHeader';
-import { MiniAppContainer, MiniAppContainerRef } from '@/components/miniapp/MiniAppContainer';
-import { TriggerConfigDialog } from '@/components/miniapp/TriggerConfigDialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bell, Settings } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Loader2, AlertCircle, Download } from 'lucide-react';
+import { toast } from 'sonner';
+import { MiniAppMCPClient } from '@/services/MiniAppMCPClient';
+import { MiniAppContainer } from '@/components/miniapp/MiniAppContainer';
+import type { MiniAppContainerRef } from '@/components/miniapp/MiniAppContainer';
+import type { HostContext } from '@/lib/miniapp/types';
 import type { Database } from '@/types/database.types';
 
 type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
-type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row'];
-
-interface TriggerConfig {
-  id?: string;
-  type: 'schedule' | 'event' | 'manual';
-  enabled: boolean;
-  interval?: number;
-  cron?: string;
-  eventType?: string;
-  message?: string;
-  metadata?: Record<string, any>;
-}
 
 export default function MiniAppDetailPage() {
   const params = useParams();
   const router = useRouter();
   const miniAppId = params.id as string;
+  const clientRef = useRef<MiniAppMCPClient | null>(null);
   const containerRef = useRef<MiniAppContainerRef>(null);
+  const { resolvedTheme } = useTheme();
 
   const [miniApp, setMiniApp] = useState<MiniApp | null>(null);
-  const [installation, setInstallation] = useState<MiniAppInstallation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [triggerConfig, setTriggerConfig] = useState<TriggerConfig | null>(null);
-  const [showTriggerDialog, setShowTriggerDialog] = useState(false);
+  const [installed, setInstalled] = useState<boolean | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const [uiLoading, setUiLoading] = useState(false);
+  const [uiError, setUiError] = useState<string | null>(null);
+  const [htmlContent, setHtmlContent] = useState<string | null>(null);
+
+  const hostContext: HostContext = {
+    theme: (resolvedTheme === 'dark' ? 'dark' : 'light'),
+    locale: typeof navigator !== 'undefined' ? navigator.language : 'zh-CN',
+  };
 
   useEffect(() => {
     loadMiniApp();
     loadInstallation();
-    loadTriggerConfig();
   }, [miniAppId]);
 
   const loadMiniApp = async () => {
@@ -70,202 +70,74 @@ export default function MiniAppDetailPage() {
     try {
       const response = await fetch(`/api/miniapps/${miniAppId}/install`);
       const result = await response.json();
-
-      if (result.success && result.data) {
-        setInstallation(result.data);
-      }
-    } catch (error) {
-      console.error('Failed to load installation:', error);
+      setInstalled(result.success && !!result.data);
+    } catch {
+      setInstalled(false);
     }
   };
+  const initializeMCP = useCallback(async () => {
+    setUiLoading(true);
+    setUiError(null);
 
-  const loadTriggerConfig = async () => {
     try {
-      const response = await fetch(`/api/miniapps/${miniAppId}/trigger`);
-      const result = await response.json();
+      const client = new MiniAppMCPClient(miniAppId);
+      clientRef.current = client;
 
-      if (result.success && result.data) {
-        setTriggerConfig(result.data);
+      await client.initialize();
+
+      // 通用资源发现：查找 HTML 类型资源
+      const htmlResource = await client.findHtmlResource();
+      if (htmlResource) {
+        const res = await client.readResource(htmlResource.uri);
+        if (res?.text) {
+          setHtmlContent(res.text);
+        }
       }
-    } catch (error) {
-      console.error('Failed to load trigger config:', error);
+    } catch (err) {
+      setUiError(err instanceof Error ? err.message : 'MCP 初始化失败');
+    } finally {
+      setUiLoading(false);
     }
-  };
+  }, [miniAppId]);
 
-  const saveTriggerConfig = async (config: TriggerConfig) => {
+  // 已安装后初始化 MCP
+  useEffect(() => {
+    if (miniApp && installed) {
+      initializeMCP();
+    }
+  }, [miniApp, installed, initializeMCP]);
+
+  // 安装应用
+  const handleInstall = async () => {
+    if (!miniApp) return;
+    setInstalling(true);
     try {
-      const response = await fetch(`/api/miniapps/${miniAppId}/trigger`, {
+      const manifest = miniApp.manifest as any || {};
+      const permissions = manifest.required_permissions || [];
+      const response = await fetch(`/api/miniapps/${miniAppId}/install`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify({ granted_permissions: permissions }),
       });
       const result = await response.json();
-
       if (result.success) {
-        setTriggerConfig(config);
+        setInstalled(true);
+        toast.success('安装成功', {
+          description: `${miniApp.display_name} 已成功安装`,
+        });
       } else {
-        throw new Error(result.error || 'Failed to save trigger config');
-      }
-    } catch (error) {
-      console.error('Failed to save trigger config:', error);
-      throw error;
-    }
-  };
-
-  const handleMessage = async (message: any) => {
-    try {
-      let result: any = null;
-
-      // 处理不同的消息类型
-      switch (message.action) {
-        case 'storage.get':
-          result = await handleStorageGet(message.payload.key);
-          break;
-        case 'storage.set':
-          result = await handleStorageSet(message.payload.key, message.payload.value);
-          break;
-        case 'storage.remove':
-          result = await handleStorageRemove(message.payload.key);
-          break;
-        case 'notification.send':
-          result = await handleNotificationSend(message.payload);
-          break;
-        case 'user.getInfo':
-          result = await handleGetUserInfo();
-          break;
-        default:
-          console.warn('Unknown message action:', message.action);
-          result = { error: 'Unknown action' };
-      }
-
-      // 通过 ref 发送响应回 iframe
-      if (containerRef.current && message.id) {
-        await containerRef.current.sendMessage(message.id, 'response', {
-          id: message.id,
-          result,
+        toast.error('安装失败', {
+          description: result.error || '安装小应用时出现错误',
         });
       }
-    } catch (error) {
-      console.error('Error handling message:', error);
-
-      // 发送错误响应
-      if (containerRef.current && message.id) {
-        await containerRef.current.sendMessage(message.id, 'response', {
-          id: message.id,
-          error: (error as Error).message,
-        });
-      }
+    } catch {
+      toast.error('安装失败', { description: '无法安装小应用，请稍后重试' });
+    } finally {
+      setInstalling(false);
     }
   };
 
-  const handleStorageGet = async (key: string) => {
-    if (!installation) return null;
-
-    try {
-      const response = await fetch(
-        `/api/miniapp-data?installation_id=${installation.id}&key=${key}`
-      );
-      const result = await response.json();
-
-      if (result.success && result.data) {
-        return result.data.value;
-      }
-      return null;
-    } catch (error) {
-      console.error('Failed to get storage:', error);
-      return null;
-    }
-  };
-
-  const handleStorageSet = async (key: string, value: any) => {
-    if (!installation) return false;
-
-    try {
-      const response = await fetch('/api/miniapp-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          installation_id: installation.id,
-          key,
-          value,
-        }),
-      });
-      const result = await response.json();
-
-      return result.success;
-    } catch (error) {
-      console.error('Failed to set storage:', error);
-      return false;
-    }
-  };
-
-  const handleStorageRemove = async (key: string) => {
-    if (!installation) return false;
-
-    try {
-      const response = await fetch(
-        `/api/miniapp-data?installation_id=${installation.id}&key=${key}`,
-        { method: 'DELETE' }
-      );
-      const result = await response.json();
-
-      return result.success;
-    } catch (error) {
-      console.error('Failed to remove storage:', error);
-      return false;
-    }
-  };
-
-  const handleNotificationSend = async (payload: any) => {
-    // 检查权限
-    if (!installation?.granted_permissions?.includes('system:notification')) {
-      console.warn('Notification permission not granted');
-      return false;
-    }
-
-    // 发送浏览器通知
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(payload.title, {
-        body: payload.body,
-        ...payload.options,
-      });
-      return true;
-    }
-
-    return false;
-  };
-
-  const handleGetUserInfo = async () => {
-    // 检查权限
-    if (!installation?.granted_permissions?.includes('user:read')) {
-      console.warn('User read permission not granted');
-      return null;
-    }
-
-    try {
-      const response = await fetch('/api/profile');
-      const result = await response.json();
-
-      if (result.success) {
-        return {
-          id: result.data.id,
-          display_name: result.data.display_name,
-          avatar_url: result.data.avatar_url,
-        };
-      }
-      return null;
-    } catch (error) {
-      console.error('Failed to get user info:', error);
-      return null;
-    }
-  };
-
-  const handleError = (error: Error) => {
-    console.error('Mini app error:', error);
-    setError(error.message);
-  };
-
-  if (loading) {
+  if (loading || installed === null) {
     return (
       <>
         <AppHeader />
@@ -297,18 +169,41 @@ export default function MiniAppDetailPage() {
     );
   }
 
-  if (!installation) {
+  if (!installed) {
     return (
       <>
         <AppHeader />
         <div className="container mx-auto py-8 px-4">
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold">Mini App Not Installed</h2>
-            <p className="text-muted-foreground mt-2">
-              Please install this mini app from the gallery first
+          <div className="mb-6 flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push('/miniapps')}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">{miniApp.display_name}</h1>
+              <p className="text-muted-foreground text-sm mt-0.5">
+                {miniApp.description}
+              </p>
+            </div>
+          </div>
+          <div className="text-center py-16">
+            <Download className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h2 className="text-xl font-semibold mb-2">尚未安装此应用</h2>
+            <p className="text-muted-foreground text-sm mb-6">
+              安装后即可使用交互功能
             </p>
-            <Button onClick={() => router.push('/miniapps')} className="mt-4">
-              Go to Gallery
+            <Button onClick={handleInstall} disabled={installing}>
+              {installing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  安装中...
+                </>
+              ) : (
+                'Install'
+              )}
             </Button>
           </div>
         </div>
@@ -316,93 +211,87 @@ export default function MiniAppDetailPage() {
     );
   }
 
+  // 渲染交互区域内容
+  const renderInteractContent = () => {
+    if (uiLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="text-sm">正在加载交互界面...</p>
+        </div>
+      );
+    }
+
+    if (uiError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-3">
+          <AlertCircle className="h-8 w-8 text-destructive" />
+          <p className="text-sm text-destructive">{uiError}</p>
+          <Button variant="outline" size="sm" onClick={initializeMCP}>
+            <RefreshCw className="h-4 w-4 mr-1" />
+            重试
+          </Button>
+        </div>
+      );
+    }
+
+    if (!htmlContent) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
+          <p className="text-sm">此应用未提供交互界面</p>
+          <p className="text-xs">应用需要注册 HTML 类型的 UI 资源</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="h-full overflow-hidden">
+        <MiniAppContainer
+          ref={containerRef}
+          miniApp={miniApp!}
+          mcpClient={clientRef.current}
+          hostContext={hostContext}
+          htmlContent={htmlContent}
+          onError={(err) => console.error('MiniApp error:', err)}
+        />
+      </div>
+    );
+  };
+
   return (
     <>
       <AppHeader />
       <div className="container mx-auto py-8 px-4">
         {/* 页面标题 */}
         <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">{miniApp.display_name}</h1>
-            <p className="text-muted-foreground mt-1">{miniApp.description}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* 触发器配置按钮 */}
+          <div className="flex items-center gap-3">
             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowTriggerDialog(true)}
-              className="gap-2"
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push('/miniapps')}
             >
-              <Bell className="h-4 w-4" />
-              {triggerConfig?.enabled ? '触发器已启用' : '配置触发器'}
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Button variant="outline" onClick={() => router.push('/miniapps')}>
-              Back
-            </Button>
-          </div>
-        </div>
-
-        {/* 触发器状态提示 */}
-        {triggerConfig?.enabled && (
-          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950">
-            <div className="flex items-start gap-3">
-              <Bell className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="font-medium text-blue-900 dark:text-blue-100">触发器已启用</h3>
-                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                  {triggerConfig.type === 'schedule' && (
-                    <>
-                      {triggerConfig.interval
-                        ? `每 ${triggerConfig.interval} 分钟触发一次`
-                        : triggerConfig.cron
-                          ? `按 Cron 表达式触发: ${triggerConfig.cron}`
-                          : '定时触发'}
-                    </>
-                  )}
-                  {triggerConfig.type === 'event' && (
-                    <>事件触发: {triggerConfig.eventType || '未设置'}</>
-                  )}
-                  {triggerConfig.type === 'manual' && <>手动触发</>}
-                </p>
-                {triggerConfig.message && (
-                  <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                    消息: {triggerConfig.message}
-                  </p>
-                )}
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setShowTriggerDialog(true)}>
-                <Settings className="h-4 w-4" />
-              </Button>
+            <div>
+              <h1 className="text-2xl font-bold">{miniApp.display_name}</h1>
+              <p className="text-muted-foreground text-sm mt-0.5">
+                {miniApp.description}
+              </p>
             </div>
           </div>
-        )}
-
-        {/* 小应用容器 */}
-        <div
-          className="rounded-lg border bg-card shadow-sm overflow-hidden"
-          style={{ height: 'calc(100vh - 280px)' }}
-        >
-          <MiniAppContainer
-            ref={containerRef}
-            miniApp={miniApp}
-            installation={installation}
-            className="h-full"
-            onMessage={handleMessage}
-            onError={handleError}
-          />
+          <Button variant="ghost" size="sm" onClick={initializeMCP}>
+            <RefreshCw className="h-4 w-4 mr-1" />
+            刷新
+          </Button>
         </div>
 
-        {/* 触发器配置对话框 */}
-        {installation && (
-          <TriggerConfigDialog
-            open={showTriggerDialog}
-            onOpenChange={setShowTriggerDialog}
-            installation={installation}
-            existingTrigger={triggerConfig || undefined}
-            onSave={saveTriggerConfig}
-          />
-        )}
+        {/* 交互区域 */}
+        <div
+          className="rounded-lg border bg-card shadow-sm overflow-hidden"
+          style={{ height: 'calc(100vh - 240px)' }}
+        >
+          {renderInteractContent()}
+        </div>
       </div>
     </>
   );

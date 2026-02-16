@@ -666,7 +666,7 @@ CREATE POLICY "Users can manage own mini apps"
 ```
 
 **关键字段说明**：
-- `code`：小应用的JavaScript代码（沙箱环境执行）
+- `code`：MiniApp 的 MCP Server 代码（通过 Edge Function 沙箱执行，注册工具和 HTML 资源）
 - `manifest`：声明式配置（版本、权限、API、触发器）
 - `runtime_config`：运行时限制（内存、执行时间、网络域名）
 - `security_review`：安全审核状态
@@ -674,8 +674,8 @@ CREATE POLICY "Users can manage own mini apps"
 - `architecture_version`：架构版本（v1=原有架构，v2-mcp=MCP 协议架构）
 
 **架构版本说明**：
-- `v1`: 原有架构，使用 code 字段存储 UI 和逻辑
-- `v2-mcp`: 新架构，使用 skill_content + code 字段，通过 MCP 协议提供服务
+- `v1`: 原有架构（已废弃），使用 code 字段存储 UI 和逻辑
+- `v2-mcp`: 当前架构，code 字段存储 MCP Server 代码，UI 通过 `registerAppResource` 注册 HTML 资源，前端使用 iframe 渲染
 
 ---
 

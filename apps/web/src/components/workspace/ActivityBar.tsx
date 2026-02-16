@@ -15,10 +15,11 @@ import {
   Terminal as TerminalIcon,
   GitBranch,
   Settings,
+  Package,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-export type ActivityBarItem = 'resources' | 'devices' | 'files' | 'terminal' | 'git' | 'settings';
+export type ActivityBarItem = 'resources' | 'devices' | 'files' | 'terminal' | 'git' | 'apps' | 'settings';
 
 interface ActivityBarProps {
   activeItem: ActivityBarItem;
@@ -36,6 +37,7 @@ const activityItems: Array<{
   { id: 'files', icon: FolderTree, label: '文件浏览器' },
   { id: 'git', icon: GitBranch, label: '源代码管理' },
   { id: 'terminal', icon: TerminalIcon, label: '终端' },
+  { id: 'apps', icon: Package, label: '应用管理' },
 ];
 
 export function ActivityBar({ activeItem, onItemClick, className = '' }: ActivityBarProps) {

@@ -68,23 +68,28 @@ export class ServiceInitializer {
   ): Promise<void> {
     const results: Array<{ name: string; success: boolean; error?: string }> = [];
 
-    for (const service of services) {
-      if (service.status === 'inactive') {
-        formatter.dim(`Skipping inactive service: ${service.name}`);
-        continue;
+    const activeServices = services.filter((s) => {
+      if (s.status === 'inactive') {
+        formatter.dim(`Skipping inactive service: ${s.name}`);
+        return false;
       }
+      return true;
+    });
 
-      try {
-        formatter.dim(`Connecting to MCP service: ${service.name}...`);
-        await mcpConnector.addService(bindingCode, service);
-        results.push({ name: service.name, success: true });
-        formatter.success(`✓ ${service.name} connected`);
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-        results.push({ name: service.name, success: false, error: errorMsg });
-        formatter.error(`✗ ${service.name} failed: ${errorMsg}`);
-      }
-    }
+    await Promise.all(
+      activeServices.map(async (service) => {
+        try {
+          formatter.dim(`Connecting to MCP service: ${service.name}...`);
+          await mcpConnector.addService(bindingCode, service);
+          results.push({ name: service.name, success: true });
+          formatter.success(`✓ ${service.name} connected`);
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+          results.push({ name: service.name, success: false, error: errorMsg });
+          formatter.error(`✗ ${service.name} failed: ${errorMsg}`);
+        }
+      })
+    );
 
     // 显示总结
     const successCount = results.filter((r) => r.success).length;

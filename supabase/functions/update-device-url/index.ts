@@ -22,6 +22,7 @@ interface DeviceUrls {
   cloudflare_url: string | null;
   localhost_url: string | null;
   hostname_url: string | null;
+  tailscale_url?: string | null;
 }
 
 Deno.serve(async (req) => {
@@ -54,7 +55,7 @@ Deno.serve(async (req) => {
 
     // 验证至少有一个 URL
     const urls = device_urls as DeviceUrls;
-    if (!urls.cloudflare_url && !urls.localhost_url && !urls.hostname_url) {
+    if (!urls.cloudflare_url && !urls.localhost_url && !urls.hostname_url && !urls.tailscale_url) {
       return new Response(JSON.stringify({ error: 'At least one URL must be provided' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -66,6 +67,7 @@ Deno.serve(async (req) => {
       { name: 'cloudflare_url', value: urls.cloudflare_url },
       { name: 'localhost_url', value: urls.localhost_url },
       { name: 'hostname_url', value: urls.hostname_url },
+      { name: 'tailscale_url', value: urls.tailscale_url },
     ];
 
     for (const { name, value } of urlsToValidate) {

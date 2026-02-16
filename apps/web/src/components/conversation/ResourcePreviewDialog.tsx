@@ -95,14 +95,12 @@ export function ResourcePreviewDialog({
     }
 
     // MiniApp 预览
-    if (resource.type === 'miniapp' && resource.metadata?.miniApp && resource.metadata?.installation) {
+    if (resource.type === 'miniapp' && resource.metadata?.miniApp) {
       const miniApp = resource.metadata.miniApp as Parameters<typeof MiniAppWindow>[0]['miniApp'];
-      const installation = resource.metadata.installation as Parameters<typeof MiniAppWindow>[0]['installation'];
       return (
         <div className="flex-1 overflow-hidden">
           <MiniAppWindow
             miniApp={miniApp}
-            installation={installation}
             onClose={() => onOpenChange(false)}
             className="h-full"
           />

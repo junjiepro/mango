@@ -5,26 +5,40 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { miniAppService } from '@/services/MiniAppService'
+import { miniAppInstallationService } from '@/services/MiniAppInstallationService'
+import { createClient } from '@/lib/supabase/server'
 import { AppError, ErrorType } from '@mango/shared/utils'
 
 /**
  * GET /api/miniapps
- * 获取小应用列表（公开的或用户创建的）
+ * 获取小应用列表（公开的或用户创建的或用户安装的）
  */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const type = searchParams.get('type') || 'public' // 'public' | 'user'
+    const type = searchParams.get('type') || 'public' // 'public' | 'user' | 'owned'
     const status = searchParams.get('status') || undefined
     const tags = searchParams.get('tags')?.split(',') || undefined
     const search = searchParams.get('search') || undefined
     const limit = parseInt(searchParams.get('limit') || '10')
     const offset = parseInt(searchParams.get('offset') || '0')
 
+    // 获取当前用户 ID
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
     let result
 
     if (type === 'user') {
+      // 用户创建的应用
       result = await miniAppService.getUserMiniApps({
+        status,
+        limit,
+        offset,
+      })
+    } else if (type === 'owned') {
+      // 用户拥有的应用（创建的 + 安装的）
+      result = await miniAppService.getOwnedMiniApps({
         status,
         limit,
         offset,
@@ -42,6 +56,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: result.data,
       count: result.count,
+      currentUserId: user?.id || null,
     })
   } catch (error) {
     if (error instanceof AppError) {
@@ -119,6 +134,16 @@ export async function POST(request: NextRequest) {
       is_public,
       is_shareable,
     })
+
+    // 创建后自动为创建者安装，授予 manifest 中声明的所有权限
+    try {
+      await miniAppInstallationService.installMiniApp({
+        mini_app_id: miniApp.id,
+        granted_permissions: (manifest?.required_permissions) || [],
+      })
+    } catch (installError) {
+      console.error('Auto-install after creation failed:', installError)
+    }
 
     return NextResponse.json(
       {

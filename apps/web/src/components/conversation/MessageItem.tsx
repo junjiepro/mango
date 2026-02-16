@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { HtmlContentRenderer, isHtmlContent, parseContentSegments } from './HtmlContentRenderer';
 import { MiniAppReference } from './MiniAppReference';
 import { A2UIRenderer } from '@/components/a2ui/A2UIRenderer';
+import { FeedbackButton } from '@/components/feedback/FeedbackButton';
 
 type MessageType = Database['public']['Tables']['messages']['Row'];
 type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
@@ -585,6 +586,11 @@ export function MessageItem({
                 <RefreshCcwIcon className="size-4" />
               </MessageAction>
             )}
+            <FeedbackButton
+              messageId={message.id}
+              conversationId={message.conversation_id}
+              size="sm"
+            />
           </MessageActions>
         )}
 

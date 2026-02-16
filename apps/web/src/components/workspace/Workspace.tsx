@@ -9,15 +9,28 @@
 import React, { useState } from 'react';
 import type { WorkspaceTab } from '@mango/shared/types/workspace.types';
 import { WorkspaceHeader } from './WorkspaceHeader';
+import { MiniAppManager } from './MiniAppManager';
 
 interface WorkspaceProps {
   isOpen: boolean;
   onClose: () => void;
   children?: React.ReactNode;
+  conversationId?: string;
+  selectedMiniAppId?: string | null;
+  onMiniAppSelect?: (miniAppId: string | null) => void;
+  defaultTab?: WorkspaceTab;
 }
 
-export function Workspace({ isOpen, onClose, children }: WorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>('resources');
+export function Workspace({
+  isOpen,
+  onClose,
+  children,
+  conversationId,
+  selectedMiniAppId,
+  onMiniAppSelect,
+  defaultTab = 'resources',
+}: WorkspaceProps) {
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>(defaultTab);
 
   if (!isOpen) {
     return null;
@@ -29,7 +42,24 @@ export function Workspace({ isOpen, onClose, children }: WorkspaceProps) {
     { id: 'files', label: '文件' },
     { id: 'terminal', label: '终端' },
     { id: 'git', label: 'Git' },
+    { id: 'apps', label: '应用' },
   ];
+
+  // 渲染标签页内容
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'apps':
+        return (
+          <MiniAppManager
+            conversationId={conversationId}
+            selectedMiniAppId={selectedMiniAppId}
+            onMiniAppSelect={onMiniAppSelect}
+          />
+        );
+      default:
+        return children;
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-background border-l border-border">
@@ -58,7 +88,7 @@ export function Workspace({ isOpen, onClose, children }: WorkspaceProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {children}
+        {renderTabContent()}
       </div>
     </div>
   );

@@ -24,6 +24,7 @@ interface MiniAppListProps {
   onUninstall?: (miniApp: MiniApp) => Promise<void>
   onOpen?: (miniApp: MiniApp) => void
   onShare?: (miniApp: MiniApp) => void
+  onChatWithAgent?: (miniApp: MiniApp) => void
 }
 
 /**
@@ -39,6 +40,7 @@ export function MiniAppList({
   onUninstall,
   onOpen,
   onShare,
+  onChatWithAgent,
 }: MiniAppListProps) {
   const [permissionDialog, setPermissionDialog] = useState<{
     open: boolean
@@ -141,6 +143,7 @@ export function MiniAppList({
             onUninstall={onUninstall}
             onOpen={onOpen}
             onShare={onShare}
+            onChatWithAgent={onChatWithAgent}
           />
         ))}
       </div>

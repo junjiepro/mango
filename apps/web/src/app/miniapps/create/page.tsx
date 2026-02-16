@@ -74,7 +74,7 @@ export default function CreateMiniAppPage() {
 
       if (result.success) {
         toast.success('创建成功', {
-          description: `${formData.display_name} 已成功创建`,
+          description: `${formData.display_name} 已创建并自动安装`,
         })
         router.push(`/miniapps/${result.data.id}`)
       } else {

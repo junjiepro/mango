@@ -83,7 +83,7 @@
       {
         "uri": "ui://mango/main",
         "name": "MiniApp UI",
-        "mimeType": "application/vnd.mcp-ui+json"
+        "mimeType": "text/html"
       }
     ]
   },
@@ -117,8 +117,8 @@
     "contents": [
       {
         "uri": "ui://mango/main",
-        "mimeType": "application/vnd.mcp-ui+json",
-        "text": "{\"type\":\"container\",\"children\":[]}"
+        "mimeType": "text/html",
+        "text": "<!DOCTYPE html><html><head><title>MiniApp</title></head><body>...</body></html>"
       }
     ]
   },

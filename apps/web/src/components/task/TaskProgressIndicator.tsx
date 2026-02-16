@@ -7,6 +7,7 @@
 
 import React from 'react'
 import type { Database } from '@/types/database.types'
+import { FeedbackButton } from '@/components/feedback/FeedbackButton'
 
 type Task = Database['public']['Tables']['tasks']['Row']
 
@@ -167,6 +168,17 @@ export function TaskProgressIndicator({
               ? task.result
               : JSON.stringify(task.result, null, 2)}
           </pre>
+        </div>
+      )}
+
+      {/* 反馈按钮 - 任务完成或失败时显示 */}
+      {(task.status === 'completed' || task.status === 'failed') && (
+        <div className="mt-3 flex justify-end">
+          <FeedbackButton
+            taskId={task.id}
+            conversationId={task.conversation_id}
+            size="sm"
+          />
         </div>
       )}
     </div>

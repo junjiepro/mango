@@ -312,96 +312,108 @@ Based on plan.md monorepo structure:
 
 ### Database Schema for Skill Architecture v3
 
-- [ ] T151 [P] [US4] Create `skill_registry` table migration in `supabase/migrations/20260127000001_skill_registry.sql` (统一元数据注册表,支持pgvector语义搜索)
-- [ ] T152 [P] [US4] Create `skill_content_cache` table migration in `supabase/migrations/20260127000002_skill_content_cache.sql` (数据库级内容缓存)
-- [ ] T153 [P] [US4] Create `device_skill_sync` table migration in `supabase/migrations/20260127000003_device_skill_sync.sql` (设备Skill同步状态)
-- [ ] T154 [P] [US4] Create `skill_versions` table migration in `supabase/migrations/20260127000004_skill_versions.sql` (Skill版本历史)
-- [ ] T155 [P] [US4] Create `skill_execution_logs` table migration in `supabase/migrations/20260127000005_skill_execution_logs.sql` (执行日志统计)
-- [ ] T156 [US4] Add RLS policies and indexes for all Skill tables
+- [x] T151 [P] [US4] Create `skill_registry` table migration in `supabase/migrations/20260127000001_skill_registry.sql` (统一元数据注册表,支持pgvector语义搜索)
+- [x] T152 [P] [US4] Create `skill_content_cache` table migration in `supabase/migrations/20260127000002_skill_content_cache.sql` (数据库级内容缓存)
+- [x] T153 [P] [US4] Create `device_skill_sync` table migration in `supabase/migrations/20260127000003_device_skill_sync.sql` (设备Skill同步状态)
+- [x] T154 [P] [US4] Create `skill_versions` table migration in `supabase/migrations/20260127000004_skill_versions.sql` (Skill版本历史)
+- [x] T155 [P] [US4] Create `skill_execution_logs` table migration in `supabase/migrations/20260127000005_skill_execution_logs.sql` (执行日志统计)
+- [x] T156 [US4] Add RLS policies and indexes for all Skill tables
 - [ ] T157 [US4] Apply Skill migrations using `supabase db push`
 
 ### Skill Registry Infrastructure
 
-- [ ] T158 [P] [US4] Create Skill types in `packages/shared/types/skill.types.ts` (SkillCategory, SkillMetadata, ContentRef)
-- [ ] T159 [P] [US4] Create UnifiedSkillLoader in `supabase/functions/_shared/skill-loader.ts` (请求级缓存→数据库缓存→源)
-- [ ] T160 [P] [US4] Create skill-manifest.json build script in `scripts/build-skill-manifest.ts` (构建时生成)
-- [ ] T161 [US4] Integrate build script into CI/CD workflow in `.github/workflows/ci.yml`
+- [x] T158 [P] [US4] Create Skill types in `packages/shared/types/skill.types.ts` (SkillCategory, SkillMetadata, ContentRef)
+- [x] T159 [P] [US4] Create UnifiedSkillLoader in `supabase/functions/_shared/skill-loader.ts` (请求级缓存→数据库缓存→源)
+- [x] T160 [P] [US4] Create skill-manifest.json build script in `scripts/build-skill-manifest.ts` (构建时生成)
+- [x] T161 [US4] Integrate build script into CI/CD workflow in `.github/workflows/ci.yml`
 
 ### Edge Function Skills
 
-- [ ] T162 [P] [US4] Create Edge Skill Markdown template in `supabase/functions/skills/_template-skill.md`
-- [ ] T163 [P] [US4] Create SkillMarkdownParser in `supabase/functions/_shared/skill-parser.ts` (Markdown自解析)
-- [ ] T164 [US4] Migrate existing skills to new Markdown format
+- [x] T162 [P] [US4] Create Edge Skill Markdown template in `supabase/functions/skills/_template-skill.md`
+- [x] T163 [P] [US4] Create SkillMarkdownParser in `supabase/functions/_shared/skill-parser.ts` (Markdown自解析)
+- [x] T164 [US4] Migrate existing skills to new Markdown format
 
 ### Skill Semantic Search
 
-- [ ] T165 [P] [US4] Enable pgvector extension in Supabase
-- [ ] T166 [P] [US4] Create embedding generation service in `supabase/functions/generate-skill-embedding/index.ts`
-- [ ] T167 [US4] Create semantic skill search API in `apps/web/src/app/api/skills/search/route.ts`
-- [ ] T168 [US4] Integrate semantic search into Agent tool selection
+- [x] T165 [P] [US4] Enable pgvector extension in Supabase
+- [x] T166 [P] [US4] Create embedding generation service in `supabase/functions/generate-skill-embedding/index.ts`
+- [x] T167 [US4] Create semantic skill search API in `apps/web/src/app/api/skills/search/route.ts`
+- [x] T168 [US4] Integrate semantic search into Agent tool selection
 
 ### Feedback Collection
 
-- [ ] T169 [P] [US4] Create Feedback service in `apps/web/src/services/FeedbackService.ts`
-- [ ] T170 [P] [US4] Create Learning service in `apps/web/src/services/LearningService.ts`
-- [ ] T171 [P] [US4] Create API route for submitting feedback in `apps/web/src/app/api/feedback/route.ts`
-- [ ] T172 [P] [US4] Create API route for learning rules in `apps/web/src/app/api/learning/rules/route.ts`
+- [x] T169 [P] [US4] Create Feedback service in `apps/web/src/services/FeedbackService.ts`
+- [x] T170 [P] [US4] Create Learning service in `apps/web/src/services/LearningService.ts`
+- [x] T171 [P] [US4] Create API route for submitting feedback in `apps/web/src/app/api/feedback/route.ts`
+- [x] T172 [P] [US4] Create API route for learning rules in `apps/web/src/app/api/learning/rules/route.ts`
 
 ### Feedback UI Components
 
-- [ ] T173 [P] [US4] Create FeedbackButton component in `apps/web/src/components/feedback/FeedbackButton.tsx`
-- [ ] T174 [P] [US4] Create FeedbackDialog component in `apps/web/src/components/feedback/FeedbackDialog.tsx`
-- [ ] T175 [US4] Integrate FeedbackButton in MessageItem component
-- [ ] T176 [US4] Integrate FeedbackButton in TaskProgressIndicator component
+- [x] T173 [P] [US4] Create FeedbackButton component in `apps/web/src/components/feedback/FeedbackButton.tsx`
+- [x] T174 [P] [US4] Create FeedbackDialog component in `apps/web/src/components/feedback/FeedbackDialog.tsx`
+- [x] T175 [US4] Integrate FeedbackButton in MessageItem component
+- [x] T176 [US4] Integrate FeedbackButton in TaskProgressIndicator component
 
 ### Learning Rule Extraction
 
-- [ ] T177 [US4] Create Supabase Edge Function for rule extraction in `supabase/functions/extract-learning-rules/index.ts`
-- [ ] T178 [US4] Implement signal aggregation logic (feedback, behavior, implicit signals)
-- [ ] T179 [US4] Implement pattern recognition using clustering (DBSCAN for feedback grouping, cosine similarity for embedding)
-- [ ] T180 [US4] Implement rule confidence scoring
+- [x] T177 [US4] Create Supabase Edge Function for rule extraction in `supabase/functions/extract-learning-rules/index.ts`
+- [x] T178 [US4] Implement signal aggregation logic (feedback, behavior, implicit signals)
+- [x] T179 [US4] Implement pattern recognition using clustering (DBSCAN for feedback grouping, cosine similarity for embedding)
+- [x] T180 [US4] Implement rule confidence scoring
 
 ### Learning Rule Application
 
-- [ ] T181 [P] [US4] Create prompt engineering service in `apps/web/src/services/PromptService.ts`
-- [ ] T182 [US4] Integrate learning rules into Agent request context
-- [ ] T183 [US4] Create RAG knowledge base in `supabase/functions/rag-search/index.ts`
-- [ ] T184 [US4] Add rule application tracking in Task execution
+- [x] T181 [P] [US4] Create prompt engineering service in `apps/web/src/services/PromptService.ts`
+- [x] T182 [US4] Integrate learning rules into Agent request context
+- [x] T183 [US4] Create RAG knowledge base in `supabase/functions/rag-search/index.ts`
+- [x] T184 [US4] Add rule application tracking in Task execution
 
 ### User Learning Data Management
 
-- [ ] T185 [P] [US4] Create learning summary page in `apps/web/src/app/learning/page.tsx`
-- [ ] T186 [P] [US4] Create learning rules list component in `apps/web/src/components/learning/RulesList.tsx`
-- [ ] T187 [US4] Create API route for deleting learning data in `apps/web/src/app/api/learning/cleanup/route.ts`
-- [ ] T188 [US4] Create data export functionality in `apps/web/src/app/api/learning/export/route.ts`
+- [x] T185 [P] [US4] Create learning summary page in `apps/web/src/app/learning/page.tsx`
+- [x] T186 [P] [US4] Create learning rules list component in `apps/web/src/components/learning/RulesList.tsx`
+- [x] T187 [US4] Create API route for deleting learning data in `apps/web/src/app/api/learning/cleanup/route.ts`
+- [x] T188 [US4] Create data export functionality in `apps/web/src/app/api/learning/export/route.ts`
 
 ### Device Skill Sync (CLI Integration)
 
-- [ ] T189 [P] [US4] Create skill sync service in `apps/cli/src/lib/skill-sync.ts` (设备Skill同步逻辑)
-- [ ] T190 [P] [US4] Create /skills endpoint in `apps/cli/src/server/routes/skills.ts` (设备Skill列表和内容)
-- [ ] T191 [US4] Implement offline skill cache in CLI for degradation support
-- [ ] T192 [US4] Add skill sync status to device management page
+- [x] T189 [P] [US4] Create skill sync service in `apps/cli/src/lib/skill-sync.ts` (设备Skill同步逻辑)
+- [x] T190 [P] [US4] Create /skills endpoint in `apps/cli/src/server/routes/skills.ts` (设备Skill列表和内容)
+- [x] T191 [US4] Implement offline skill cache in CLI for degradation support
+- [x] T192 [US4] Add skill sync status to device management page
 
 ### MiniApp 改造为 Skill + MCP Server
 
-- [ ] T193 [P] [US4] Update mini_apps table schema: add `skill_content` and `code` columns in `supabase/migrations/20260127000006_miniapp_skill_mcp.sql`
-- [ ] T194 [P] [US4] Create MiniApp MCP Edge Function in `supabase/functions/miniapp-mcp/index.ts` (Hono + @hono/mcp)
-- [ ] T195 [P] [US4] Create MiniApp sandbox context in `supabase/functions/miniapp-mcp/context.ts` (storage, notification APIs)
-- [ ] T196 [P] [US4] Create MiniApp code executor in `supabase/functions/miniapp-mcp/executor.ts` (安全沙箱执行)
-- [ ] T197 [US4] Implement unified UI Resource URI `ui://mango/main` in MiniApp MCP Server
-- [ ] T198 [P] [US4] Install @mcp-ui/server and @mcp-ui/client dependencies
-- [ ] T199 [P] [US4] Create UIResourceRenderer component in `apps/web/src/components/miniapp/UIResourceRenderer.tsx`
-- [ ] T200 [US4] Update MiniAppContainer to use MCP protocol for tool calls
-- [ ] T201 [US4] Create MiniApp Skill template in `supabase/functions/skills/miniapp-template-skill.md`
+- [x] T193 [P] [US4] Update mini_apps table schema: add `skill_content` and `code` columns in `supabase/migrations/20260127000007_miniapp_skill_mcp.sql`
+- [x] T194 [P] [US4] Create MiniApp MCP Edge Function in `supabase/functions/miniapp-mcp/index.ts` (Hono + 标准 MCP JSON-RPC) ✅ 2026-02-02 完成
+- [x] T195 [P] [US4] Create MiniApp sandbox context in `supabase/functions/miniapp-mcp/context.ts` (user, storage, notification APIs) ✅ 2026-02-02 重构
+- [x] T196 [P] [US4] Create MiniApp code executor in `supabase/functions/miniapp-mcp/adapter.ts` (安全沙箱执行，整合到 adapter) ✅ 2026-02-02 重构
+- [x] T197 [US4] Implement unified UI Resource URI `ui://mango/main` in MiniApp MCP Server ✅ 2026-02-02 完成
+- [x] T198 [P] [US4] Install @mcp-ui/server and @mcp-ui/client dependencies
+- [x] T199 [P] [US4] Create UIResourceRenderer component in `apps/web/src/components/miniapp/UIResourceRenderer.tsx` ✅ 2026-02-02 增强
+- [x] T200 [US4] Update MiniAppContainer to use MCP protocol for tool calls
+- [x] T201 [US4] Create MiniApp Skill template in `supabase/functions/skills/miniapp-template-skill.md`
+- [x] T212 [P] [US4] Create MiniApp MCP types in `supabase/functions/miniapp-mcp/types.ts` ✅ 2026-02-02 新增
+- [x] T213 [P] [US4] Create MCP Server implementation in `supabase/functions/miniapp-mcp/mcp-server.ts` (标准 JSON-RPC 2.0) ✅ 2026-02-02 新增
+- [x] T214 [P] [US4] Create MiniAppMCPClient service in `apps/web/src/services/MiniAppMCPClient.ts` ✅ 2026-02-02 重构
 
 ### Extension Skill Generation (自动化扩展 Skill)
 
-- [ ] T202 [P] [US4] Create ExtensionSkillGenerator in `supabase/functions/_shared/extension-skill-generator.ts`
-- [ ] T203 [US4] Implement feedback clustering algorithm for pattern extraction
-- [ ] T204 [US4] Create extension skill injection into Agent prompt
-- [ ] T205 [US4] Add extension skill management UI in learning summary page
+- [x] T202 [P] [US4] Create ExtensionSkillGenerator in `supabase/functions/_shared/extension-skill-generator.ts`
+- [x] T203 [US4] Implement feedback clustering algorithm for pattern extraction
+- [x] T204 [US4] Create extension skill injection into Agent prompt
+- [x] T205 [US4] Add extension skill management UI in learning summary page
 
-**Checkpoint**: User Story 4 complete - Agent learns from feedback, Skill architecture unified, MiniApp transformed to Skill + MCP Server
+### Skill Context Engineering (基于 Claude Code 设计模式优化)
+
+- [x] T206 [US4] Create SkillContextLoader in `supabase/functions/process-agent-message/lib/skill-context.ts` (两阶段加载：元数据先行)
+- [x] T207 [US4] Create load_skill tool in `supabase/functions/process-agent-message/tools/load-skill.ts` (Agent 按需加载完整内容)
+- [x] T208 [US4] Implement XML format skill metadata injection (类似 Claude Code 的 `<available-skills>` 格式)
+- [x] T209 [US4] Implement keyword-based skill matching for user message (关键词/触发词/标签匹配)
+- [x] T210 [US4] Integrate skill context into Agent system prompt
+- [x] T211 [US4] Update system-prompt.ts to support skill context injection
+
+**Checkpoint**: User Story 4 complete - Agent learns from feedback, Skill architecture unified, MiniApp transformed to Skill + MCP Server, Skill context engineering optimized
 
 ---
 

@@ -3933,6 +3933,10 @@ CREATE TABLE mini_app_data (
 
 #### MCP Server 实现
 
+> **⚠️ 注意**：以下代码示例中的 `createUIResource` + JSON 组件树模式已废弃。
+> 当前架构使用 `registerAppResource` 注册 HTML 资源，前端通过 iframe 渲染。
+> 详见 `research-miniapp-hono-mcp.md` 和 `research-miniapp-unified-ui.md`。
+
 **Edge Function 端点** (supabase/functions/miniapp-mcp/index.ts):
 
 ```typescript

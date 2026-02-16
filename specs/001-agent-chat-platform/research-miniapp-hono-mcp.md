@@ -1,7 +1,7 @@
 # MiniApp MCP 服务实现方案
 
 **更新日期**: 2026-01-06
-**基于**: @hono/mcp + @mcp-ui/server
+**基于**: @hono/mcp + MCP Server HTML 资源
 
 ## 1. MiniApp MCP Edge Function 实现
 
@@ -12,7 +12,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPTransport } from '@hono/mcp';
 import { Hono } from 'hono';
-import { createUIResource } from '@mcp-ui/server';
 import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 
@@ -76,8 +75,8 @@ export default app;
 ```typescript
 interface MiniAppContext {
   // 注入的全局对象
-  mcpServer: McpServer;
-  createUIResource: typeof createUIResource;
+  registerAppTool: (name: string, description: string, schema: any, handler: Function) => void;
+  registerAppResource: (uri: string, html: string) => void;
   z: typeof z;
 
   // 用户信息
@@ -170,8 +169,8 @@ async function createMiniAppContext(
   };
 
   return {
-    mcpServer: null as any, // 将在执行时注入
-    createUIResource,
+    registerAppTool: null as any, // 将在执行时注入
+    registerAppResource: null as any, // 将在执行时注入
     z,
     user: {
       id: user.id,
@@ -196,14 +195,19 @@ async function executeMiniAppCode(
   code: string,
   context: MiniAppContext
 ): Promise<void> {
-  // 注入 mcpServer 到上下文
-  context.mcpServer = mcpServer;
+  // 注入 registerAppTool / registerAppResource 到上下文
+  context.registerAppTool = (name, desc, schema, handler) => {
+    mcpServer.tool({ name, description: desc, parameters: schema, execute: handler });
+  };
+  context.registerAppResource = (uri, html) => {
+    mcpServer.resource({ uri, mimeType: 'text/html', text: html });
+  };
 
   // 创建受限的全局对象
   const sandbox = {
     // MCP 相关
-    mcpServer,
-    createUIResource,
+    registerAppTool: context.registerAppTool,
+    registerAppResource: context.registerAppResource,
     z,
 
     // 上下文 API
@@ -227,7 +231,7 @@ async function executeMiniAppCode(
   // 包装代码
   const wrappedCode = `
     (async function(context) {
-      const { mcpServer, createUIResource, z, user, storage, notification, console } = context;
+      const { registerAppTool, registerAppResource, z, user, storage, notification, console } = context;
 
       ${code}
     })(sandbox);
@@ -252,19 +256,17 @@ async function executeMiniAppCode(
 ```javascript
 // TodoList MiniApp Code
 // 注册工具
-mcpServer.tool({
-  name: 'add_todo',
-  description: '添加新的待办事项',
-  parameters: z.object({
+registerAppTool(
+  'add_todo',
+  '添加新的待办事项',
+  z.object({
     title: z.string().describe('待办事项标题'),
     description: z.string().optional().describe('详细描述'),
     dueDate: z.string().optional().describe('截止日期'),
   }),
-  execute: async ({ title, description, dueDate }) => {
-    // 获取现有待办
+  async ({ title, description, dueDate }) => {
     const todos = await storage.get('todos') || [];
 
-    // 创建新待办
     const newTodo = {
       id: crypto.randomUUID(),
       title,
@@ -275,27 +277,21 @@ mcpServer.tool({
       userId: user.id,
     };
 
-    // 保存
     todos.push(newTodo);
     await storage.set('todos', todos);
-
-    // 发送通知
     await notification.send('新待办', `已添加：${title}`);
 
-    return {
-      success: true,
-      todo: newTodo,
-    };
-  },
-});
+    return { success: true, todo: newTodo };
+  }
+);
 
-mcpServer.tool({
-  name: 'list_todos',
-  description: '列出所有待办事项',
-  parameters: z.object({
+registerAppTool(
+  'list_todos',
+  '列出所有待办事项',
+  z.object({
     filter: z.enum(['all', 'active', 'completed']).optional(),
   }),
-  execute: async ({ filter = 'all' }) => {
+  async ({ filter = 'all' }) => {
     const todos = await storage.get('todos') || [];
 
     let filtered = todos;
@@ -306,59 +302,34 @@ mcpServer.tool({
     }
 
     return { todos: filtered };
-  },
-});
+  }
+);
 
-// 注册 UI Resource
-const uiResource = createUIResource({
-  uri: 'ui://todolist/main',
-  content: {
-    type: 'container',
-    props: { title: '待办事项' },
-    children: [
-      {
-        type: 'form',
-        id: 'add-form',
-        children: [
-          {
-            type: 'input',
-            id: 'title',
-            props: { label: '标题', required: true },
-          },
-          {
-            type: 'button',
-            props: { label: '添加', variant: 'primary' },
-            events: [{
-              event: 'onClick',
-              action: 'call_tool',
-              payload: {
-                tool: 'add_todo',
-                args: { title: '{{form.title}}' },
-              },
-            }],
-          },
-        ],
-      },
-      {
-        type: 'list',
-        id: 'todo-list',
-        props: {
-          dataSource: '{{todos}}',
-          itemTemplate: {
-            type: 'card',
-            props: {
-              title: '{{item.title}}',
-              description: '{{item.description}}',
-            },
-          },
-        },
-      },
-    ],
-  },
-  encoding: 'json',
-});
-
-mcpServer.resource(uiResource);
+// 注册 UI Resource（HTML 格式）
+registerAppResource('ui://mango/main', `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>待办事项</title>
+    <style>
+      body { font-family: sans-serif; padding: 16px; }
+      .todo-item { padding: 8px; border-bottom: 1px solid #eee; }
+      .completed { text-decoration: line-through; color: #999; }
+    </style>
+  </head>
+  <body>
+    <h2>待办事项</h2>
+    <form id="add-form">
+      <input type="text" id="title" placeholder="输入待办标题" required />
+      <button type="submit">添加</button>
+    </form>
+    <div id="todo-list"></div>
+    <script>
+      // MiniApp 前端逻辑通过 postMessage 与宿主通信
+    </script>
+  </body>
+  </html>
+`);
 ```
 
 ---

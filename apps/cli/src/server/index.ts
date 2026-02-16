@@ -15,7 +15,7 @@ import { acpConnector } from '../lib/connectors/acp-connector.js';
 import { serviceHealthChecker } from '../lib/service-health.js';
 import { findAvailablePort } from '../lib/port-utils.js';
 import { bindingCodeManager, BindingConfig } from '../lib/binding-code-manager.js';
-import { generateDeviceId, getLocalIpAddress } from '../lib/device-id.js';
+import { generateDeviceId, getLocalIpAddress, getTailscaleAddress } from '../lib/device-id.js';
 import { tempBindingManager } from '../lib/temp-binding-manager.js';
 import { tunnelManager } from '../lib/tunnel-manager.js';
 import { randomBytes } from 'crypto';
@@ -109,10 +109,12 @@ export function createServer(config: CLIConfig) {
       // 准备设备 URL 信息
       const tunnelUrl = tunnelManager.getTunnelUrl();
       const localIp = getLocalIpAddress();
+      const tailscaleAddr = getTailscaleAddress();
       const deviceUrls = {
         cloudflare_url: tunnelUrl,
         localhost_url: `http://localhost:${actualPort}`,
         hostname_url: `http://${localIp}:${actualPort}`,
+        ...(tailscaleAddr ? { tailscale_url: `http://${tailscaleAddr}:${actualPort}` } : {}),
       };
 
       // 准备设备信息

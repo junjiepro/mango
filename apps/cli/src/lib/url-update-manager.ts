@@ -19,6 +19,7 @@ export interface DeviceUrls {
   cloudflare_url: string | null;
   localhost_url: string | null;
   hostname_url: string | null;
+  tailscale_url?: string | null;
 }
 
 /**

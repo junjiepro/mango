@@ -114,10 +114,9 @@ function A2UIPreview({ resource, className }: ResourcePreviewProps) {
  */
 function MiniAppPreview({ resource, className }: ResourcePreviewProps) {
   const miniApp = resource.metadata?.miniApp as Parameters<typeof MiniAppWindow>[0]['miniApp'] | undefined;
-  const installation = resource.metadata?.installation as Parameters<typeof MiniAppWindow>[0]['installation'] | undefined;
   const displayName = (miniApp as { display_name?: string })?.display_name;
 
-  if (!miniApp || !installation) {
+  if (!miniApp) {
     return (
       <PreviewContainer
         title="小应用"
@@ -138,7 +137,6 @@ function MiniAppPreview({ resource, className }: ResourcePreviewProps) {
       <div className="flex-1 overflow-hidden">
         <MiniAppWindow
           miniApp={miniApp}
-          installation={installation}
           onClose={() => {}}
           className="h-full"
         />

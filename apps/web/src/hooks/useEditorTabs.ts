@@ -9,14 +9,20 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { FileNode } from '@/hooks/useDeviceFiles';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
+import type { Database } from '@/types/database.types';
+
+type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
 
 export interface EditorTab {
   id: string;
-  type: 'file' | 'resource';
+  type: 'file' | 'resource' | 'miniapp';
   title: string;
   file?: FileNode;
   resource?: DetectedResource;
+  miniApp?: MiniApp;
   isDirty?: boolean;
+  isCreateMode?: boolean;
+  isOwner?: boolean;
 }
 
 export interface UseEditorTabsOptions {
@@ -104,6 +110,57 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
     setActiveTabId(tabId);
   }, []);
 
+  // 打开 MiniApp 标签页
+  const openMiniAppTab = useCallback((miniApp: MiniApp, isOwner?: boolean) => {
+    const tabId = `miniapp-${miniApp.id}`;
+
+    setTabs((prevTabs) => {
+      const existingTab = prevTabs.find((t) => t.id === tabId);
+      if (existingTab) {
+        setActiveTabId(tabId);
+        return prevTabs;
+      }
+
+      const newTab: EditorTab = {
+        id: tabId,
+        type: 'miniapp',
+        title: miniApp.display_name,
+        miniApp,
+        isDirty: false,
+        isOwner,
+      };
+
+      return [...prevTabs, newTab];
+    });
+
+    setActiveTabId(tabId);
+  }, []);
+
+  // 打开创建 MiniApp 标签页
+  const openCreateMiniAppTab = useCallback(() => {
+    const tabId = 'miniapp-create-new';
+
+    setTabs((prevTabs) => {
+      const existingTab = prevTabs.find((t) => t.id === tabId);
+      if (existingTab) {
+        setActiveTabId(tabId);
+        return prevTabs;
+      }
+
+      const newTab: EditorTab = {
+        id: tabId,
+        type: 'miniapp',
+        title: '新建应用',
+        isDirty: false,
+        isCreateMode: true,
+      };
+
+      return [...prevTabs, newTab];
+    });
+
+    setActiveTabId(tabId);
+  }, []);
+
   // 关闭标签页
   const closeTab = useCallback((tabId: string) => {
     setTabs((prevTabs) => {
@@ -132,6 +189,17 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
     setTabs((prevTabs) =>
       prevTabs.map((tab) =>
         tab.id === tabId ? { ...tab, isDirty } : tab
+      )
+    );
+  }, []);
+
+  // 更新已打开标签页中的 MiniApp 数据（用于恢复时刷新缓存）
+  const updateMiniAppInTab = useCallback((miniAppId: string, miniApp: MiniApp) => {
+    setTabs((prevTabs) =>
+      prevTabs.map((tab) =>
+        tab.id === `miniapp-${miniAppId}`
+          ? { ...tab, miniApp, title: miniApp.display_name }
+          : tab
       )
     );
   }, []);
@@ -173,6 +241,8 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
     activeTab,
     openFileTab,
     openResourceTab,
+    openMiniAppTab,
+    openCreateMiniAppTab,
     closeTab,
     markTabDirty,
     closeAllTabs,
@@ -180,5 +250,6 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
     closeAllFileTabs,
     setActiveTabId,
     resetState,
+    updateMiniAppInTab,
   };
 }

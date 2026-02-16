@@ -6,3 +6,4 @@
 export * from './database.types';
 export * from './resource.types';
 export * from './workspace.types';
+export * from './skill.types';
