@@ -318,7 +318,7 @@ Based on plan.md monorepo structure:
 - [x] T154 [P] [US4] Create `skill_versions` table migration in `supabase/migrations/20260127000004_skill_versions.sql` (Skill版本历史)
 - [x] T155 [P] [US4] Create `skill_execution_logs` table migration in `supabase/migrations/20260127000005_skill_execution_logs.sql` (执行日志统计)
 - [x] T156 [US4] Add RLS policies and indexes for all Skill tables
-- [ ] T157 [US4] Apply Skill migrations using `supabase db push`
+- [x] T157 [US4] Apply Skill migrations using `supabase db push`
 
 ### Skill Registry Infrastructure
 
@@ -440,7 +440,7 @@ Based on plan.md monorepo structure:
 - [X] T156 [P] [US5] Create ResourcePanel component in `apps/web/src/components/resource/ResourcePanel.tsx`
 - [X] T157 [P] [US5] Create ResourceItem component in `apps/web/src/components/resource/ResourceItem.tsx`
 - [X] T158 [P] [US5] Create useResourceSniffer hook in `apps/web/src/hooks/useResourceSniffer.ts`
-- [ ] T159 [US5] Add resource panel to chat layout in `apps/web/src/components/chat/ChatArea.tsx`
+- [x] T159 [US5] Add resource panel to chat layout in `apps/web/src/components/chat/ChatArea.tsx`
 
 ### 工作区布局与状态
 
@@ -478,8 +478,8 @@ Based on plan.md monorepo structure:
 
 - [X] T180 [P] [US5] Install xterm.js and addons ✅ 已安装
 - [X] T181 [P] [US5] Create Terminal component in `apps/web/src/components/workspace/Terminal.tsx` ✅ 已完成
-- [ ] T182 [P] [US5] Create useTerminal hook in `apps/web/src/hooks/useTerminal.ts`
-- [ ] T183 [US5] Implement WebSocket terminal proxy in backend
+- [x] T182 [P] [US5] Create useTerminal hook in `apps/web/src/hooks/useTerminal.ts`
+- [x] T183 [US5] Implement WebSocket terminal proxy in backend
 - [X] T184 [US5] Implement terminal API in device service ✅ 已完成 Web 端 API
 
 ### 数据库迁移
