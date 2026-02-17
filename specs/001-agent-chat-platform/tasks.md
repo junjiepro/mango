@@ -499,34 +499,34 @@ Based on plan.md monorepo structure:
 
 ### i18n Infrastructure
 
-- [ ] T157 [P] [US6] Setup next-intl library in `apps/web/src/i18n/config.ts`
-- [ ] T158 [P] [US6] Create English translations in `apps/web/messages/en.json`
-- [ ] T159 [P] [US6] Create Chinese translations in `apps/web/messages/zh.json`
-- [ ] T160 [P] [US6] Create locale middleware in `apps/web/src/middleware.ts` (update existing)
-- [ ] T161 [P] [US6] Create language switcher component in `apps/web/src/components/LanguageSwitcher.tsx`
+- [x] T157 [P] [US6] Setup next-intl library in `apps/web/src/i18n/config.ts`
+- [x] T158 [P] [US6] Create English translations in `apps/web/messages/en/`
+- [x] T159 [P] [US6] Create Chinese translations in `apps/web/messages/zh/`
+- [x] T160 [P] [US6] Create locale middleware in `apps/web/src/middleware.ts` (update existing)
+- [x] T161 [P] [US6] Create language switcher component in `apps/web/src/components/LanguageSwitcher.tsx`
 
 ### Translation Coverage
 
-- [ ] T162 [P] [US6] Translate all UI components in conversations module
-- [ ] T163 [P] [US6] Translate all UI components in MiniApps module
-- [ ] T164 [P] [US6] Translate all UI components in user profile and settings
-- [ ] T165 [P] [US6] Translate error messages in `packages/shared/utils/errors.ts`
-- [ ] T166 [P] [US6] Translate notification messages
-- [ ] T167 [P] [US6] Translate CLI tool messages in `apps/cli/messages/`
+- [x] T162 [P] [US6] Translate all UI components in conversations module
+- [x] T163 [P] [US6] Translate all UI components in MiniApps module
+- [x] T164 [P] [US6] Translate all UI components in user profile and settings
+- [x] T165 [P] [US6] Translate error messages in `packages/shared/utils/errors.ts`
+- [x] T166 [P] [US6] Translate notification messages
+- [x] T167 [P] [US6] Translate CLI tool messages in `apps/cli/messages/`
 
 ### Locale Detection & Persistence
 
-- [ ] T168 [US6] Implement browser locale detection
-- [ ] T169 [US6] Store user language preference in user_profiles.preferences
-- [ ] T170 [US6] Create API route for updating language preference in `apps/web/src/app/api/profile/language/route.ts`
+- [x] T168 [US6] Implement browser locale detection
+- [x] T169 [US6] Store user language preference in user_profiles.preferences
+- [x] T170 [US6] Create API route for updating language preference in `apps/web/src/app/api/profile/language/route.ts`
 
 ### Agent Multilingual Support
 
-- [ ] T171 [US6] Implement language detection in user messages
-- [ ] T172 [US6] Pass detected language to Agent context in prompt
-- [ ] T173 [US6] Validate Agent responses maintain same language as user input
+- [x] T171 [US6] Implement language detection in user messages
+- [x] T172 [US6] Pass detected language to Agent context in prompt
+- [x] T173 [US6] Validate Agent responses maintain same language as user input
 
-**Checkpoint**: User Story 6 complete - Full i18n support for Chinese and English
+**Checkpoint**: User Story 6 complete ✅ - Full i18n support for Chinese and English
 
 ---
 

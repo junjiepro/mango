@@ -7,6 +7,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -36,6 +37,7 @@ interface Tool {
 }
 
 export function MCPDebugger({ deviceId, bindingCode, onlineUrls }: MCPDebuggerProps) {
+  const t = useTranslations('devices');
   const [tools, setTools] = useState<Tool[]>([]);
   const [selectedTool, setSelectedTool] = useState<string>('');
   const [toolArgs, setToolArgs] = useState('{}');
@@ -62,7 +64,7 @@ export function MCPDebugger({ deviceId, bindingCode, onlineUrls }: MCPDebuggerPr
   // 连接到 MCP 服务器
   const connectToServer = async () => {
     if (!onlineUrl) {
-      setError('设备不在线');
+      setError(t('mcpDebugger.deviceOffline'));
       return false;
     }
 
@@ -97,7 +99,7 @@ export function MCPDebugger({ deviceId, bindingCode, onlineUrls }: MCPDebuggerPr
       setIsConnected(true);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : '连接失败');
+      setError(err instanceof Error ? err.message : t('mcpDebugger.connectionFailed'));
       return false;
     } finally {
       setIsConnecting(false);
@@ -137,14 +139,14 @@ export function MCPDebugger({ deviceId, bindingCode, onlineUrls }: MCPDebuggerPr
       try {
         JSON.parse(value);
       } catch (err) {
-        setJsonError('Invalid JSON format');
+        setJsonError(t('invalidJsonFormat'));
       }
     }
   };
 
   const callTool = async () => {
     if (!selectedTool) {
-      setError('请选择一个工具');
+      setError(t('mcpDebugger.pleaseSelectTool'));
       return;
     }
 
@@ -165,7 +167,7 @@ export function MCPDebugger({ deviceId, bindingCode, onlineUrls }: MCPDebuggerPr
         try {
           parsedArgs = JSON.parse(toolArgs);
         } catch (err) {
-          throw new Error('参数 JSON 格式错误');
+          throw new Error(t('mcpDebugger.invalidJson'));
         }
       }
 
@@ -187,11 +189,11 @@ export function MCPDebugger({ deviceId, bindingCode, onlineUrls }: MCPDebuggerPr
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">MCP 服务调试</CardTitle>
+        <CardTitle className="text-lg">{t('mcpDebugger.title')}</CardTitle>
         <CardDescription>
-          使用 MCP SDK 连接设备端的 MCP 服务器
-          {isConnected && <span className="ml-2 text-green-600">● 已连接</span>}
-          {!isConnected && onlineUrl && <span className="ml-2 text-gray-400">○ 未连接</span>}
+          {t('mcpDebugger.description')}
+          {isConnected && <span className="ml-2 text-green-600">● {t('mcpDebugger.connected')}</span>}
+          {!isConnected && onlineUrl && <span className="ml-2 text-gray-400">○ {t('mcpDebugger.notConnected')}</span>}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -205,12 +207,12 @@ export function MCPDebugger({ deviceId, bindingCode, onlineUrls }: MCPDebuggerPr
             {isLoadingTools ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                加载中...
+                {t('mcpDebugger.loading')}
               </>
             ) : (
               <>
                 <List className="mr-2 h-4 w-4" />
-                列出工具
+                {t('mcpDebugger.listTools')}
               </>
             )}
           </Button>
@@ -228,7 +230,7 @@ export function MCPDebugger({ deviceId, bindingCode, onlineUrls }: MCPDebuggerPr
               }}
               variant="outline"
               size="icon"
-              title="断开连接"
+              title={t('mcpDebugger.disconnect')}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -238,10 +240,10 @@ export function MCPDebugger({ deviceId, bindingCode, onlineUrls }: MCPDebuggerPr
         {tools.length > 0 && (
           <>
             <div className="space-y-2">
-              <Label>选择工具</Label>
+              <Label>{t('mcpDebugger.selectTool')}</Label>
               <Select value={selectedTool} onValueChange={setSelectedTool}>
                 <SelectTrigger>
-                  <SelectValue placeholder="选择一个工具" />
+                  <SelectValue placeholder={t('mcpDebugger.selectATool')} />
                 </SelectTrigger>
                 <SelectContent>
                   {tools.map((tool) => (
@@ -255,7 +257,7 @@ export function MCPDebugger({ deviceId, bindingCode, onlineUrls }: MCPDebuggerPr
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="tool-args">参数 (JSON)</Label>
+              <Label htmlFor="tool-args">{t('mcpDebugger.argsJson')}</Label>
               <Textarea
                 id="tool-args"
                 value={toolArgs}
@@ -274,12 +276,12 @@ export function MCPDebugger({ deviceId, bindingCode, onlineUrls }: MCPDebuggerPr
               {isCallingTool ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  调用中...
+                  {t('mcpDebugger.calling')}
                 </>
               ) : (
                 <>
                   <Play className="mr-2 h-4 w-4" />
-                  调用工具
+                  {t('mcpDebugger.callTool')}
                 </>
               )}
             </Button>
@@ -294,7 +296,7 @@ export function MCPDebugger({ deviceId, bindingCode, onlineUrls }: MCPDebuggerPr
 
         {result && (
           <div className="space-y-2">
-            <Label>结果</Label>
+            <Label>{t('mcpDebugger.result')}</Label>
             <pre className="bg-muted p-4 rounded-lg text-sm overflow-auto max-h-[400px]">
               {JSON.stringify(result, null, 2)}
             </pre>

@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { FolderOpen, ChevronDown, History, FolderInput, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -44,6 +45,7 @@ export function WorkingDirectorySelector({
   className,
   compact = false,
 }: WorkingDirectorySelectorProps) {
+  const t = useTranslations('workspace');
   const [isOpen, setIsOpen] = useState(false);
   const [showInputDialog, setShowInputDialog] = useState(false);
   const [inputPath, setInputPath] = useState('');
@@ -92,10 +94,10 @@ export function WorkingDirectorySelector({
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return '刚刚';
-    if (diffMins < 60) return `${diffMins}分钟前`;
-    if (diffHours < 24) return `${diffHours}小时前`;
-    if (diffDays < 7) return `${diffDays}天前`;
+    if (diffMins < 1) return t('workingDirSelector.justNow');
+    if (diffMins < 60) return t('workingDirSelector.minutesAgo', { count: diffMins });
+    if (diffHours < 24) return t('workingDirSelector.hoursAgo', { count: diffHours });
+    if (diffDays < 7) return t('workingDirSelector.daysAgo', { count: diffDays });
     return date.toLocaleDateString();
   };
 
@@ -114,7 +116,7 @@ export function WorkingDirectorySelector({
           >
             <FolderOpen className={cn('shrink-0', compact ? 'h-3 w-3' : 'h-4 w-4')} />
             <span className="truncate">
-              {currentPath ? formatPath(currentPath) : '选择工作目录'}
+              {currentPath ? formatPath(currentPath) : t('workingDirSelector.selectDir')}
             </span>
             <ChevronDown className={cn('shrink-0', compact ? 'h-3 w-3' : 'h-4 w-4')} />
           </Button>
@@ -122,9 +124,9 @@ export function WorkingDirectorySelector({
         <PopoverContent className="w-80 p-0" align="start">
           {/* 当前路径 */}
           <div className="p-3 border-b">
-            <div className="text-xs text-muted-foreground mb-1">当前工作目录</div>
+            <div className="text-xs text-muted-foreground mb-1">{t('workingDirSelector.currentDir')}</div>
             <div className="text-sm font-medium truncate" title={currentPath}>
-              {currentPath || '未设置'}
+              {currentPath || t('workingDirSelector.notSet')}
             </div>
           </div>
 
@@ -141,7 +143,7 @@ export function WorkingDirectorySelector({
               }}
             >
               <FolderInput className="h-3 w-3 mr-1" />
-              输入路径
+              {t('workingDirSelector.inputPath')}
             </Button>
           </div>
 
@@ -150,7 +152,7 @@ export function WorkingDirectorySelector({
             <div className="p-2">
               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
                 <History className="h-3 w-3" />
-                <span>最近访问</span>
+                <span>{t('workingDirSelector.recentAccess')}</span>
               </div>
               <ScrollArea className="max-h-[200px]">
                 <div className="space-y-1">
@@ -177,7 +179,7 @@ export function WorkingDirectorySelector({
           )}
 
           {recentPaths.length === 0 && (
-            <div className="p-4 text-center text-xs text-muted-foreground">暂无访问记录</div>
+            <div className="p-4 text-center text-xs text-muted-foreground">{t('workingDirSelector.noHistory')}</div>
           )}
         </PopoverContent>
       </Popover>
@@ -186,13 +188,13 @@ export function WorkingDirectorySelector({
       <Dialog open={showInputDialog} onOpenChange={setShowInputDialog}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>输入工作目录路径</DialogTitle>
+            <DialogTitle>{t('workingDirSelector.inputDirPath')}</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <Input
               value={inputPath}
               onChange={(e) => setInputPath(e.target.value)}
-              placeholder="例如: /home/user/projects 或 D:\Projects"
+              placeholder={t('workingDirSelector.pathExample')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleInputConfirm();
@@ -200,15 +202,15 @@ export function WorkingDirectorySelector({
               }}
             />
             <p className="text-xs text-muted-foreground mt-2">
-              输入设备上的绝对路径，按 Enter 确认
+              {t('workingDirSelector.pathHint')}
             </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowInputDialog(false)}>
-              取消
+              {t('workingDirSelector.cancel')}
             </Button>
             <Button onClick={handleInputConfirm} disabled={!inputPath.trim()}>
-              确认
+              {t('workingDirSelector.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Loader2, RefreshCw, AlertCircle, Play, CheckCircle2,
   XCircle, ChevronRight, Server, Wrench, FolderOpen, ScrollText,
@@ -55,6 +56,7 @@ interface ServerInfo {
 type DebugSection = 'tools' | 'resources' | 'logs';
 
 export function MCPDebugPanel({ miniAppId }: MCPDebugPanelProps) {
+  const t = useTranslations('workspace');
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(true);
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
@@ -119,7 +121,7 @@ export function MCPDebugPanel({ miniAppId }: MCPDebugPanelProps) {
       addLog('response', 'resources/list', { resources: resourcesList });
       setResources(resourcesList);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '连接失败';
+      const msg = err instanceof Error ? err.message : t('mcpDebugPanel.connectionFailed');
       addLog('error', 'initialize', { error: msg });
       setConnectError(msg);
       setConnected(false);
@@ -146,7 +148,7 @@ export function MCPDebugPanel({ miniAppId }: MCPDebugPanelProps) {
       addLog('response', `tools/call: ${selectedTool.name}`, result);
       setToolResult(result);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '调用失败';
+      const msg = err instanceof Error ? err.message : t('mcpDebugPanel.connectionFailed');
       addLog('error', `tools/call: ${selectedTool.name}`, { error: msg });
       setToolResult({ error: msg });
     } finally {
@@ -168,7 +170,7 @@ export function MCPDebugPanel({ miniAppId }: MCPDebugPanelProps) {
       addLog('response', `resources/read: ${resource.uri}`, content);
       setResourceContent(content);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '读取失败';
+      const msg = err instanceof Error ? err.message : t('mcpDebugPanel.connectionFailed');
       addLog('error', `resources/read: ${resource.uri}`, { error: msg });
       setResourceContent({ error: msg });
     } finally {
@@ -184,11 +186,12 @@ export function MCPDebugPanel({ miniAppId }: MCPDebugPanelProps) {
         serverInfo={serverInfo}
         connectError={connectError}
         onReconnect={connect}
+        t={t}
       />
       <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
         <ResizablePanel defaultSize={60} minSize={20}>
           <div className="flex h-full overflow-hidden">
-            <SectionNav activeSection={activeSection} onSectionChange={setActiveSection} />
+            <SectionNav activeSection={activeSection} onSectionChange={setActiveSection} t={t} />
             <div className="flex-1 min-w-0 overflow-hidden">
               {activeSection === 'tools' && (
                 <ToolsSection
@@ -200,6 +203,7 @@ export function MCPDebugPanel({ miniAppId }: MCPDebugPanelProps) {
                   onSelectTool={(t) => { setSelectedTool(t); setToolResult(null); setToolArgs('{}'); }}
                   onArgsChange={setToolArgs}
                   onExecute={executeTool}
+                  t={t}
                 />
               )}
               {activeSection === 'resources' && (
@@ -209,15 +213,16 @@ export function MCPDebugPanel({ miniAppId }: MCPDebugPanelProps) {
                   resourceContent={resourceContent}
                   resourceLoading={resourceLoading}
                   onReadResource={readResource}
+                  t={t}
                 />
               )}
-              {activeSection === 'logs' && <LogsSection logs={logs} />}
+              {activeSection === 'logs' && <LogsSection logs={logs} t={t} />}
             </div>
           </div>
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={40} minSize={15}>
-          <LogsSection logs={logs} />
+          <LogsSection logs={logs} t={t} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
@@ -227,13 +232,14 @@ export function MCPDebugPanel({ miniAppId }: MCPDebugPanelProps) {
 // === 子组件 ===
 
 function ServerInfoBar({
-  connecting, connected, serverInfo, connectError, onReconnect,
+  connecting, connected, serverInfo, connectError, onReconnect, t,
 }: {
   connecting: boolean;
   connected: boolean;
   serverInfo: ServerInfo | null;
   connectError: string | null;
   onReconnect: () => void;
+  t: ReturnType<typeof useTranslations>;
 }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2 border-b bg-muted/30 shrink-0">
@@ -247,14 +253,14 @@ function ServerInfoBar({
         )}
         <Server className="h-4 w-4 text-muted-foreground" />
         <span className="text-xs font-medium">
-          {connecting ? '连接中...' : connected
+          {connecting ? t('mcpDebugPanel.connecting') : connected
             ? `${serverInfo?.serverInfo.name || 'MCP Server'} v${serverInfo?.serverInfo.version || '?'}`
-            : '未连接'}
+            : t('mcpDebugPanel.notConnected')}
         </span>
       </div>
       {serverInfo && (
         <span className="text-xs text-muted-foreground">
-          协议 {serverInfo.protocolVersion}
+          {t('mcpDebugPanel.protocol', { version: serverInfo.protocolVersion })}
         </span>
       )}
       {connectError && (
@@ -268,15 +274,16 @@ function ServerInfoBar({
 }
 
 function SectionNav({
-  activeSection, onSectionChange,
+  activeSection, onSectionChange, t,
 }: {
   activeSection: DebugSection;
   onSectionChange: (s: DebugSection) => void;
+  t: ReturnType<typeof useTranslations>;
 }) {
   const items: { key: DebugSection; icon: React.ReactNode; label: string }[] = [
-    { key: 'tools', icon: <Wrench className="h-4 w-4" />, label: '工具' },
-    { key: 'resources', icon: <FolderOpen className="h-4 w-4" />, label: '资源' },
-    { key: 'logs', icon: <ScrollText className="h-4 w-4" />, label: '日志' },
+    { key: 'tools', icon: <Wrench className="h-4 w-4" />, label: t('mcpDebugPanel.tools') },
+    { key: 'resources', icon: <FolderOpen className="h-4 w-4" />, label: t('mcpDebugPanel.resources') },
+    { key: 'logs', icon: <ScrollText className="h-4 w-4" />, label: t('mcpDebugPanel.logs') },
   ];
 
   return (
@@ -302,7 +309,7 @@ function SectionNav({
 
 function ToolsSection({
   tools, selectedTool, toolArgs, toolResult, toolExecuting,
-  onSelectTool, onArgsChange, onExecute,
+  onSelectTool, onArgsChange, onExecute, t,
 }: {
   tools: ToolDefinition[];
   selectedTool: ToolDefinition | null;
@@ -312,6 +319,7 @@ function ToolsSection({
   onSelectTool: (t: ToolDefinition) => void;
   onArgsChange: (v: string) => void;
   onExecute: () => void;
+  t: ReturnType<typeof useTranslations>;
 }) {
   return (
     <div className="flex h-full overflow-hidden">
@@ -319,7 +327,7 @@ function ToolsSection({
       <ScrollArea className="w-48 border-r shrink-0">
         <div className="p-2 space-y-0.5">
           {tools.length === 0 ? (
-            <p className="text-xs text-muted-foreground p-2">无可用工具</p>
+            <p className="text-xs text-muted-foreground p-2">{t('mcpDebugPanel.noTools')}</p>
           ) : tools.map((tool) => (
             <button
               key={tool.name}
@@ -347,7 +355,7 @@ function ToolsSection({
               <p className="text-xs text-muted-foreground mt-1">{selectedTool.description}</p>
             </div>
             <div className="p-3 flex-1 flex flex-col min-h-0 gap-2 overflow-auto">
-              <label className="text-xs font-medium shrink-0">参数 (JSON)</label>
+              <label className="text-xs font-medium shrink-0">{t('mcpDebugPanel.argsJson')}</label>
               <textarea
                 value={toolArgs}
                 onChange={(e) => onArgsChange(e.target.value)}
@@ -360,11 +368,11 @@ function ToolsSection({
                 ) : (
                   <Play className="h-4 w-4 mr-1" />
                 )}
-                执行
+                {t('mcpDebugPanel.execute')}
               </Button>
               {toolResult !== null && (
                 <div className="min-h-0 shrink-0">
-                  <label className="text-xs font-medium">结果</label>
+                  <label className="text-xs font-medium">{t('mcpDebugPanel.result')}</label>
                   <pre className="mt-1 p-2 rounded bg-muted text-xs font-mono overflow-auto max-h-[200px]">
                     {JSON.stringify(toolResult, null, 2)}
                   </pre>
@@ -374,7 +382,7 @@ function ToolsSection({
           </>
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-            选择左侧工具进行调试
+            {t('mcpDebugPanel.selectToolToDebug')}
           </div>
         )}
       </div>
@@ -383,13 +391,14 @@ function ToolsSection({
 }
 
 function ResourcesSection({
-  resources, selectedResource, resourceContent, resourceLoading, onReadResource,
+  resources, selectedResource, resourceContent, resourceLoading, onReadResource, t,
 }: {
   resources: ResourceDefinition[];
   selectedResource: ResourceDefinition | null;
   resourceContent: unknown;
   resourceLoading: boolean;
   onReadResource: (r: ResourceDefinition) => void;
+  t: ReturnType<typeof useTranslations>;
 }) {
   return (
     <div className="flex h-full overflow-hidden">
@@ -397,7 +406,7 @@ function ResourcesSection({
       <ScrollArea className="w-48 border-r shrink-0">
         <div className="p-2 space-y-0.5">
           {resources.length === 0 ? (
-            <p className="text-xs text-muted-foreground p-2">无可用资源</p>
+            <p className="text-xs text-muted-foreground p-2">{t('mcpDebugPanel.noResources')}</p>
           ) : resources.map((res) => (
             <button
               key={res.uri}
@@ -438,7 +447,7 @@ function ResourcesSection({
           </div>
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-            选择左侧资源进行预览
+            {t('mcpDebugPanel.selectResourceToPreview')}
           </div>
         )}
       </div>
@@ -446,12 +455,12 @@ function ResourcesSection({
   );
 }
 
-function LogsSection({ logs }: { logs: LogEntry[] }) {
+function LogsSection({ logs, t }: { logs: LogEntry[]; t: ReturnType<typeof useTranslations> }) {
   return (
     <ScrollArea className="h-full">
       <div className="p-2 space-y-1">
         {logs.length === 0 ? (
-          <p className="text-xs text-muted-foreground p-2">暂无日志</p>
+          <p className="text-xs text-muted-foreground p-2">{t('mcpDebugPanel.noLogs')}</p>
         ) : logs.map((log) => (
           <div key={log.id} className="flex items-start gap-2 p-1.5 rounded text-xs hover:bg-muted/50">
             <span className="text-muted-foreground shrink-0 font-mono w-[70px]">

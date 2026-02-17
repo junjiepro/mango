@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { AppError, ErrorType, normalizeError } from '@mango/shared/utils';
 import { logger } from '@mango/shared/utils';
+import { cookies } from 'next/headers';
 
 /**
  * GET /api/conversations/[id]/messages
@@ -180,6 +181,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           messageId: message.id,
           userId: user.id,
           deviceId: deviceId || null,
+          locale: (await cookies()).get('NEXT_LOCALE')?.value || 'zh',
         }),
       }).catch((error) => {
         logger.error('Failed to trigger agent response', { error });

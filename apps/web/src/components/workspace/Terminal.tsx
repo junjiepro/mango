@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -20,6 +21,7 @@ interface TerminalProps {
 }
 
 export function Terminal({ deviceId, device, className }: TerminalProps) {
+  const t = useTranslations('workspace');
   const { client, isReady } = useDeviceClient(device);
 
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -134,7 +136,7 @@ export function Terminal({ deviceId, device, className }: TerminalProps) {
           }));
         }, 100);
 
-        xterm.writeln('终端已连接');
+        xterm.writeln(t('terminal.connected'));
       };
 
       ws.onmessage = (event) => {
@@ -145,16 +147,16 @@ export function Terminal({ deviceId, device, className }: TerminalProps) {
       };
 
       ws.onerror = () => {
-        xterm.writeln('\r\n终端连接错误');
+        xterm.writeln('\r\n' + t('terminal.connectionError'));
       };
 
       ws.onclose = () => {
-        xterm.writeln('\r\n终端连接已断开');
+        xterm.writeln('\r\n' + t('terminal.disconnected'));
       };
 
       wsRef.current = ws;
     } catch (error) {
-      xterm.writeln('\r\n无法连接到终端');
+      xterm.writeln('\r\n' + t('terminal.cannotConnect'));
       console.error('Terminal connection error:', error);
     }
   };

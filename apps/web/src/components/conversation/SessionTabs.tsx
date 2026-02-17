@@ -5,6 +5,7 @@
 
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { MessageSquare, Bot, X, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -31,6 +32,7 @@ export function SessionTabs({
   compact = false,
   disableCreateSession = false,
 }: SessionTabsProps) {
+  const t = useTranslations('conversations');
   return (
     <div className={cn('flex items-center gap-1', className)}>
       {/* 会话标签 */}
@@ -91,7 +93,7 @@ export function SessionTabs({
         onClick={onCreateACPSession}
         disabled={disableCreateSession}
         className={cn('flex-shrink-0', compact ? 'h-7 w-7' : 'h-8 w-8')}
-        title={disableCreateSession ? '请先选择设备' : '新建 ACP 会话'}
+        title={disableCreateSession ? t('sessionTabs.selectDeviceFirst') : t('sessionTabs.newACPSession')}
       >
         <Plus className="h-3.5 w-3.5" />
       </Button>

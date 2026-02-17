@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   MonitorIcon,
   XCircle,
@@ -56,6 +57,7 @@ interface DeviceTabProps {
 }
 
 export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
+  const t = useTranslations('devices');
   // 状态检查
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [deviceStatus, setDeviceStatus] = useState<{
@@ -163,7 +165,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
         setMcpServicesJson(JSON.stringify(mcpServices, null, 2));
       }
     } catch (err) {
-      setConfigError(err instanceof Error ? err.message : '加载配置失败');
+      setConfigError(err instanceof Error ? err.message : t('deviceTab.loadConfigFailed'));
     } finally {
       setConfigLoading(false);
     }
@@ -179,7 +181,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
       try {
         mcpServices = JSON.parse(mcpServicesJson);
       } catch {
-        setConfigError('MCP 服务配置 JSON 格式错误');
+        setConfigError(t('deviceTab.mcpJsonFormatError'));
         return;
       }
     }
@@ -204,14 +206,14 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
       });
 
       if (!response.ok) {
-        throw new Error('保存配置失败');
+        throw new Error(t('deviceTab.saveConfigFailed'));
       }
 
       setConfigSuccess(true);
       setTimeout(() => setConfigSuccess(false), 3000);
       onRefresh?.();
     } catch (err) {
-      setConfigError(err instanceof Error ? err.message : '保存配置失败');
+      setConfigError(err instanceof Error ? err.message : t('deviceTab.saveConfigFailed'));
     } finally {
       setConfigSaving(false);
     }
@@ -220,7 +222,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
   // 连接到 MCP 服务器
   const connectToServer = async () => {
     if (!onlineUrl || !device?.binding_code) {
-      setError('设备不在线');
+      setError(t('deviceTab.deviceOffline'));
       return false;
     }
 
@@ -244,7 +246,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
       setIsConnected(true);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : '连接失败');
+      setError(err instanceof Error ? err.message : t('deviceTab.connectionFailed'));
       return false;
     } finally {
       setIsConnecting(false);
@@ -266,7 +268,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
       const response = await clientRef.current!.listTools();
       setTools(response.tools || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载工具失败');
+      setError(err instanceof Error ? err.message : t('deviceTab.loadToolsFailed'));
       setIsConnected(false);
     } finally {
       setIsLoadingTools(false);
@@ -282,7 +284,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
       try {
         JSON.parse(value);
       } catch {
-        setJsonError('JSON 格式错误');
+        setJsonError(t('deviceTab.jsonFormatError'));
       }
     }
   };
@@ -290,7 +292,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
   // 调用工具
   const callTool = async () => {
     if (!selectedTool) {
-      setError('请选择一个工具');
+      setError(t('deviceTab.pleaseSelectTool'));
       return;
     }
 
@@ -309,7 +311,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
         try {
           parsedArgs = JSON.parse(toolArgs);
         } catch {
-          throw new Error('参数 JSON 格式错误');
+          throw new Error(t('deviceTab.argsJsonFormatError'));
         }
       }
 
@@ -320,7 +322,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
 
       setResult(response);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '调用失败');
+      setError(err instanceof Error ? err.message : t('deviceTab.callFailed'));
       setIsConnected(false);
     } finally {
       setIsCallingTool(false);
@@ -346,9 +348,9 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
         <div className="text-muted-foreground mb-2">
           <MonitorIcon className="w-12 h-12 mx-auto opacity-50" />
         </div>
-        <p className="text-sm text-muted-foreground">未选择设备</p>
+        <p className="text-sm text-muted-foreground">{t('deviceTab.noDevice')}</p>
         <p className="text-xs text-muted-foreground mt-1">
-          请在顶部工具栏选择一个设备
+          {t('deviceTab.noDeviceHint')}
         </p>
       </div>
     );
@@ -367,7 +369,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium truncate">{device.binding_name}</div>
             <div className="text-xs text-muted-foreground truncate">
-              {onlineUrl || '离线'}
+              {onlineUrl || t('offline')}
             </div>
           </div>
           <Badge variant={device.status === 'active' ? 'default' : 'secondary'} className="flex-shrink-0">
@@ -380,23 +382,23 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
           <CollapsibleTrigger asChild>
             <button className="flex items-center gap-2 w-full text-left text-sm font-medium py-1.5 hover:text-primary transition-colors">
               {statusOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              状态监控
+              {t('deviceTab.statusMonitor')}
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2 pt-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">连接状态</span>
+              <span className="text-muted-foreground">{t('deviceTab.connectionStatus')}</span>
               <div className="flex items-center gap-1.5">
                 <Circle className={`w-2 h-2 fill-current ${isOnline ? 'text-green-500' : 'text-gray-400'}`} />
                 <span className={isOnline ? 'text-green-600' : 'text-muted-foreground'}>
-                  {isOnline ? '在线' : '离线'}
+                  {isOnline ? t('online') : t('offline')}
                 </span>
               </div>
             </div>
 
             {deviceStatus?.last_check_at && (
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">最后检查</span>
+                <span className="text-muted-foreground">{t('deviceTab.lastCheck')}</span>
                 <span className="text-xs">
                   {new Date(deviceStatus.last_check_at).toLocaleString('zh-CN')}
                 </span>
@@ -422,7 +424,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
               ) : (
                 <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
               )}
-              刷新状态
+              {t('deviceTab.refreshStatus')}
             </Button>
           </CollapsibleContent>
         </Collapsible>
@@ -437,7 +439,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
           <CollapsibleTrigger asChild>
             <button className="flex items-center gap-2 w-full text-left text-sm font-medium py-1.5 hover:text-primary transition-colors">
               {configOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              配置管理
+              {t('deviceTab.configManagement')}
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-3 pt-2">
@@ -450,12 +452,12 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
                 <div className="space-y-1.5">
                   <Label className="text-xs flex items-center gap-1">
                     <FolderOpen className="w-3 h-3" />
-                    工作目录
+                    {t('deviceTab.workspaceDir')}
                   </Label>
                   <Input
                     value={workspaceDir}
                     onChange={(e) => setWorkspaceDir(e.target.value)}
-                    placeholder="默认工作目录"
+                    placeholder={t('deviceTab.workspaceDirPlaceholder')}
                     className="h-8 text-xs"
                   />
                 </div>
@@ -463,23 +465,23 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
                 <div className="space-y-1.5">
                   <Label className="text-xs flex items-center gap-1">
                     <FolderOpen className="w-3 h-3" />
-                    数据目录
+                    {t('deviceTab.dataDir')}
                   </Label>
                   <Input
                     value={bindingDataDir}
                     onChange={(e) => setBindingDataDir(e.target.value)}
-                    placeholder="默认数据目录"
+                    placeholder={t('deviceTab.dataDirPlaceholder')}
                     className="h-8 text-xs"
                   />
                   <p className="text-xs text-muted-foreground">
-                    修改数据目录会自动迁移现有数据
+                    {t('deviceTab.dataDirHint')}
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
                   <Label className="text-xs flex items-center gap-1">
                     <Settings className="w-3 h-3" />
-                    MCP 服务配置
+                    {t('deviceTab.mcpServiceConfig')}
                   </Label>
                   <Textarea
                     value={mcpServicesJson}
@@ -489,7 +491,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
                       try {
                         if (e.target.value.trim()) JSON.parse(e.target.value);
                       } catch {
-                        setMcpJsonError('JSON 格式错误');
+                        setMcpJsonError(t('deviceTab.jsonFormatError'));
                       }
                     }}
                     placeholder="{}"
@@ -508,7 +510,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
 
                 {configSuccess && (
                   <Alert className="py-2 bg-green-50 text-green-900 border-green-200">
-                    <AlertDescription className="text-xs">配置已保存</AlertDescription>
+                    <AlertDescription className="text-xs">{t('deviceTab.configSaved')}</AlertDescription>
                   </Alert>
                 )}
 
@@ -523,7 +525,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
                   ) : (
                     <Save className="w-3.5 h-3.5 mr-1.5" />
                   )}
-                  保存配置
+                  {t('deviceTab.saveConfig')}
                 </Button>
               </>
             )}
@@ -535,8 +537,8 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
           <CollapsibleTrigger asChild>
             <button className="flex items-center gap-2 w-full text-left text-sm font-medium py-1.5 hover:text-primary transition-colors">
               {mcpOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              MCP 调试
-              {isConnected && <span className="text-xs text-green-600 ml-auto">● 已连接</span>}
+              {t('deviceTab.mcpDebug')}
+              {isConnected && <span className="text-xs text-green-600 ml-auto">● {t('deviceTab.connected')}</span>}
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-3 pt-2">
@@ -554,27 +556,27 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
                 ) : (
                   <List className="w-3.5 h-3.5 mr-1.5" />
                 )}
-                {isConnected ? '刷新工具' : '连接并列出工具'}
+                {isConnected ? t('deviceTab.refreshTools') : t('deviceTab.connectAndListTools')}
               </Button>
               {isConnected && (
-                <Button variant="outline" size="sm" onClick={disconnect} title="断开连接">
+                <Button variant="outline" size="sm" onClick={disconnect} title={t('disconnect')}>
                   <XCircle className="w-3.5 h-3.5" />
                 </Button>
               )}
             </div>
 
             {!isOnline && (
-              <p className="text-xs text-muted-foreground">设备离线，无法连接 MCP 服务</p>
+              <p className="text-xs text-muted-foreground">{t('deviceTab.deviceOfflineCannotConnect')}</p>
             )}
 
             {/* 工具选择和调用 */}
             {tools.length > 0 && (
               <>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">选择工具</Label>
+                  <Label className="text-xs">{t('deviceTab.selectTool')}</Label>
                   <Select value={selectedTool} onValueChange={setSelectedTool}>
                     <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="选择工具" />
+                      <SelectValue placeholder={t('deviceTab.selectTool')} />
                     </SelectTrigger>
                     <SelectContent>
                       {tools.map((tool) => (
@@ -592,7 +594,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs">参数 (JSON)</Label>
+                  <Label className="text-xs">{t('deviceTab.argsJson')}</Label>
                   <Textarea
                     value={toolArgs}
                     onChange={(e) => handleArgsChange(e.target.value)}
@@ -613,7 +615,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
                   ) : (
                     <Play className="w-3.5 h-3.5 mr-1.5" />
                   )}
-                  调用工具
+                  {t('deviceTab.callTool')}
                 </Button>
               </>
             )}
@@ -629,7 +631,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
             {/* 结果显示 */}
             {result && (
               <div className="space-y-1.5">
-                <Label className="text-xs">结果</Label>
+                <Label className="text-xs">{t('deviceTab.result')}</Label>
                 <pre className="bg-muted p-2 rounded text-xs overflow-auto max-h-[200px] whitespace-pre-wrap break-all">
                   {JSON.stringify(result, null, 2)}
                 </pre>

@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import {
   Menu,
   Laptop,
@@ -124,6 +125,8 @@ export function ConversationHeader({
 }: ConversationHeaderProps) {
   const router = useRouter();
   const { isFullscreenMode } = useWorkspaceLayout();
+  const t = useTranslations('conversations');
+  const tc = useTranslations('common');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(false);
@@ -145,11 +148,11 @@ export function ConversationHeader({
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return '刚刚';
-    if (diffMins < 60) return `${diffMins}分钟前`;
-    if (diffHours < 24) return `${diffHours}小时前`;
-    if (diffDays < 7) return `${diffDays}天前`;
-    return date.toLocaleDateString('zh-CN');
+    if (diffMins < 1) return tc('time.justNow');
+    if (diffMins < 60) return tc('time.minutesAgo', { count: diffMins });
+    if (diffHours < 24) return tc('time.hoursAgo', { count: diffHours });
+    if (diffDays < 7) return tc('time.daysAgo', { count: diffDays });
+    return date.toLocaleDateString();
   };
 
   // 开始编辑标题
@@ -219,7 +222,7 @@ export function ConversationHeader({
       const response = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: '新对话' }),
+        body: JSON.stringify({ title: t('newConversation') }),
       });
       if (response.ok) {
         const data = await response.json();
@@ -242,7 +245,7 @@ export function ConversationHeader({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 flex-shrink-0"
-                title="导航菜单"
+                title={t('navMenu')}
               >
                 <Menu className="h-4 w-4" />
               </Button>
@@ -271,7 +274,7 @@ export function ConversationHeader({
                   }}
                 >
                   <MessageSquare className="h-4 w-4" />
-                  对话列表
+                  {tc('nav.conversationList')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -282,7 +285,7 @@ export function ConversationHeader({
                   }}
                 >
                   <Monitor className="h-4 w-4" />
-                  设备管理
+                  {tc('nav.devices')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -293,7 +296,7 @@ export function ConversationHeader({
                   }}
                 >
                   <Package className="h-4 w-4" />
-                  应用管理
+                  {tc('nav.appManager')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -304,7 +307,7 @@ export function ConversationHeader({
                   }}
                 >
                   <Settings className="h-4 w-4" />
-                  设置
+                  {tc('nav.settings')}
                 </Button>
               </div>
 
@@ -318,7 +321,7 @@ export function ConversationHeader({
                   onClick={handleNewConversation}
                 >
                   <Plus className="h-4 w-4" />
-                  新建对话
+                  {t('newConversation')}
                 </Button>
               </div>
 
@@ -326,7 +329,7 @@ export function ConversationHeader({
 
               {/* 最近会话列表 */}
               <div className="flex-1">
-                <div className="px-4 py-2 text-xs text-muted-foreground font-medium">最近对话</div>
+                <div className="px-4 py-2 text-xs text-muted-foreground font-medium">{t('recentConversations')}</div>
                 <ScrollArea className="h-[calc(100vh-320px)]">
                   {loadingConversations ? (
                     <div className="flex items-center justify-center py-8">
@@ -334,7 +337,7 @@ export function ConversationHeader({
                     </div>
                   ) : conversations.length === 0 ? (
                     <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      暂无对话
+                      {t('noConversations')}
                     </div>
                   ) : (
                     <div className="px-2 space-y-0.5">
@@ -388,8 +391,8 @@ export function ConversationHeader({
                                     : 'text-muted-foreground hidden group-hover:flex'
                                 )}
                               >
-                                <span>{conv.stats.message_count || 0} 条消息</span>
-                                <span>{conv.stats.task_count || 0} 个任务</span>
+                                <span>{t('messageCount', { count: conv.stats.message_count || 0 })}</span>
+                                <span>{t('taskCount', { count: conv.stats.task_count || 0 })}</span>
                               </div>
                             )}
                           </button>
@@ -444,7 +447,7 @@ export function ConversationHeader({
             <button
               onClick={handleStartEditTitle}
               className="flex items-center gap-1 group hover:bg-muted rounded px-1.5 py-0.5 transition-colors"
-              title="点击编辑标题"
+              title={t('clickToEditTitle')}
             >
               <span className="text-sm font-medium truncate max-w-[120px] sm:max-w-[160px]">
                 {conversationTitle}
@@ -478,22 +481,22 @@ export function ConversationHeader({
           <Select value={selectedDeviceId || 'none'} onValueChange={onDeviceChange}>
             <SelectTrigger className="w-16 sm:w-[100px] h-8 text-xs [&>span]:hidden sm:[&>span]:inline-flex">
               <Laptop className="h-4 w-4 sm:hidden" />
-              <SelectValue className="" placeholder="设备">
+              <SelectValue className="" placeholder={t('selectDevice')}>
                 {selectedDeviceId ? (
                   <div className="flex items-center gap-1.5">
                     <Laptop className="h-3.5 w-3.5" />
                     <span className="truncate">
-                      {devices.find((d) => d.id === selectedDeviceId)?.binding_name || '设备'}
+                      {devices.find((d) => d.id === selectedDeviceId)?.binding_name || t('selectDevice')}
                     </span>
                   </div>
                 ) : (
-                  <span className="text-muted-foreground">无设备</span>
+                  <span className="text-muted-foreground">{t('noDevice')}</span>
                 )}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">
-                <span className="text-muted-foreground">不使用设备</span>
+                <span className="text-muted-foreground">{t('noDeviceOption')}</span>
               </SelectItem>
               {devices.map((device) => (
                 <SelectItem key={device.id} value={device.id}>
@@ -529,7 +532,7 @@ export function ConversationHeader({
               size="icon"
               className="h-8 w-8 hidden sm:inline-flex"
               onClick={onOpenMiniAppSelector}
-              title="小应用"
+              title={tc('nav.miniapps')}
             >
               <Package className="h-4 w-4" />
             </Button>
@@ -541,7 +544,7 @@ export function ConversationHeader({
             size="icon"
             className="h-8 w-8"
             onClick={onToggleWorkspace}
-            title={showWorkspace ? '关闭工作区' : '打开工作区'}
+            title={showWorkspace ? t('closeWorkspace') : t('openWorkspace')}
           >
             <PanelRight className="h-4 w-4" />
           </Button>
@@ -557,7 +560,7 @@ export function ConversationHeader({
               {/* 会话切换 */}
               {sessions.length > 0 && (
                 <>
-                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">会话</div>
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t('sessions')}</div>
                   {sessions.map((session) => {
                     const isActive = session.id === activeSessionId;
                     const isRunning =
@@ -602,7 +605,7 @@ export function ConversationHeader({
               {/* 新建会话 */}
               <DropdownMenuItem onClick={onCreateACPSession} disabled={!selectedDeviceId}>
                 <Plus className="h-4 w-4" />
-                新建 Agent 会话
+                {t('newAgentSession')}
               </DropdownMenuItem>
 
               <DropdownMenuSeparator />
@@ -613,7 +616,7 @@ export function ConversationHeader({
                   <DropdownMenuItem onClick={() => setShowMobileWorkingDir(true)}>
                     <FolderOpen className="h-4 w-4" />
                     <span className="truncate flex-1">
-                      {currentWorkingDirectory || '选择工作目录'}
+                      {currentWorkingDirectory || t('selectWorkingDir')}
                     </span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -624,7 +627,7 @@ export function ConversationHeader({
               {onOpenMiniAppSelector && (
                 <DropdownMenuItem onClick={onOpenMiniAppSelector}>
                   <Package className="h-4 w-4" />
-                  小应用
+                  {tc('nav.miniapps')}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -636,7 +639,7 @@ export function ConversationHeader({
               'h-2 w-2 rounded-full flex-shrink-0',
               isRealtimeConnected ? 'bg-green-500' : 'bg-gray-400'
             )}
-            title={isRealtimeConnected ? '已连接' : '未连接'}
+            title={isRealtimeConnected ? tc('status.connected') : tc('status.disconnected')}
           />
         </div>
       </div>
@@ -646,7 +649,7 @@ export function ConversationHeader({
         <Sheet open={showMobileWorkingDir} onOpenChange={setShowMobileWorkingDir}>
           <SheetContent side="bottom" className="h-[50vh]">
             <SheetHeader>
-              <SheetTitle>选择工作目录</SheetTitle>
+              <SheetTitle>{t('selectWorkingDir')}</SheetTitle>
             </SheetHeader>
             <div className="mt-4">
               <WorkingDirectorySelector

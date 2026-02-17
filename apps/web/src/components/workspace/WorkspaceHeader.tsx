@@ -7,6 +7,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import {
   X,
   Maximize2,
@@ -26,7 +27,7 @@ interface WorkspaceHeaderProps {
 }
 
 export function WorkspaceHeader({
-  title = '工作区',
+  title,
   isFullscreen = false,
   onClose,
   onToggleFullscreen,
@@ -34,11 +35,15 @@ export function WorkspaceHeader({
   onSettings,
   showActions = true
 }: WorkspaceHeaderProps) {
+  const t = useTranslations('workspace');
+
+  const resolvedTitle = title ?? t('header.title');
+
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background">
       {/* 标题 */}
       <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        <h2 className="text-sm font-semibold text-foreground">{resolvedTitle}</h2>
       </div>
 
       {/* 操作按钮 */}
@@ -48,8 +53,8 @@ export function WorkspaceHeader({
             <button
               onClick={onRefresh}
               className="p-1.5 hover:bg-accent rounded transition-colors"
-              title="刷新"
-              aria-label="刷新工作区"
+              title={t('header.refresh')}
+              aria-label={t('header.refreshWorkspace')}
             >
               <RefreshCw className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -59,8 +64,8 @@ export function WorkspaceHeader({
             <button
               onClick={onSettings}
               className="p-1.5 hover:bg-accent rounded transition-colors"
-              title="设置"
-              aria-label="工作区设置"
+              title={t('header.settings')}
+              aria-label={t('header.workspaceSettings')}
             >
               <Settings className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -70,8 +75,8 @@ export function WorkspaceHeader({
             <button
               onClick={onToggleFullscreen}
               className="p-1.5 hover:bg-accent rounded transition-colors"
-              title={isFullscreen ? '退出全屏' : '全屏'}
-              aria-label={isFullscreen ? '退出全屏' : '全屏'}
+              title={isFullscreen ? t('header.exitFullscreen') : t('header.fullscreen')}
+              aria-label={isFullscreen ? t('header.exitFullscreen') : t('header.fullscreen')}
             >
               {isFullscreen ? (
                 <Minimize2 className="w-4 h-4 text-muted-foreground" />
@@ -85,8 +90,8 @@ export function WorkspaceHeader({
             <button
               onClick={onClose}
               className="p-1.5 hover:bg-accent rounded transition-colors"
-              title="关闭"
-              aria-label="关闭工作区"
+              title={t('header.close')}
+              aria-label={t('header.closeWorkspace')}
             >
               <X className="w-4 h-4 text-muted-foreground" />
             </button>

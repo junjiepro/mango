@@ -206,43 +206,55 @@ export function normalizeError(error: unknown): AppError {
 }
 
 /**
- * 错误消息映射 (用户友好的错误消息)
+ * Supported locales for error messages
  */
-export const ERROR_MESSAGES: Record<ErrorType, string> = {
-  [ErrorType.AUTH_UNAUTHORIZED]: '未授权，请先登录',
-  [ErrorType.AUTH_FORBIDDEN]: '权限不足，无法访问该资源',
-  [ErrorType.AUTH_SESSION_EXPIRED]: '会话已过期，请重新登录',
-  [ErrorType.AUTH_INVALID_CREDENTIALS]: '用户名或密码错误',
+export type SupportedLocale = 'zh' | 'en'
 
-  [ErrorType.VALIDATION_FAILED]: '输入验证失败',
-  [ErrorType.VALIDATION_REQUIRED_FIELD]: '必填字段缺失',
-  [ErrorType.VALIDATION_INVALID_FORMAT]: '输入格式无效',
+/**
+ * 错误消息映射 (多语言)
+ */
+export const ERROR_MESSAGES: Record<ErrorType, Record<SupportedLocale, string>> = {
+  [ErrorType.AUTH_UNAUTHORIZED]: { zh: '未授权，请先登录', en: 'Unauthorized. Please log in' },
+  [ErrorType.AUTH_FORBIDDEN]: { zh: '权限不足，无法访问该资源', en: 'Access denied' },
+  [ErrorType.AUTH_SESSION_EXPIRED]: { zh: '会话已过期，请重新登录', en: 'Session expired. Please log in again' },
+  [ErrorType.AUTH_INVALID_CREDENTIALS]: { zh: '用户名或密码错误', en: 'Invalid email or password' },
 
-  [ErrorType.RESOURCE_NOT_FOUND]: '请求的资源不存在',
-  [ErrorType.RESOURCE_ALREADY_EXISTS]: '资源已存在',
-  [ErrorType.RESOURCE_CONFLICT]: '资源冲突',
+  [ErrorType.VALIDATION_FAILED]: { zh: '输入验证失败', en: 'Validation failed' },
+  [ErrorType.VALIDATION_REQUIRED_FIELD]: { zh: '必填字段缺失', en: 'Required field is missing' },
+  [ErrorType.VALIDATION_INVALID_FORMAT]: { zh: '输入格式无效', en: 'Invalid format' },
 
-  [ErrorType.BUSINESS_LOGIC_ERROR]: '业务逻辑错误',
-  [ErrorType.QUOTA_EXCEEDED]: '配额已用尽',
-  [ErrorType.RATE_LIMIT_EXCEEDED]: '请求过于频繁，请稍后再试',
+  [ErrorType.RESOURCE_NOT_FOUND]: { zh: '请求的资源不存在', en: 'Resource not found' },
+  [ErrorType.RESOURCE_ALREADY_EXISTS]: { zh: '资源已存在', en: 'Resource already exists' },
+  [ErrorType.RESOURCE_CONFLICT]: { zh: '资源冲突', en: 'Resource conflict' },
 
-  [ErrorType.INTERNAL_SERVER_ERROR]: '服务器内部错误',
-  [ErrorType.DATABASE_ERROR]: '数据库错误',
-  [ErrorType.NETWORK_ERROR]: '网络错误',
-  [ErrorType.TIMEOUT_ERROR]: '请求超时',
+  [ErrorType.BUSINESS_LOGIC_ERROR]: { zh: '业务逻辑错误', en: 'Business logic error' },
+  [ErrorType.QUOTA_EXCEEDED]: { zh: '配额已用尽', en: 'Quota exceeded' },
+  [ErrorType.RATE_LIMIT_EXCEEDED]: { zh: '请求过于频繁，请稍后再试', en: 'Too many requests. Please try again later' },
 
-  [ErrorType.EXTERNAL_SERVICE_ERROR]: '外部服务错误',
-  [ErrorType.MCP_SERVICE_ERROR]: 'MCP 服务错误',
-  [ErrorType.MINIAPP_ERROR]: '小应用错误',
+  [ErrorType.INTERNAL_SERVER_ERROR]: { zh: '服务器内部错误', en: 'Internal server error' },
+  [ErrorType.DATABASE_ERROR]: { zh: '数据库错误', en: 'Database error' },
+  [ErrorType.NETWORK_ERROR]: { zh: '网络错误', en: 'Network error' },
+  [ErrorType.TIMEOUT_ERROR]: { zh: '请求超时', en: 'Request timed out' },
 
-  [ErrorType.UNKNOWN_ERROR]: '未知错误',
+  [ErrorType.EXTERNAL_SERVICE_ERROR]: { zh: '外部服务错误', en: 'External service error' },
+  [ErrorType.MCP_SERVICE_ERROR]: { zh: 'MCP 服务错误', en: 'MCP service error' },
+  [ErrorType.MINIAPP_ERROR]: { zh: '小应用错误', en: 'Mini app error' },
+
+  [ErrorType.UNKNOWN_ERROR]: { zh: '未知错误', en: 'Unknown error' },
+}
+
+/**
+ * 获取指定类型和语言的错误消息
+ */
+export function getErrorMessage(type: ErrorType, locale: SupportedLocale = 'zh'): string {
+  return ERROR_MESSAGES[type]?.[locale] || ERROR_MESSAGES[type]?.zh || 'Unknown error'
 }
 
 /**
  * 获取用户友好的错误消息
  */
-export function getUserFriendlyMessage(error: AppError): string {
-  return ERROR_MESSAGES[error.type] || error.message
+export function getUserFriendlyMessage(error: AppError, locale: SupportedLocale = 'zh'): string {
+  return ERROR_MESSAGES[error.type]?.[locale] || error.message
 }
 
 /**

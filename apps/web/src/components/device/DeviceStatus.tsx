@@ -6,6 +6,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ interface DeviceStatusProps {
 }
 
 export function DeviceStatus({ deviceId, initialStatus }: DeviceStatusProps) {
+  const t = useTranslations('devices');
   const [status, setStatus] = useState(initialStatus);
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export function DeviceStatus({ deviceId, initialStatus }: DeviceStatusProps) {
       const response = await fetch(`/api/devices/${deviceId}`);
 
       if (!response.ok) {
-        throw new Error('Failed to check device status');
+        throw new Error(t('failedCheckStatus'));
       }
 
       const data = await response.json();
@@ -44,7 +46,7 @@ export function DeviceStatus({ deviceId, initialStatus }: DeviceStatusProps) {
         health_check_error: data.device.health_check_error,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      setError(err instanceof Error ? err.message : t('unknown'));
     } finally {
       setIsChecking(false);
     }
@@ -61,14 +63,14 @@ export function DeviceStatus({ deviceId, initialStatus }: DeviceStatusProps) {
 
   const getStatusBadge = () => {
     if (!status) {
-      return <Badge variant="outline">Unknown</Badge>;
+      return <Badge variant="outline">{t('unknown')}</Badge>;
     }
 
     if (status.is_online) {
       return (
         <Badge variant="default" className="bg-green-500">
           <Circle className="mr-1 h-2 w-2 fill-current" />
-          在线
+          {t('online')}
         </Badge>
       );
     }
@@ -76,7 +78,7 @@ export function DeviceStatus({ deviceId, initialStatus }: DeviceStatusProps) {
     return (
       <Badge variant="destructive">
         <Circle className="mr-1 h-2 w-2 fill-current" />
-        离线
+        {t('offline')}
       </Badge>
     );
   };
@@ -85,7 +87,7 @@ export function DeviceStatus({ deviceId, initialStatus }: DeviceStatusProps) {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">设备状态</CardTitle>
+          <CardTitle className="text-lg">{t('status')}</CardTitle>
           <Button
             variant="outline"
             size="sm"
@@ -102,13 +104,13 @@ export function DeviceStatus({ deviceId, initialStatus }: DeviceStatusProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">当前状态</span>
+          <span className="text-sm text-muted-foreground">{t('currentStatus')}</span>
           {getStatusBadge()}
         </div>
 
         {status?.last_check_at && (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">最后检查</span>
+            <span className="text-sm text-muted-foreground">{t('lastCheck')}</span>
             <span className="text-sm">
               {new Date(status.last_check_at).toLocaleString('zh-CN')}
             </span>
@@ -133,7 +135,7 @@ export function DeviceStatus({ deviceId, initialStatus }: DeviceStatusProps) {
         {!status?.is_online && (
           <Alert>
             <AlertDescription className="text-sm">
-              设备离线。请确保 Mango CLI 工具正在运行，并且设备 URL 可访问。
+              {t('offlineHint')}
             </AlertDescription>
           </Alert>
         )}

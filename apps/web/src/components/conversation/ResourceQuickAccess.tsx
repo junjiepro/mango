@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   X,
   FileText,
@@ -181,9 +182,9 @@ function ResourceItem({ resource, installations, onOpenMiniApp, onResourceClick,
 
   let displayName = resource.metadata?.filename || resource.content;
   if (resource.type === 'code') {
-    displayName = `${resource.metadata?.language || 'code'} 代码`;
+    displayName = `${resource.metadata?.language || 'code'}`;
   } else if (isHtml) {
-    displayName = 'HTML 代码';
+    displayName = 'HTML';
   }
 
   return (
@@ -226,6 +227,7 @@ export function ResourceQuickAccess({
   onResourceClick,
   isWorkspaceActive = false,
 }: ResourceQuickAccessProps) {
+  const t = useTranslations('conversations');
   // 获取最近的资源（最多显示10个）
   const recentResources = useMemo(() => {
     // 按时间排序（最新的在前）
@@ -248,7 +250,7 @@ export function ResourceQuickAccess({
       {/* 资源统计 */}
       <div className="py-[5px] flex items-center gap-2 text-sm font-medium text-foreground flex-shrink-0">
         <FileText className="h-4 w-4 text-primary" />
-        <span>资源</span>
+        <span>{t('resource.title')}</span>
         <span className="text-muted-foreground">({resources.length})</span>
       </div>
 
@@ -280,7 +282,7 @@ export function ResourceQuickAccess({
           onClick={onOpenWorkspace}
           className="flex items-center gap-1 px-3 py-1.5 text-sm text-primary hover:bg-accent rounded-md transition-colors flex-shrink-0"
         >
-          <span>更多</span>
+          <span>{t('resource.more')}</span>
           <ChevronRight className="h-4 w-4" />
         </button>
       )}

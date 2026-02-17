@@ -8,6 +8,7 @@
 'use client'
 
 import React from 'react'
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import type { Database } from '@/types/database.types'
@@ -39,6 +40,7 @@ export function MiniAppCard({
   onShare,
   onChatWithAgent,
 }: MiniAppCardProps) {
+  const t = useTranslations('miniapps')
   const stats = miniApp.stats as any || {}
   const manifest = miniApp.manifest as any || {}
 
@@ -118,7 +120,7 @@ export function MiniAppCard({
               d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
             />
           </svg>
-          <span>{stats.active_users || 0} users</span>
+          <span>{stats.active_users || 0} {t('stats.users')}</span>
         </div>
 
         <div className="flex items-center gap-1">
@@ -135,7 +137,7 @@ export function MiniAppCard({
               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
             />
           </svg>
-          <span>{stats.install_count || 0} installs</span>
+          <span>{stats.install_count || 0} {t('stats.installs')}</span>
         </div>
 
         {stats.avg_rating > 0 && (
@@ -159,13 +161,13 @@ export function MiniAppCard({
               onClick={() => onOpen?.(miniApp)}
               className="flex-1"
             >
-              Open
+              {t('actions.open')}
             </Button>
             <Button
               variant="outline"
               onClick={() => onUninstall?.(miniApp)}
             >
-              Uninstall
+              {t('actions.uninstall')}
             </Button>
           </>
         ) : (
@@ -173,7 +175,7 @@ export function MiniAppCard({
             onClick={() => onInstall?.(miniApp)}
             className="flex-1"
           >
-            Install
+            {t('actions.install')}
           </Button>
         )}
 
@@ -182,7 +184,7 @@ export function MiniAppCard({
             variant="ghost"
             size="icon"
             onClick={() => onShare?.(miniApp)}
-            title="Share"
+            title={t('actions.share')}
           >
             <svg
               className="h-4 w-4"
@@ -205,7 +207,7 @@ export function MiniAppCard({
             variant="ghost"
             size="icon"
             onClick={() => onChatWithAgent(miniApp)}
-            title="Chat with Agent"
+            title={t('actions.chatWithAgent')}
           >
             <svg
               className="h-4 w-4"
@@ -229,12 +231,12 @@ export function MiniAppCard({
         <div className="absolute top-4 right-4 flex gap-1.5">
           {miniApp.status === 'draft' && (
             <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
-              Draft
+              {t('status.draft')}
             </span>
           )}
           {!installed && (
             <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-              未安装
+              {t('notInstalled')}
             </span>
           )}
         </div>

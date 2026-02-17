@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import type { Database } from '@/types/database.types';
 import {
   Message,
@@ -99,6 +100,7 @@ export function MessageItem({
   const isAgent = message.sender_type === 'agent';
   const isSystem = message.sender_type === 'system';
   const isMiniApp = message.sender_type === 'miniapp';
+  const t = useTranslations('conversations');
 
   // 确定消息角色
   const messageRole = isUser ? 'user' : 'assistant';
@@ -197,11 +199,11 @@ export function MessageItem({
   }, [message.id, attachmentsTodo]);
 
   const getSenderName = () => {
-    if (isUser) return '你';
-    if (isAgent) return 'Agent';
-    if (isSystem) return '系统';
+    if (isUser) return t('messageItem.you');
+    if (isAgent) return t('messageItem.agent');
+    if (isSystem) return t('messageItem.system');
     if (isMiniApp && miniAppInvocation) return miniAppInvocation.miniAppName;
-    return '未知';
+    return t('messageItem.unknown');
   };
 
   const formatTime = (dateString: string) => {
@@ -278,11 +280,11 @@ export function MessageItem({
 
     // 内置工具的显示名称映射
     const builtInToolNames: Record<string, string> = {
-      generating_image: '图片生成',
-      reading_taged_file: '读取标记文件',
-      invoke_miniapp: '调用小应用',
-      create_miniapp: '创建小应用',
-      update_miniapp: '更新小应用',
+      generating_image: t('messageItem.imageGeneration'),
+      reading_taged_file: t('messageItem.readTaggedFile'),
+      invoke_miniapp: t('messageItem.invokeMiniApp'),
+      create_miniapp: t('messageItem.createMiniApp'),
+      update_miniapp: t('messageItem.updateMiniApp'),
     };
 
     // 如果是内置工具,返回映射的名称
@@ -319,15 +321,15 @@ export function MessageItem({
       case 'running':
         return {
           icon: <ClockIcon className="size-3 animate-spin" />,
-          text: '执行中',
+          text: t('messageItem.toolRunning'),
           color: 'text-blue-500',
         };
       case 'success':
-        return { icon: '✓', text: '成功', color: 'text-green-500' };
+        return { icon: '✓', text: t('messageItem.toolSuccess'), color: 'text-green-500' };
       case 'error':
-        return { icon: '✗', text: '失败', color: 'text-red-500' };
+        return { icon: '✗', text: t('messageItem.toolError'), color: 'text-red-500' };
       default:
-        return { icon: '○', text: '等待中', color: 'text-gray-500' };
+        return { icon: '○', text: t('messageItem.toolPending'), color: 'text-gray-500' };
     }
   };
 
@@ -348,7 +350,7 @@ export function MessageItem({
             {message.edited_at && (
               <>
                 <span>·</span>
-                <span>(已编辑)</span>
+                <span>{t('messageItem.edited')}</span>
               </>
             )}
             {isStreaming && (
@@ -356,7 +358,7 @@ export function MessageItem({
                 <span>·</span>
                 <span className="flex items-center gap-1">
                   <ClockIcon className="size-3 animate-spin" />
-                  <span>生成中...</span>
+                  <span>{t('messageItem.generating')}</span>
                 </span>
               </>
             )}
@@ -404,7 +406,7 @@ export function MessageItem({
                       {/* 全局 MCP 工具标识 */}
                       {toolCall.isMcpTool && !toolCall.deviceName && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                          全局
+                          {t('messageItem.global')}
                         </span>
                       )}
                     </div>
@@ -472,9 +474,9 @@ export function MessageItem({
                     {miniAppInvocation.miniAppName}
                   </span>
                   {miniAppInvocation.error ? (
-                    <span className="text-xs text-red-600 dark:text-red-400">执行失败</span>
+                    <span className="text-xs text-red-600 dark:text-red-400">{t('messageItem.executionFailed')}</span>
                   ) : (
-                    <span className="text-xs text-purple-600 dark:text-purple-400">已调用</span>
+                    <span className="text-xs text-purple-600 dark:text-purple-400">{t('messageItem.invoked')}</span>
                   )}
                 </div>
 
@@ -489,7 +491,7 @@ export function MessageItem({
                 {miniAppInvocation.result && !miniAppInvocation.error && (
                   <div className="mt-2 text-xs text-muted-foreground">
                     <details className="cursor-pointer">
-                      <summary className="hover:text-foreground">查看结果</summary>
+                      <summary className="hover:text-foreground">{t('messageItem.viewResult')}</summary>
                       <pre className="mt-2 p-2 bg-background rounded text-xs overflow-x-auto">
                         {JSON.stringify(miniAppInvocation.result, null, 2)}
                       </pre>
@@ -555,7 +557,7 @@ export function MessageItem({
             <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border/50 pt-3 text-xs text-muted-foreground">
               {message.agent_metadata.model && (
                 <div className="flex items-center gap-1">
-                  <span className="font-medium">模型:</span>
+                  <span className="font-medium">{t('messageItem.model')}</span>
                   <span>{message.agent_metadata.model}</span>
                 </div>
               )}
@@ -578,11 +580,11 @@ export function MessageItem({
         {/* 消息操作按钮 */}
         {showActions && !isUser && message.status === 'sent' && (
           <MessageActions>
-            <MessageAction tooltip="复制消息" onClick={handleCopy}>
+            <MessageAction tooltip={t('messageItem.copyMessage')} onClick={handleCopy}>
               <CopyIcon className="size-4" />
             </MessageAction>
             {onRetry && (
-              <MessageAction tooltip="重新生成" onClick={onRetry}>
+              <MessageAction tooltip={t('messageItem.regenerate')} onClick={onRetry}>
                 <RefreshCcwIcon className="size-4" />
               </MessageAction>
             )}
@@ -598,16 +600,16 @@ export function MessageItem({
         {message.status === 'pending' && (
           <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
             <ClockIcon className="size-3 animate-spin" />
-            <span>发送中...</span>
+            <span>{t('messageItem.sending')}</span>
           </div>
         )}
         {message.status === 'failed' && (
           <div className="mt-2 flex items-center gap-2 text-xs text-destructive">
             <AlertCircleIcon className="size-3" />
-            <span>发送失败</span>
+            <span>{t('messageItem.sendFailed')}</span>
             {onRetry && (
               <button onClick={onRetry} className="underline hover:no-underline">
-                重试
+                {t('messageItem.retry')}
               </button>
             )}
           </div>

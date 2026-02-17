@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { MessageItem } from './MessageItem';
 import {
   Conversation,
@@ -52,6 +53,8 @@ export function MessageList({
   onImageClick,
   className = '',
 }: MessageListProps) {
+  const t = useTranslations('conversations');
+  const tc = useTranslations('common');
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(initialMessages.length);
@@ -130,8 +133,8 @@ export function MessageList({
     return (
       <div className={`flex h-full items-center justify-center p-8 ${className}`}>
         <div className="text-center">
-          <p className="text-muted-foreground">还没有消息</p>
-          <p className="mt-2 text-sm text-muted-foreground">发送第一条消息开始对话</p>
+          <p className="text-muted-foreground">{t('noMessages')}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t('startConversation')}</p>
         </div>
       </div>
     );
@@ -144,7 +147,7 @@ export function MessageList({
         {hasMore && (
           <div className="flex justify-center pb-4">
             <Button variant="outline" size="sm" onClick={onLoadMore} disabled={isLoading}>
-              {isLoading ? '加载中...' : '加载更多'}
+              {isLoading ? tc('actions.loading') : t('loadMore')}
             </Button>
           </div>
         )}

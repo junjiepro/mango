@@ -8,6 +8,7 @@
 'use client';
 
 import React, { useRef, useState, DragEvent } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { logger } from '@mango/shared/utils';
 import { FileIcon } from 'lucide-react';
@@ -45,6 +46,7 @@ export function AttachmentUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string>('');
+  const t = useTranslations('conversations');
 
   /**
    * 验证文件
@@ -56,7 +58,7 @@ export function AttachmentUpload({
     for (const file of files) {
       // 检查文件大小
       if (file.size > maxSize) {
-        errors.push(`"${file.name}" 超过最大限制 ${formatFileSize(maxSize)}`);
+        errors.push(t('attachment.fileTooLarge', { name: file.name, maxSize: formatFileSize(maxSize) }));
         continue;
       }
 
@@ -77,7 +79,7 @@ export function AttachmentUpload({
       });
 
       if (!isAccepted) {
-        errors.push(`"${file.name}" 文件类型不支持`);
+        errors.push(t('attachment.fileTypeNotSupported', { name: file.name }));
         continue;
       }
 
@@ -199,7 +201,7 @@ export function AttachmentUpload({
           onClick={openFileDialog}
           disabled={disabled}
           className="h-8 w-8 p-0"
-          title="上传附件"
+          title={t('attachment.upload')}
         >
           <FileIcon />
         </Button>
@@ -242,11 +244,11 @@ export function AttachmentUpload({
             <FileIcon />
           </div>
           <div className="text-sm font-medium">
-            {isDragging ? '释放以上传文件' : '点击或拖拽文件到此处'}
+            {isDragging ? t('attachment.dropToUpload') : t('attachment.clickOrDrop')}
           </div>
           <div className="text-xs text-muted-foreground">
-            支持 {accept.split(',').slice(0, 3).join(', ')}
-            {accept.split(',').length > 3 && ' 等'} (最大 {formatFileSize(maxSize)})
+            {t('attachment.supportedFormats', { formats: accept.split(',').slice(0, 3).join(', ') })}
+            {accept.split(',').length > 3 && t('attachment.andMore')} ({t('attachment.maxSize', { size: formatFileSize(maxSize) })})
           </div>
         </div>
       </div>

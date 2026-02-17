@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { ConversationList } from '@/components/conversation/ConversationList'
 import { AppHeader } from '@/components/layouts/AppHeader'
 import type { Database } from '@/types/database.types'
@@ -18,6 +19,7 @@ type Conversation = Database['public']['Tables']['conversations']['Row']
  */
 export default function ConversationsPage() {
   const router = useRouter()
+  const t = useTranslations('conversations')
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
 
   const handleSelectConversation = (conversation: Conversation) => {
@@ -33,9 +35,9 @@ export default function ConversationsPage() {
         <div className="container mx-auto p-4 md:p-6 lg:p-8">
           <div className="mx-auto max-w-4xl">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold">我的对话</h2>
+              <h2 className="text-2xl font-bold">{t('pageTitle')}</h2>
               <p className="mt-2 text-muted-foreground">
-                选择一个对话继续,或创建新的对话
+                {t('pageDescription')}
               </p>
             </div>
 

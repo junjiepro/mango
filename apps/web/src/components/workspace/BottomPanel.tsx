@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -40,9 +41,10 @@ export function BottomPanel({
   initialActiveTerminalId,
   onStateChange,
 }: BottomPanelProps) {
+  const t = useTranslations('workspace');
   const isInitializedRef = useRef(false);
   const [terminals, setTerminals] = useState<TerminalSession[]>(
-    initialTerminals || [{ id: '1', title: '终端 1' }]
+    initialTerminals || [{ id: '1', title: t('bottomPanel.terminal', { id: 1 }) }]
   );
   const [activeTerminal, setActiveTerminal] = useState(initialActiveTerminalId || '1');
 
@@ -67,7 +69,7 @@ export function BottomPanel({
     const newId = String(terminals.length + 1);
     const newTerminal: TerminalSession = {
       id: newId,
-      title: `终端 ${newId}`,
+      title: t('bottomPanel.terminal', { id: newId }),
     };
     setTerminals([...terminals, newTerminal]);
     setActiveTerminal(newId);
@@ -130,7 +132,7 @@ export function BottomPanel({
               size="icon"
               onClick={handleAddTerminal}
               className="h-7 w-7"
-              title="新建终端"
+              title={t('bottomPanel.newTerminal')}
             >
               <Plus className="h-4 w-4" />
             </Button>

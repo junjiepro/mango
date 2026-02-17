@@ -6,6 +6,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { conversationService } from '@/services/ConversationService'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -30,6 +31,8 @@ export function ConversationList({
   selectedConversationId,
   className = '',
 }: ConversationListProps) {
+  const t = useTranslations('conversations')
+  const tc = useTranslations('common')
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
@@ -62,7 +65,7 @@ export function ConversationList({
       const defaultDeviceId = DeviceCache.getDefaultDeviceId()
 
       const newConversation = await conversationService.createConversation({
-        title: '新对话',
+        title: t('newConversation'),
         device_id: defaultDeviceId || undefined,
       })
       setConversations((prev) => [newConversation, ...prev])
@@ -81,11 +84,11 @@ export function ConversationList({
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
 
-    if (diffMins < 1) return '刚刚'
-    if (diffMins < 60) return `${diffMins}分钟前`
-    if (diffHours < 24) return `${diffHours}小时前`
-    if (diffDays < 7) return `${diffDays}天前`
-    return date.toLocaleDateString('zh-CN')
+    if (diffMins < 1) return tc('time.justNow')
+    if (diffMins < 60) return tc('time.minutesAgo', { count: diffMins })
+    if (diffHours < 24) return tc('time.hoursAgo', { count: diffHours })
+    if (diffDays < 7) return tc('time.daysAgo', { count: diffDays })
+    return date.toLocaleDateString()
   }
 
   if (isLoading) {
@@ -101,14 +104,14 @@ export function ConversationList({
   if (error) {
     return (
       <div className={`rounded-lg border border-destructive/50 bg-destructive/10 p-4 ${className}`}>
-        <p className="text-sm text-destructive">加载对话列表失败</p>
+        <p className="text-sm text-destructive">{t('loadFailed')}</p>
         <Button
           variant="outline"
           size="sm"
           onClick={loadConversations}
           className="mt-2"
         >
-          重试
+          {tc('actions.retry')}
         </Button>
       </div>
     )
@@ -122,14 +125,14 @@ export function ConversationList({
         className="w-full"
         variant="outline"
       >
-        + 新建对话
+        {t('newConversationButton')}
       </Button>
 
       {/* 对话列表 */}
       {conversations.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center">
           <p className="text-sm text-muted-foreground">
-            还没有对话,点击上方按钮创建第一个对话
+            {t('emptyState')}
           </p>
         </div>
       ) : (
@@ -163,8 +166,8 @@ export function ConversationList({
               {/* 统计信息 */}
               {conversation.stats && (
                 <div className="mt-2 flex gap-3 text-xs text-muted-foreground">
-                  <span>{conversation.stats.message_count || 0} 条消息</span>
-                  <span>{conversation.stats.task_count || 0} 个任务</span>
+                  <span>{t('messageCount', { count: conversation.stats.message_count || 0 })}</span>
+                  <span>{t('taskCount', { count: conversation.stats.task_count || 0 })}</span>
                 </div>
               )}
             </button>

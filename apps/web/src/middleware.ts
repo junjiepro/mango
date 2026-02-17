@@ -7,9 +7,16 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { authConfig, isProtectedPath, getRedirectUrl } from '@/lib/supabase/auth-config'
 
+function detectLocaleFromHeader(acceptLanguage: string): string {
+  const enMatch = acceptLanguage.match(/en(?:-\w+)?(?:;q=([\d.]+))?/)
+  const zhMatch = acceptLanguage.match(/zh(?:-\w+)?(?:;q=([\d.]+))?/)
+  const enQ = enMatch ? parseFloat(enMatch[1] || '1') : 0
+  const zhQ = zhMatch ? parseFloat(zhMatch[1] || '1') : 0
+  return enQ > zhQ ? 'en' : 'zh'
+}
+
 /**
  * Next.js Middleware
- * 在请求到达页面之前执行认证检查
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -20,6 +27,17 @@ export async function middleware(request: NextRequest) {
       headers: request.headers,
     },
   })
+
+  // Locale detection: set NEXT_LOCALE cookie if not present
+  if (!request.cookies.get('NEXT_LOCALE')?.value) {
+    const acceptLanguage = request.headers.get('Accept-Language') || ''
+    const locale = detectLocaleFromHeader(acceptLanguage)
+    response.cookies.set('NEXT_LOCALE', locale, {
+      path: '/',
+      maxAge: 365 * 24 * 60 * 60, // 1 year
+      sameSite: 'lax',
+    })
+  }
 
   // 创建 Supabase 客户端
   const supabase = createServerClient(

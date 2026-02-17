@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { MiniAppReference } from './MiniAppReference';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,7 @@ export function MiniAppQuickAccess({
   onClose,
   className,
 }: MiniAppQuickAccessProps) {
+  const t = useTranslations('conversations');
   // 从所有消息中提取并去重 MiniApp 引用
   const miniAppRefs = useMemo(() => {
     const refMap = new Map<string, MiniAppRef>();
@@ -110,7 +112,7 @@ export function MiniAppQuickAccess({
             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
           />
         </svg>
-        <span>对话中的小应用</span>
+        <span>{t('miniAppQuickAccess.title')}</span>
       </div>
 
       {/* MiniApp 列表 - 横向滚动 */}

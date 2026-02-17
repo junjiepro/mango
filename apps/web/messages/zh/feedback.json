@@ -1,0 +1,28 @@
+{
+  "dialog": {
+    "thankYou": "感谢您的好评！",
+    "thankYouFeedback": "感谢您的反馈",
+    "tellUsGood": "告诉我们哪里做得好...",
+    "tellUsImprove": "告诉我们如何改进...",
+    "cancel": "取消",
+    "submitting": "提交中...",
+    "submit": "提交"
+  },
+  "learning": {
+    "title": "学习规则",
+    "noRules": "暂无学习规则",
+    "category": "类别:",
+    "preference": "偏好:",
+    "positive": "正面",
+    "negative": "负面",
+    "pattern": "模式:",
+    "extensionSkill": "扩展技能",
+    "noExtensionSkills": "暂无扩展技能。通过反馈帮助 Agent 学习。",
+    "loading": "加载中...",
+    "refresh": "刷新",
+    "export": "导出",
+    "confidence": "置信度:",
+    "noRulesPage": "暂无学习规则。通过反馈帮助 Agent 学习您的偏好。",
+    "preferencePrefix": "偏好: "
+  }
+}

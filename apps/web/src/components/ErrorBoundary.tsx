@@ -6,6 +6,7 @@
 'use client'
 
 import React, { Component, ErrorInfo, ReactNode } from 'react'
+import { useTranslations } from 'next-intl'
 import { AppError, normalizeError } from '@mango/shared/utils'
 import { logger } from '@mango/shared/utils'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,13 @@ interface Props {
   children: ReactNode
   fallback?: (error: AppError, reset: () => void) => ReactNode
   onError?: (error: AppError, errorInfo: ErrorInfo) => void
+  translations?: {
+    title: string
+    description: string
+    errorDetails: string
+    retry: string
+    goHome: string
+  }
 }
 
 interface State {
@@ -77,16 +85,16 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="w-full max-w-md space-y-4 rounded-lg border border-destructive/50 bg-card p-6 shadow-lg">
             <div className="space-y-2">
               <h2 className="text-2xl font-bold text-destructive">
-                出错了
+                {this.props.translations?.title || '出错了'}
               </h2>
               <p className="text-sm text-muted-foreground">
-                应用程序遇到了一个错误。我们已经记录了这个问题。
+                {this.props.translations?.description || '应用程序遇到了一个错误。我们已经记录了这个问题。'}
               </p>
             </div>
 
             {process.env.NODE_ENV === 'development' && (
               <div className="space-y-2">
-                <p className="text-sm font-medium">错误详情:</p>
+                <p className="text-sm font-medium">{this.props.translations?.errorDetails || '错误详情:'}</p>
                 <div className="rounded-md bg-muted p-3">
                   <p className="text-xs font-mono text-muted-foreground">
                     {this.state.error.type}
@@ -103,14 +111,14 @@ export class ErrorBoundary extends Component<Props, State> {
 
             <div className="flex gap-2">
               <Button onClick={this.handleReset} className="flex-1">
-                重试
+                {this.props.translations?.retry || '重试'}
               </Button>
               <Button
                 variant="outline"
                 onClick={() => window.location.href = '/'}
                 className="flex-1"
               >
-                返回首页
+                {this.props.translations?.goHome || '返回首页'}
               </Button>
             </div>
           </div>
@@ -136,4 +144,26 @@ export function withErrorBoundary<P extends object>(
       </ErrorBoundary>
     )
   }
+}
+
+/**
+ * TranslatedErrorBoundary
+ * 带国际化支持的 ErrorBoundary wrapper，使用 next-intl 提供翻译文本
+ */
+export function TranslatedErrorBoundary({ children, ...props }: Omit<Props, 'translations'>) {
+  const t = useTranslations('errors');
+  return (
+    <ErrorBoundary
+      translations={{
+        title: t('errorBoundary.title'),
+        description: t('errorBoundary.description'),
+        errorDetails: t('errorBoundary.errorDetails'),
+        retry: t('errorBoundary.retry'),
+        goHome: t('errorBoundary.goHome'),
+      }}
+      {...props}
+    >
+      {children}
+    </ErrorBoundary>
+  );
 }

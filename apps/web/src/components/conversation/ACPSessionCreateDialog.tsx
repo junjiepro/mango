@@ -6,6 +6,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -39,6 +40,7 @@ export function ACPSessionCreateDialog({
   availableAgents,
   onCreateSession,
 }: ACPSessionCreateDialogProps) {
+  const t = useTranslations('conversations');
   const [selectedAgent, setSelectedAgent] = useState<ACPAgent | null>(null);
   const [envVars, setEnvVars] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -75,10 +77,10 @@ export function ACPSessionCreateDialog({
         setEnvVars(parsed);
         setJsonError(null);
       } else {
-        setJsonError('环境变量必须是一个对象');
+        setJsonError(t('acpSession.envVarsMustBeObject'));
       }
     } catch (error) {
-      setJsonError('JSON 格式错误');
+      setJsonError(t('acpSession.jsonFormatError'));
     }
   };
 
@@ -102,12 +104,12 @@ export function ACPSessionCreateDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>创建 ACP 会话</DialogTitle>
+          <DialogTitle>{t('acpSession.title')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>选择 Agent</Label>
+            <Label>{t('acpSession.selectAgent')}</Label>
             <Select
               value={selectedAgent?.name}
               onValueChange={(name) => {
@@ -117,7 +119,7 @@ export function ACPSessionCreateDialog({
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="选择一个 Agent" />
+                <SelectValue placeholder={t('acpSession.selectAgentPlaceholder')} />
               </SelectTrigger>
               <SelectContent>
                 {availableAgents.map((agent) => (
@@ -140,11 +142,11 @@ export function ACPSessionCreateDialog({
           {/* 环境变量配置 */}
           {selectedAgent && (
             <div className="space-y-2">
-              <Label>环境变量</Label>
+              <Label>{t('acpSession.envVars')}</Label>
               <Tabs value={editMode} onValueChange={(v) => setEditMode(v as 'form' | 'json')}>
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="form">表单模式</TabsTrigger>
-                  <TabsTrigger value="json">JSON 模式</TabsTrigger>
+                  <TabsTrigger value="form">{t('acpSession.formMode')}</TabsTrigger>
+                  <TabsTrigger value="json">{t('acpSession.jsonMode')}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="form" className="space-y-3 mt-3">
@@ -160,7 +162,7 @@ export function ACPSessionCreateDialog({
                         )}
                         <Input
                           type={envConfig.key.includes('KEY') || envConfig.key.includes('SECRET') ? 'password' : 'text'}
-                          placeholder={`输入 ${envConfig.key}`}
+                          placeholder={t('acpSession.inputPlaceholder', { key: envConfig.key })}
                           value={envVars[envConfig.key] || ''}
                           onChange={(e) =>
                             setEnvVars((prev) => ({
@@ -172,7 +174,7 @@ export function ACPSessionCreateDialog({
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-muted-foreground">该 Agent 没有推荐的环境变量</p>
+                    <p className="text-sm text-muted-foreground">{t('acpSession.noRecommendedEnvVars')}</p>
                   )}
                 </TabsContent>
 
@@ -187,7 +189,7 @@ export function ACPSessionCreateDialog({
                     <p className="text-sm text-destructive">{jsonError}</p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    直接编辑 JSON 格式的环境变量,支持添加自定义变量
+                    {t('acpSession.jsonEditHint')}
                   </p>
                 </TabsContent>
               </Tabs>
@@ -199,7 +201,7 @@ export function ACPSessionCreateDialog({
             disabled={!selectedAgent || loading || !!jsonError}
             className="w-full"
           >
-            {loading ? '创建中...' : '创建会话'}
+            {loading ? t('acpSession.creating') : t('acpSession.create')}
           </Button>
         </div>
       </DialogContent>

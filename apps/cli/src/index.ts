@@ -7,6 +7,10 @@ import { showVersion } from './commands/version.js';
 import { showStatus } from './commands/status.js';
 import { formatter } from './lib/formatter.js';
 import { configManager } from './lib/config.js';
+import { initLocale, t } from './i18n/index.js';
+
+// Initialize locale from environment
+initLocale();
 
 // 全局错误处理 - 防止进程崩溃
 process.on('uncaughtException', (error) => {
@@ -33,33 +37,33 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const program = new Command();
 
-program.name('mango-cli').description('Mango CLI - 智能Agent对话平台命令行工具').version('0.1.0');
+program.name('mango-cli').description(t('app.description')).version('0.1.0');
 
-// Start command - 启动设备服务
+// Start command
 program
   .command('start')
-  .description('启动设备服务并创建Cloudflare Tunnel')
-  .option('--port <port>', '本地服务端口', '3000')
-  .option('--ignore-open-bind-url', '不自动打开绑定页面')
+  .description(t('commands.start'))
+  .option('--port <port>', t('options.port'), '3000')
+  .option('--ignore-open-bind-url', t('options.ignoreOpenBind'))
   .option('--app-url <url>', 'Mango Web URL', process.env.MANGO_APP_URL)
   .option('--supabase-url <url>', 'Supabase URL', process.env.SUPABASE_URL)
   .option('--supabase-anon-key <key>', 'Supabase anon key', process.env.SUPABASE_ANON_KEY)
   .option(
     '--device-secret <secret>',
-    'Device secret (自动生成如果未提供)',
+    t('options.deviceSecret'),
     process.env.DEVICE_SECRET
   )
   .action(async (options) => {
     await startDeviceService(options);
   });
 
-// Config command - 配置管理
+// Config command
 program
   .command('config')
-  .description('管理MCP/ACP服务配置')
-  .option('--list', '列出所有配置的服务')
-  .option('--add <name>', '添加新服务')
-  .option('--remove <name>', '删除服务')
+  .description(t('commands.config'))
+  .option('--list', t('options.configList'))
+  .option('--add <name>', t('options.configAdd'))
+  .option('--remove <name>', t('options.configRemove'))
   .action((options) => {
     if (options.list) {
       const services = configManager.loadMCPServices();
@@ -88,26 +92,26 @@ program
     }
   });
 
-// Status command - 查看设备服务状态
+// Status command
 program
   .command('status')
-  .description('查看设备服务状态')
+  .description(t('commands.status'))
   .action(() => {
     showStatus();
   });
 
-// Version command - 显示版本信息
+// Version command
 program
   .command('version')
-  .description('显示版本信息')
+  .description(t('commands.version'))
   .action(() => {
     showVersion();
   });
 
-// Help command - 显示帮助信息
+// Help command
 program
   .command('help')
-  .description('显示帮助信息')
+  .description(t('commands.help'))
   .action(() => {
     showHelp();
   });

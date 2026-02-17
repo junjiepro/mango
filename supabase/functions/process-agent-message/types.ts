@@ -7,6 +7,8 @@ export interface AgentMessagePayload {
   messageId: string;
   userId: string;
   deviceId?: string | null;
+  /** 用户语言偏好 */
+  locale?: string;
   /** 续传参数 */
   continuation?: {
     /** Agent 消息 ID（续传时使用） */

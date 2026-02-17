@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,7 @@ export function FileInputDialog({
   onConfirm,
   onCancel,
 }: FileInputDialogProps) {
+  const t = useTranslations('workspace');
   const [value, setValue] = useState(defaultValue);
 
   useEffect(() => {
@@ -68,7 +70,7 @@ export function FileInputDialog({
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="name">名称</Label>
+            <Label htmlFor="name">{t('fileInputDialog.name')}</Label>
             <Input
               id="name"
               value={value}
@@ -81,10 +83,10 @@ export function FileInputDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>
-            取消
+            {t('fileInputDialog.cancel')}
           </Button>
           <Button onClick={handleConfirm} disabled={!value.trim()}>
-            确定
+            {t('fileInputDialog.confirm')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -74,7 +74,9 @@ function ConversationDetailContent() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [loadingDevices, setLoadingDevices] = useState(false);
   // 工作区应用管理状态
-  const [selectedWorkspaceMiniAppId, setSelectedWorkspaceMiniAppId] = useState<string | null>(urlMiniAppId);
+  const [selectedWorkspaceMiniAppId, setSelectedWorkspaceMiniAppId] = useState<string | null>(
+    urlMiniAppId
+  );
   // 资源预览状态
   const [previewResource, setPreviewResource] = useState<DetectedResource | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
@@ -86,9 +88,13 @@ function ConversationDetailContent() {
   const isLayoutRestoringRef = React.useRef(false);
 
   // 使用持久化的初始值
-  const [showQuickAccess, setShowQuickAccess] = useState(initialLayoutState.current.showQuickAccess);
+  const [showQuickAccess, setShowQuickAccess] = useState(
+    initialLayoutState.current.showQuickAccess
+  );
   const [showWorkspace, setShowWorkspace] = useState(initialLayoutState.current.showWorkspace);
-  const [workspacePanelSize, setWorkspacePanelSize] = useState(initialLayoutState.current.workspacePanelSize);
+  const [workspacePanelSize, setWorkspacePanelSize] = useState(
+    initialLayoutState.current.workspacePanelSize
+  );
 
   // ACP 会话管理
   const {
@@ -604,10 +610,7 @@ function ConversationDetailContent() {
             <div className="flex-shrink-0">
               <div className="bg-background p-4">
                 <div className="container mx-auto max-w-4xl">
-                  <MessageInput
-                    onSendMessage={handleSendMessage}
-                    placeholder="输入消息... (Ctrl+Enter 发送)"
-                  />
+                  <MessageInput onSendMessage={handleSendMessage} />
 
                   {showQuickAccess && resources.length > 0 && (
                     <ResourceQuickAccess
@@ -651,7 +654,9 @@ function ConversationDetailContent() {
                 sessionDeviceName={
                   devices.find((d) => d.id === session.deviceId)?.device_name || ''
                 }
-                currentDeviceName={devices.find((d) => d.id === selectedDeviceId)?.device_name || ''}
+                currentDeviceName={
+                  devices.find((d) => d.id === selectedDeviceId)?.device_name || ''
+                }
               />
             ))}
         </ChatLayout>

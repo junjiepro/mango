@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { Package, Code, RefreshCw, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -35,6 +36,7 @@ export function MiniAppManager({
   onMiniAppSelect,
   onEditWithAgent,
 }: MiniAppManagerProps) {
+  const t = useTranslations('workspace');
   const [miniApps, setMiniApps] = useState<MiniApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedApp, setSelectedApp] = useState<MiniApp | null>(null);
@@ -57,7 +59,7 @@ export function MiniAppManager({
       }
     } catch (error) {
       console.error('Failed to load mini apps:', error);
-      toast.error('加载失败');
+      toast.error(t('miniAppManager.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -136,7 +138,7 @@ export function MiniAppManager({
             <h3 className="font-medium text-sm truncate">{app.display_name}</h3>
             {!isAppOwner && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
-                已安装
+                {t('miniAppManager.installed')}
               </span>
             )}
           </div>
@@ -153,7 +155,7 @@ export function MiniAppManager({
       {/* 列表 */}
       <div className="flex-1 flex flex-col min-h-0">
         <div className="p-3 border-b flex items-center justify-between shrink-0">
-          <h3 className="font-medium text-sm">我的应用</h3>
+          <h3 className="font-medium text-sm">{t('miniAppManager.myApps')}</h3>
           <Button
             variant="ghost"
             size="icon"
@@ -180,7 +182,7 @@ export function MiniAppManager({
               </>
             ) : miniApps.length === 0 ? (
               <div className="p-4 text-center text-muted-foreground text-sm">
-                暂无应用
+                {t('miniAppManager.noApps')}
               </div>
             ) : (
               miniApps.map(renderAppItem)
@@ -232,7 +234,7 @@ export function MiniAppManager({
                   onClick={() => onEditWithAgent?.(selectedApp.id)}
                 >
                   <Code className="h-3 w-3 mr-1" />
-                  查看
+                  {t('miniAppManager.view')}
                 </Button>
               )}
               <Button
@@ -250,7 +252,7 @@ export function MiniAppManager({
           {versions.length > 0 && (
             <ScrollArea className="flex-1">
               <div className="p-3 space-y-2">
-                <h3 className="font-medium text-xs text-muted-foreground">版本历史</h3>
+                <h3 className="font-medium text-xs text-muted-foreground">{t('miniAppManager.versionHistory')}</h3>
                 {versions.slice(0, 5).map((v) => (
                   <div
                     key={v.version}

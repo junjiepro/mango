@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ import { logger } from '@mango/shared/utils'
  * 忘记密码页面 - 请求重置
  */
 export default function ResetPasswordPage() {
+  const t = useTranslations('auth.resetPassword')
   const supabase = createClient()
 
   const [email, setEmail] = useState('')
@@ -28,14 +30,14 @@ export default function ResetPasswordPage() {
     e.preventDefault()
 
     if (!email) {
-      toast.error('请输入您的邮箱地址')
+      toast.error(t('enterEmail'))
       return
     }
 
     // 验证邮箱格式
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      toast.error('请输入有效的邮箱地址')
+      toast.error(t('invalidEmail'))
       return
     }
 
@@ -54,14 +56,14 @@ export default function ResetPasswordPage() {
 
       setIsEmailSent(true)
 
-      toast.success('邮件已发送', {
-        description: '请检查您的邮箱，点击链接重置密码',
+      toast.success(t('emailSent'), {
+        description: t('checkEmailForLink'),
       })
     } catch (error: any) {
       logger.error('Password reset request failed', error)
 
-      toast.error('发送失败', {
-        description: error.message || '请稍后重试',
+      toast.error(t('sendFailed'), {
+        description: error.message || t('retryLater'),
       })
     } finally {
       setIsLoading(false)
@@ -88,30 +90,30 @@ export default function ResetPasswordPage() {
                 />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold">检查您的邮箱</h1>
+            <h1 className="text-2xl font-bold">{t('checkYourEmail')}</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              我们已向 <span className="font-medium text-foreground">{email}</span> 发送了密码重置链接
+              {t('sentResetLinkTo')} <span className="font-medium text-foreground">{email}</span>
             </p>
           </div>
 
           <div className="space-y-4">
             <div className="rounded-lg bg-muted p-4 text-sm">
-              <p className="mb-2 font-medium">接下来的步骤：</p>
+              <p className="mb-2 font-medium">{t('nextSteps')}</p>
               <ol className="list-inside list-decimal space-y-1 text-muted-foreground">
-                <li>打开您的邮箱</li>
-                <li>查找来自 Mango 的邮件</li>
-                <li>点击邮件中的重置密码链接</li>
-                <li>设置您的新密码</li>
+                <li>{t('step1')}</li>
+                <li>{t('step2')}</li>
+                <li>{t('step3')}</li>
+                <li>{t('step4')}</li>
               </ol>
             </div>
 
             <div className="text-center text-sm text-muted-foreground">
-              <p>没有收到邮件？</p>
+              <p>{t('noEmailReceived')}</p>
               <button
                 onClick={() => setIsEmailSent(false)}
                 className="mt-1 font-medium text-primary hover:underline"
               >
-                重新发送
+                {t('resend')}
               </button>
             </div>
           </div>
@@ -121,7 +123,7 @@ export default function ResetPasswordPage() {
               href="/auth/login"
               className="text-sm text-muted-foreground hover:text-foreground hover:underline"
             >
-              返回登录
+              {t('backToLogin')}
             </Link>
           </div>
         </div>
@@ -133,16 +135,16 @@ export default function ResetPasswordPage() {
     <CenteredLayout maxWidth="sm">
       <div className="rounded-lg border bg-card p-8 shadow-lg">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold">重置密码</h1>
+          <h1 className="text-2xl font-bold">{t('title')}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            输入您的邮箱地址，我们将发送重置密码的链接
+            {t('subtitle')}
           </p>
         </div>
 
         <form onSubmit={handleResetPassword} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium">
-              邮箱地址
+              {t('emailLabel')}
             </label>
             <Input
               id="email"
@@ -161,17 +163,17 @@ export default function ResetPasswordPage() {
             className="w-full"
             disabled={isLoading}
           >
-            {isLoading ? '发送中...' : '发送重置链接'}
+            {isLoading ? t('sending') : t('sendResetLink')}
           </Button>
         </form>
 
         <div className="mt-6 text-center text-sm">
-          <span className="text-muted-foreground">记起密码了? </span>
+          <span className="text-muted-foreground">{t('rememberPassword')} </span>
           <Link
             href="/auth/login"
             className="font-medium text-primary hover:underline"
           >
-            返回登录
+            {t('backToLogin')}
           </Link>
         </div>
       </div>

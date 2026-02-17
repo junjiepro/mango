@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ export function FeedbackDialog({
   feedbackType,
   onSubmit,
 }: FeedbackDialogProps) {
+  const t = useTranslations('feedback');
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -65,7 +67,7 @@ export function FeedbackDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {rating === 'positive' ? '感谢您的好评！' : '感谢您的反馈'}
+            {rating === 'positive' ? t('dialog.thankYou') : t('dialog.thankYouFeedback')}
           </DialogTitle>
         </DialogHeader>
 
@@ -73,8 +75,8 @@ export function FeedbackDialog({
           <Textarea
             placeholder={
               rating === 'positive'
-                ? '告诉我们哪里做得好...'
-                : '告诉我们如何改进...'
+                ? t('dialog.tellUsGood')
+                : t('dialog.tellUsImprove')
             }
             value={comment}
             onChange={(e) => setComment(e.target.value)}
@@ -84,10 +86,10 @@ export function FeedbackDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            取消
+            {t('dialog.cancel')}
           </Button>
           <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? '提交中...' : '提交'}
+            {submitting ? t('dialog.submitting') : t('dialog.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Plus, MessageSquare } from 'lucide-react';
 import {
   Dialog,
@@ -39,6 +40,7 @@ export function EditWithAgentDialog({
   miniAppId,
   miniAppName,
 }: EditWithAgentDialogProps) {
+  const t = useTranslations('miniapps');
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -75,7 +77,7 @@ export function EditWithAgentDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `使用 ${miniAppName}`,
+          title: t('useWithAgent', { name: miniAppName }),
         }),
       });
 
@@ -84,11 +86,11 @@ export function EditWithAgentDialog({
       if (result.success && result.data?.id) {
         navigateToConversation(result.data.id);
       } else {
-        toast.error('创建会话失败');
+        toast.error(t('createSessionFailed'));
       }
     } catch (error) {
       console.error('Failed to create conversation:', error);
-      toast.error('创建会话失败');
+      toast.error(t('createSessionFailed'));
     } finally {
       setCreating(false);
     }
@@ -112,7 +114,7 @@ export function EditWithAgentDialog({
         <DialogHeader>
           <DialogTitle>Chat with Agent</DialogTitle>
           <DialogDescription>
-            选择一个会话来使用 "{miniAppName}"
+            {t('selectSessionForApp', { name: miniAppName })}
           </DialogDescription>
         </DialogHeader>
 
@@ -127,10 +129,10 @@ export function EditWithAgentDialog({
             <Plus className="h-5 w-5 mr-3" />
             <div className="text-left">
               <div className="font-medium">
-                {creating ? '创建中...' : '新建会话'}
+                {creating ? t('creating') : t('newSession')}
               </div>
               <div className="text-xs text-muted-foreground">
-                创建一个新会话来使用此应用
+                {t('createSessionHint')}
               </div>
             </div>
           </Button>
@@ -142,7 +144,7 @@ export function EditWithAgentDialog({
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                或选择已有会话
+                {t('orSelectExisting')}
               </span>
             </div>
           </div>
@@ -163,7 +165,7 @@ export function EditWithAgentDialog({
               </div>
             ) : conversations.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
-                暂无会话记录
+                {t('noSessions')}
               </div>
             ) : (
               <div className="space-y-1">
@@ -178,7 +180,7 @@ export function EditWithAgentDialog({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">
-                        {conv.title || '未命名会话'}
+                        {conv.title || t('unnamedSession')}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {new Date(conv.updated_at).toLocaleDateString()}

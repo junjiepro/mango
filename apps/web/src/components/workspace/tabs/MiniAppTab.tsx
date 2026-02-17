@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { Package, History, Plus } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,7 @@ export function MiniAppTab({
   onMiniAppClick,
   onCreateNew,
 }: MiniAppTabProps) {
+  const t = useTranslations('workspace');
   const [miniApps, setMiniApps] = useState<MiniApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedApp, setSelectedApp] = useState<MiniApp | null>(null);
@@ -104,8 +106,8 @@ export function MiniAppTab({
         <div className="text-gray-400 mb-2">
           <Package className="w-16 h-16 mx-auto" strokeWidth={1.5} />
         </div>
-        <p className="text-sm text-gray-500">暂无应用</p>
-        <p className="text-xs text-gray-400 mt-1">创建的小应用会显示在这里</p>
+        <p className="text-sm text-gray-500">{t('miniAppTab.noApps')}</p>
+        <p className="text-xs text-gray-400 mt-1">{t('miniAppTab.noAppsHint')}</p>
         <Button
           variant="outline"
           size="sm"
@@ -113,7 +115,7 @@ export function MiniAppTab({
           onClick={onCreateNew}
         >
           <Plus className="h-4 w-4 mr-1" />
-          新建应用
+          {t('miniAppTab.newApp')}
         </Button>
       </div>
     );
@@ -147,7 +149,7 @@ export function MiniAppTab({
           onClick={onCreateNew}
         >
           <Plus className="h-4 w-4" />
-          新建应用
+          {t('miniAppTab.newApp')}
         </Button>
 
         {miniApps.map((app) => {
@@ -187,7 +189,7 @@ export function MiniAppTab({
                 <div className="ml-10 mt-1 mb-2 space-y-1">
                   <div className="flex items-center gap-1 text-xs text-muted-foreground px-2">
                     <History className="h-3 w-3" />
-                    <span>版本历史</span>
+                    <span>{t('miniAppTab.versionHistory')}</span>
                   </div>
                   {versions.slice(0, 3).map((v) => (
                     <div

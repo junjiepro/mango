@@ -6,6 +6,7 @@
 'use client'
 
 import React, { useState, useRef, KeyboardEvent } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { logger } from '@mango/shared/utils'
 import { uploadFiles, type UploadResult } from '@/lib/storage/upload'
@@ -42,9 +43,10 @@ interface MessageInputProps {
 export function MessageInput({
   onSendMessage,
   disabled = false,
-  placeholder = '输入消息...',
+  placeholder,
   className = '',
 }: MessageInputProps) {
+  const t = useTranslations('conversations')
   const [content, setContent] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
   const [selectedMiniApp, setSelectedMiniApp] = useState<{ miniApp: MiniApp; installation: MiniAppInstallation } | null>(null)
@@ -124,7 +126,7 @@ export function MessageInput({
         })
 
         if (uploadResults.length === 0) {
-          throw new Error('所有文件上传失败')
+          throw new Error(t('allUploadFailed'))
         }
 
         if (uploadResults.length < attachments.length) {
@@ -133,7 +135,7 @@ export function MessageInput({
             successful: uploadResults.length,
           })
           setUploadError(
-            `部分文件上传失败 (${uploadResults.length}/${attachments.length})`
+            t('partialUploadFailed', { success: uploadResults.length, total: attachments.length })
           )
         }
 
@@ -173,7 +175,7 @@ export function MessageInput({
         textareaRef.current.style.height = 'auto'
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '发送失败'
+      const errorMessage = err instanceof Error ? err.message : t('sendFailed')
       logger.error('Failed to send message', err as Error)
       setUploadError(errorMessage)
     } finally {
@@ -210,7 +212,7 @@ export function MessageInput({
                 </div>
               )}
               <span className="text-sm font-medium">
-                将调用: {selectedMiniApp.miniApp.display_name}
+                {t('willInvoke', { name: selectedMiniApp.miniApp.display_name })}
               </span>
             </div>
             <button
@@ -245,7 +247,7 @@ export function MessageInput({
           value={content}
           onChange={handleContentChange}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={placeholder || t('inputPlaceholder')}
           disabled={disabled || isSending}
           className="flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
           rows={1}
@@ -277,7 +279,7 @@ export function MessageInput({
             size="sm"
             className="h-8"
           >
-            {isSending ? '发送中...' : '发送'}
+            {isSending ? t('sending') : t('send')}
           </Button>
         </div>
       </div>
@@ -288,7 +290,7 @@ export function MessageInput({
         {isSending && uploadProgress > 0 && uploadProgress < 100 && (
           <div className="mb-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-              <span>正在上传: {uploadingFileName}</span>
+              <span>{t('uploading', { name: uploadingFileName })}</span>
               <span>{Math.round(uploadProgress)}%</span>
             </div>
             <div className="h-1 bg-muted rounded-full overflow-hidden">
@@ -317,7 +319,7 @@ export function MessageInput({
 
         {/* 提示文本 */}
         <div className="text-xs text-muted-foreground">
-          按 Ctrl+Enter 发送消息 • 支持图片、PDF、Word、文本文件(最大 10MB)
+          {t('inputHint')}
         </div>
       </div>
     </div>

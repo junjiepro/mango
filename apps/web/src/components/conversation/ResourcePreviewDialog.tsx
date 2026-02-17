@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Dialog,
   DialogContent,
@@ -57,6 +58,7 @@ export function ResourcePreviewDialog({
 }: ResourcePreviewDialogProps) {
   const [viewMode, setViewMode] = useState<'preview' | 'source'>('preview');
   const [copied, setCopied] = useState(false);
+  const t = useTranslations('conversations');
 
   if (!resource) return null;
 
@@ -64,12 +66,12 @@ export function ResourcePreviewDialog({
   const getResourceTitle = () => {
     if (resource.metadata?.filename) return resource.metadata.filename;
     if (resource.metadata?.title) return resource.metadata.title;
-    if (resource.type === 'image') return '图片预览';
-    if (resource.type === 'link') return '链接预览';
-    if (resource.type === 'miniapp') return resource.metadata?.name || '小应用';
-    if (resource.type === 'html') return 'HTML 预览';
-    if (resource.metadata?.isA2UI) return 'A2UI 组件';
-    return '资源预览';
+    if (resource.type === 'image') return t('resourcePreview.imagePreview');
+    if (resource.type === 'link') return t('resourcePreview.linkPreview');
+    if (resource.type === 'miniapp') return resource.metadata?.name || t('resourcePreview.miniApp');
+    if (resource.type === 'html') return t('resourcePreview.htmlPreview');
+    if (resource.metadata?.isA2UI) return t('resourcePreview.a2uiComponent');
+    return t('resourcePreview.resourcePreview');
   };
 
   // 复制源码到剪贴板
@@ -150,7 +152,7 @@ export function ResourcePreviewDialog({
               className="h-8 px-3"
             >
               <EyeIcon className="size-4 mr-1" />
-              预览
+              {t('resourcePreview.preview')}
             </Button>
             <Button
               size="sm"
@@ -159,7 +161,7 @@ export function ResourcePreviewDialog({
               className="h-8 px-3"
             >
               <CodeIcon className="size-4 mr-1" />
-              源码
+              {t('resourcePreview.source')}
             </Button>
           </div>
 
@@ -170,7 +172,7 @@ export function ResourcePreviewDialog({
                 src={previewUrl}
                 className="w-full h-full border-0"
                 sandbox="allow-scripts allow-same-origin allow-forms"
-                title="HTML 预览"
+                title={t('resourcePreview.htmlPreview')}
               />
             </div>
           ) : (
@@ -180,7 +182,7 @@ export function ResourcePreviewDialog({
                 variant="ghost"
                 onClick={handleCopy}
                 className="absolute top-2 right-2 h-8 w-8 p-0"
-                title={copied ? '已复制' : '复制源码'}
+                title={copied ? t('resourcePreview.copied') : t('resourcePreview.copySource')}
               >
                 {copied ? (
                   <CheckIcon className="size-4 text-green-500" />
@@ -210,7 +212,7 @@ export function ResourcePreviewDialog({
               className="h-8 px-3"
             >
               <EyeIcon className="size-4 mr-1" />
-              预览
+              {t('resourcePreview.preview')}
             </Button>
             <Button
               size="sm"
@@ -219,7 +221,7 @@ export function ResourcePreviewDialog({
               className="h-8 px-3"
             >
               <CodeIcon className="size-4 mr-1" />
-              信息
+              {t('resourcePreview.info')}
             </Button>
             <div className="flex-1" />
             <Button
@@ -229,7 +231,7 @@ export function ResourcePreviewDialog({
               className="h-8 px-3"
             >
               <ExternalLinkIcon className="size-4 mr-1" />
-              在新窗口打开
+              {t('resourcePreview.openInNewWindow')}
             </Button>
           </div>
 
@@ -240,14 +242,14 @@ export function ResourcePreviewDialog({
                 src={resource.metadata.url}
                 className="w-full h-full border-0"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                title={resource.metadata.title || '链接预览'}
+                title={resource.metadata.title || t('resourcePreview.linkPreview')}
               />
             </div>
           ) : (
             <div className="flex-1 overflow-auto p-6">
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-1">链接地址</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('resourcePreview.linkUrl')}</h3>
                   <a
                     href={resource.metadata.url}
                     target="_blank"
@@ -259,13 +261,13 @@ export function ResourcePreviewDialog({
                 </div>
                 {resource.metadata.domain && (
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-1">域名</h3>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('resourcePreview.domain')}</h3>
                     <p className="text-sm">{resource.metadata.domain}</p>
                   </div>
                 )}
                 {resource.metadata.description && (
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-1">描述</h3>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('resourcePreview.description')}</h3>
                     <p className="text-sm">{resource.metadata.description}</p>
                   </div>
                 )}

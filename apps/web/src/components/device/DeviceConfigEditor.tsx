@@ -6,6 +6,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +39,7 @@ export function DeviceConfigEditor({
   onlineUrls,
   onUpdate,
 }: DeviceConfigEditorProps) {
+  const t = useTranslations('devices');
   // 构建设备对象供 useDeviceClient 使用
   const device = {
     id: deviceId,
@@ -90,7 +92,7 @@ export function DeviceConfigEditor({
     try {
       JSON.parse(value);
     } catch (err) {
-      setJsonError('Invalid JSON format');
+      setJsonError(t('invalidJsonFormat'));
     }
   };
 
@@ -108,7 +110,7 @@ export function DeviceConfigEditor({
         try {
           parsedConfig = JSON.parse(configJson);
         } catch (err) {
-          throw new Error('Invalid JSON format');
+          throw new Error(t('invalidJsonFormat'));
         }
       }
 
@@ -131,7 +133,7 @@ export function DeviceConfigEditor({
         });
 
         if (!nameResponse.ok) {
-          throw new Error('Failed to update device name');
+          throw new Error(t('failedUpdateName'));
         }
       }
 
@@ -163,22 +165,22 @@ export function DeviceConfigEditor({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">设备配置</CardTitle>
-        <CardDescription>编辑设备的基本信息和配置</CardDescription>
+        <CardTitle className="text-lg">{t('config.title')}</CardTitle>
+        <CardDescription>{t('config.description')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="binding-name">绑定名称</Label>
+          <Label htmlFor="binding-name">{t('bindingName')}</Label>
           <Input
             id="binding-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="输入设备绑定名称"
+            placeholder={t('bindingNamePlaceholder')}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="config-json">配置 (JSON)</Label>
+          <Label htmlFor="config-json">{t('config.configJson')}</Label>
           <Textarea
             id="config-json"
             value={configJson}
@@ -202,7 +204,7 @@ export function DeviceConfigEditor({
 
         {success && (
           <Alert className="bg-green-50 text-green-900 border-green-200">
-            <AlertDescription>配置已成功保存</AlertDescription>
+            <AlertDescription>{t('config.saveSuccess')}</AlertDescription>
           </Alert>
         )}
 
@@ -210,12 +212,12 @@ export function DeviceConfigEditor({
           {isSaving ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              保存中...
+              {t('config.saving')}
             </>
           ) : (
             <>
               <Save className="mr-2 h-4 w-4" />
-              保存配置
+              {t('config.save')}
             </>
           )}
         </Button>

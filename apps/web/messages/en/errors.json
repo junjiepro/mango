@@ -1,0 +1,42 @@
+{
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "description": "The application encountered an error. We've logged this issue.",
+    "errorDetails": "Error details:",
+    "retry": "Retry",
+    "goHome": "Go to Home"
+  },
+  "auth": {
+    "unauthorized": "Unauthorized. Please log in",
+    "forbidden": "Access denied",
+    "sessionExpired": "Session expired. Please log in again",
+    "invalidCredentials": "Invalid email or password"
+  },
+  "validation": {
+    "failed": "Validation failed",
+    "requiredField": "Required field is missing",
+    "invalidFormat": "Invalid format"
+  },
+  "resource": {
+    "notFound": "Resource not found",
+    "alreadyExists": "Resource already exists",
+    "conflict": "Resource conflict"
+  },
+  "business": {
+    "logicError": "Business logic error",
+    "quotaExceeded": "Quota exceeded",
+    "rateLimitExceeded": "Too many requests. Please try again later"
+  },
+  "system": {
+    "internalError": "Internal server error",
+    "databaseError": "Database error",
+    "networkError": "Network error",
+    "timeoutError": "Request timed out"
+  },
+  "external": {
+    "serviceError": "External service error",
+    "mcpServiceError": "MCP service error",
+    "miniappError": "Mini app error"
+  },
+  "unknown": "Unknown error"
+}

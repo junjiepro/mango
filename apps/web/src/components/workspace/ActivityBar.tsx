@@ -7,6 +7,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
   FileText,
@@ -30,17 +31,18 @@ interface ActivityBarProps {
 const activityItems: Array<{
   id: ActivityBarItem;
   icon: React.ComponentType<{ className?: string }>;
-  label: string;
+  labelKey: string;
 }> = [
-  { id: 'resources', icon: FileText, label: '会话资源' },
-  { id: 'devices', icon: Laptop, label: '设备管理' },
-  { id: 'files', icon: FolderTree, label: '文件浏览器' },
-  { id: 'git', icon: GitBranch, label: '源代码管理' },
-  { id: 'terminal', icon: TerminalIcon, label: '终端' },
-  { id: 'apps', icon: Package, label: '应用管理' },
+  { id: 'resources', icon: FileText, labelKey: 'activityBar.sessionResources' },
+  { id: 'devices', icon: Laptop, labelKey: 'activityBar.deviceManager' },
+  { id: 'files', icon: FolderTree, labelKey: 'activityBar.fileExplorer' },
+  { id: 'git', icon: GitBranch, labelKey: 'activityBar.sourceControl' },
+  { id: 'terminal', icon: TerminalIcon, labelKey: 'activityBar.terminal' },
+  { id: 'apps', icon: Package, labelKey: 'activityBar.appManager' },
 ];
 
 export function ActivityBar({ activeItem, onItemClick, className = '' }: ActivityBarProps) {
+  const t = useTranslations('workspace');
   return (
     <div className={`flex flex-col w-12 bg-muted/40 ${className}`}>
       <TooltipProvider delayDuration={300}>
@@ -70,7 +72,7 @@ export function ActivityBar({ activeItem, onItemClick, className = '' }: Activit
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  <p>{item.label}</p>
+                  <p>{t(item.labelKey)}</p>
                 </TooltipContent>
               </Tooltip>
             );
@@ -95,7 +97,7 @@ export function ActivityBar({ activeItem, onItemClick, className = '' }: Activit
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>设置</p>
+              <p>{t('activityBar.settings')}</p>
             </TooltipContent>
           </Tooltip>
         </div>

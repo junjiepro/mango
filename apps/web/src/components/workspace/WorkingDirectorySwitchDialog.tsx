@@ -7,6 +7,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { FolderOpen, ArrowRight } from 'lucide-react';
 import {
   AlertDialog,
@@ -38,32 +39,34 @@ export function WorkingDirectorySwitchDialog({
   onConfirm,
   onCancel,
 }: WorkingDirectorySwitchDialogProps) {
+  const t = useTranslations('workspace');
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="max-w-lg">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <FolderOpen className="h-5 w-5" />
-            工作目录不一致
+            {t('workingDir.mismatch')}
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-3">
               <p>
-                您正在切换到的会话 <strong>{sessionName}</strong> 使用了不同的工作目录。
+                {t('workingDir.switchingSession', { name: sessionName })}
               </p>
 
               <div className="bg-muted rounded-lg p-3 space-y-2 text-sm">
                 <div className="flex items-start gap-2">
-                  <span className="text-muted-foreground shrink-0">当前目录：</span>
+                  <span className="text-muted-foreground shrink-0">{t('workingDir.currentDir')}</span>
                   <span className="font-mono text-xs break-all">
-                    {currentDirectory || '未设置'}
+                    {currentDirectory || t('workingDir.notSet')}
                   </span>
                 </div>
                 <div className="flex justify-center">
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-muted-foreground shrink-0">会话目录：</span>
+                  <span className="text-muted-foreground shrink-0">{t('workingDir.sessionDir')}</span>
                   <span className="font-mono text-xs break-all text-primary">
                     {targetDirectory}
                   </span>
@@ -71,17 +74,17 @@ export function WorkingDirectorySwitchDialog({
               </div>
 
               <p className="text-sm">
-                是否将工作区目录切换到会话的工作目录？
+                {t('workingDir.switchConfirm')}
               </p>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel}>
-            保持当前目录
+            {t('workingDir.keepCurrent')}
           </AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm}>
-            切换到会话目录
+            {t('workingDir.switchToSession')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

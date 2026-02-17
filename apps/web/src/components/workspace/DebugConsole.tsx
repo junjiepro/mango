@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { Trash2, Search, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,7 @@ interface DebugConsoleProps {
 }
 
 export function DebugConsole({ entries, onClear, onSendToAgent }: DebugConsoleProps) {
+  const t = useTranslations('workspace');
   const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState<LogLevel>('all');
   const [search, setSearch] = useState('');
@@ -116,7 +118,7 @@ export function DebugConsole({ entries, onClear, onSendToAgent }: DebugConsolePr
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
                 )}
               >
-                {level === 'all' ? '全部' : level}
+                {level === 'all' ? t('debugConsole.all') : level}
               </button>
             ))}
 
@@ -128,7 +130,7 @@ export function DebugConsole({ entries, onClear, onSendToAgent }: DebugConsolePr
               <Input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="搜索..."
+                placeholder={t('debugConsole.search')}
                 className="h-5 pl-5 pr-1.5 text-[10px] bg-background"
               />
             </div>
@@ -140,10 +142,10 @@ export function DebugConsole({ entries, onClear, onSendToAgent }: DebugConsolePr
                 size="sm"
                 className="h-5 px-1.5 text-[10px] gap-0.5"
                 onClick={handleSendErrors}
-                title="将错误日志发送给 Agent 分析"
+                title={t('debugConsole.sendToAgent')}
               >
                 <Send className="h-3 w-3" />
-                发送给 Agent
+                {t('debugConsole.sendToAgentLabel')}
               </Button>
             )}
 
@@ -153,7 +155,7 @@ export function DebugConsole({ entries, onClear, onSendToAgent }: DebugConsolePr
               size="sm"
               className="h-5 px-1.5"
               onClick={onClear}
-              title="清空日志"
+              title={t('debugConsole.clearLogs')}
             >
               <Trash2 className="h-3 w-3" />
             </Button>
@@ -172,7 +174,7 @@ export function DebugConsole({ entries, onClear, onSendToAgent }: DebugConsolePr
             <div className="p-1 space-y-px font-mono text-xs">
               {filtered.length === 0 ? (
                 <p className="text-muted-foreground text-center py-4 text-[11px]">
-                  {entries.length === 0 ? '暂无日志' : '无匹配日志'}
+                  {entries.length === 0 ? t('debugConsole.noLogs') : t('debugConsole.noMatch')}
                 </p>
               ) : (
                 filtered.map((entry, i) => (

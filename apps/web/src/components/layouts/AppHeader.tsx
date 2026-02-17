@@ -8,8 +8,10 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import type { User } from '@supabase/supabase-js';
 import { Bot, UserIcon, Laptop } from 'lucide-react';
 
@@ -24,6 +26,7 @@ interface AppHeaderProps {
 export function AppHeader({ className = '' }: AppHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const t = useTranslations('common');
   const supabase = createClient();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,7 +82,7 @@ export function AppHeader({ className = '' }: AppHeaderProps) {
               <Link href="/conversations">
                 <Button variant={isActive('/conversations') ? 'secondary' : 'ghost'} size="sm">
                   <Bot className="h-4 w-4" />
-                  对话
+                  {t('nav.conversations')}
                 </Button>
               </Link>
               <Link href="/miniapps">
@@ -96,19 +99,19 @@ export function AppHeader({ className = '' }: AppHeaderProps) {
                       d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
                     />
                   </svg>
-                  小应用
+                  {t('nav.miniapps')}
                 </Button>
               </Link>
               <Link href="/settings/devices">
                 <Button variant={isActive('/settings/devices') ? 'secondary' : 'ghost'} size="sm">
                   <Laptop className="h-4 w-4" />
-                  设备管理
+                  {t('nav.devices')}
                 </Button>
               </Link>
               <Link href="/profile">
                 <Button variant={isActive('/profile') ? 'secondary' : 'ghost'} size="sm">
                   <UserIcon className="h-4 w-4" />
-                  个人信息
+                  {t('nav.profile')}
                 </Button>
               </Link>
             </nav>
@@ -122,19 +125,21 @@ export function AppHeader({ className = '' }: AppHeaderProps) {
           ) : user ? (
             <>
               <span className="hidden sm:inline text-sm text-muted-foreground">{user.email}</span>
+              <LanguageSwitcher />
               <Button variant="outline" size="sm" onClick={handleLogout}>
-                登出
+                {t('actions.logout')}
               </Button>
             </>
           ) : (
             <>
+              <LanguageSwitcher />
               <Link href="/auth/login">
                 <Button variant="ghost" size="sm">
-                  登录
+                  {t('actions.login')}
                 </Button>
               </Link>
               <Link href="/auth/signup">
-                <Button size="sm">注册</Button>
+                <Button size="sm">{t('actions.signup')}</Button>
               </Link>
             </>
           )}

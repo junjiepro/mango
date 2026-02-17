@@ -7,6 +7,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { AppHeader } from '@/components/layouts/AppHeader';
 import { MiniAppList } from '@/components/miniapp/MiniAppList';
 import { EditWithAgentDialog } from '@/components/miniapp/EditWithAgentDialog';
@@ -30,6 +31,8 @@ import type { Database } from '@/types/database.types';
 type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
 
 export default function MiniAppsPage() {
+  const t = useTranslations('miniapps');
+  const tc = useTranslations('common');
   const router = useRouter();
   const [miniApps, setMiniApps] = useState<MiniApp[]>([]);
   const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
@@ -142,8 +145,8 @@ export default function MiniAppsPage() {
       }
     } catch (error) {
       console.error('Failed to load mini apps:', error);
-      toast.error('加载失败', {
-        description: '无法加载小应用列表，请稍后重试',
+      toast.error(t('loadFailed'), {
+        description: t('loadFailedDesc'),
       });
     } finally {
       setLoading(false);
@@ -176,19 +179,19 @@ export default function MiniAppsPage() {
 
       if (result.success) {
         setInstalledIds((prev) => new Set(prev).add(miniApp.id));
-        toast.success('安装成功', {
-          description: `${miniApp.display_name} 已成功安装`,
+        toast.success(t('installSuccess'), {
+          description: t('installSuccessDesc', { name: miniApp.display_name }),
         });
         loadMiniApps();
       } else {
-        toast.error('安装失败', {
-          description: result.error || '安装小应用时出现错误',
+        toast.error(t('installFailed'), {
+          description: result.error || t('installFailedDesc'),
         });
       }
     } catch (error) {
       console.error('Failed to install mini app:', error);
-      toast.error('安装失败', {
-        description: '无法安装小应用，请稍后重试',
+      toast.error(t('installFailed'), {
+        description: t('installFailedRetry'),
       });
     }
   };
@@ -238,21 +241,21 @@ export default function MiniAppsPage() {
         loadMiniApps();
 
         const message = clearData
-          ? '小应用已卸载，所有数据已清空'
-          : '小应用已卸载，数据已保留（重新安装时可恢复）';
+          ? t('uninstallSuccessCleared')
+          : t('uninstallSuccessKept');
 
-        toast.success('卸载成功', {
+        toast.success(t('uninstallSuccess'), {
           description: message,
         });
       } else {
-        toast.error('卸载失败', {
-          description: result.error || '卸载小应用时出现错误',
+        toast.error(t('uninstallFailed'), {
+          description: result.error || t('uninstallFailedDesc'),
         });
       }
     } catch (error) {
       console.error('Failed to uninstall mini app:', error);
-      toast.error('卸载失败', {
-        description: '无法卸载小应用，请稍后重试',
+      toast.error(t('uninstallFailed'), {
+        description: t('uninstallFailedRetry'),
       });
     } finally {
       // 关闭对话框
@@ -279,18 +282,18 @@ export default function MiniAppsPage() {
       if (result.success) {
         const shareUrl = `${window.location.origin}/miniapps/import/${result.data.shareToken}`;
         await navigator.clipboard.writeText(shareUrl);
-        toast.success('分享链接已复制', {
-          description: '分享链接已复制到剪贴板',
+        toast.success(t('shareLinkCopied'), {
+          description: t('shareLinkCopiedDesc'),
         });
       } else {
-        toast.error('生成分享链接失败', {
-          description: result.error || '生成分享链接时出现错误',
+        toast.error(t('shareGenFailed'), {
+          description: result.error || t('shareGenFailedDesc'),
         });
       }
     } catch (error) {
       console.error('Failed to share mini app:', error);
-      toast.error('分享失败', {
-        description: '无法生成分享链接，请稍后重试',
+      toast.error(t('shareFailed'), {
+        description: t('shareFailedRetry'),
       });
     }
   };
@@ -306,9 +309,9 @@ export default function MiniAppsPage() {
       <div className="container mx-auto py-8 px-4">
         {/* 页面标题 */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">Mini Apps</h1>
+          <h1 className="text-3xl font-bold">{t('page.title')}</h1>
           <p className="text-muted-foreground mt-2">
-            Discover and install mini apps to enhance your experience
+            {t('page.description')}
           </p>
         </div>
 
@@ -317,7 +320,7 @@ export default function MiniAppsPage() {
           <div className="flex-1">
             <Input
               type="search"
-              placeholder="Search mini apps..."
+              placeholder={t('page.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full"
@@ -329,20 +332,20 @@ export default function MiniAppsPage() {
               variant={viewMode === 'public' ? 'default' : 'outline'}
               onClick={() => setViewMode('public')}
             >
-              Discover
+              {t('page.discover')}
             </Button>
             <Button
               variant={viewMode === 'installed' ? 'default' : 'outline'}
               onClick={() => setViewMode('installed')}
             >
-              My Apps
+              {t('page.myApps')}
             </Button>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => loadMiniApps()}
               disabled={loading}
-              title="刷新列表"
+              title={t('refreshList')}
             >
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             </Button>
@@ -379,41 +382,41 @@ export default function MiniAppsPage() {
           {uninstallDialog.step === 'confirm' ? (
             <>
               <AlertDialogHeader>
-                <AlertDialogTitle>确认卸载</AlertDialogTitle>
+                <AlertDialogTitle>{t('confirmUninstall')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  确定要卸载 "{uninstallDialog.miniApp?.display_name}" 吗？
+                  {t('confirmUninstallDesc', { name: uninstallDialog.miniApp?.display_name })}
                   <br />
                   <br />
-                  卸载后可以重新安装，数据可以选择保留或清空。
+                  {t('uninstallNote')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>取消</AlertDialogCancel>
-                <AlertDialogAction onClick={confirmUninstall}>继续</AlertDialogAction>
+                <AlertDialogCancel>{tc('actions.cancel')}</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmUninstall}>{tc('actions.continue')}</AlertDialogAction>
               </AlertDialogFooter>
             </>
           ) : (
             <>
               <AlertDialogHeader>
-                <AlertDialogTitle>数据处理</AlertDialogTitle>
+                <AlertDialogTitle>{t('dataHandling')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  是否同时清空 "{uninstallDialog.miniApp?.display_name}" 的所有数据？
+                  {t('dataHandlingDesc', { name: uninstallDialog.miniApp?.display_name })}
                   <br />
                   <br />
-                  <strong>清空数据：</strong>所有数据将被永久删除，无法恢复
+                  <strong>{t('clearDataWarning')}</strong>{t('clearDataDesc')}
                   <br />
-                  <strong>保留数据：</strong>重新安装时可以恢复数据
+                  <strong>{t('keepDataNote')}</strong>{t('keepDataDesc')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel onClick={() => executeUninstall(false)}>
-                  保留数据
+                  {t('keepData')}
                 </AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => executeUninstall(true)}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  清空数据
+                  {t('clearData')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </>

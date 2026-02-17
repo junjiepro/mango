@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -20,6 +21,7 @@ interface ExtensionSkillManagerProps {
 }
 
 export function ExtensionSkillManager({ userId }: ExtensionSkillManagerProps) {
+  const t = useTranslations('feedback');
   const [skills, setSkills] = useState<ExtensionSkill[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -59,7 +61,7 @@ export function ExtensionSkillManager({ userId }: ExtensionSkillManagerProps) {
   };
 
   if (loading) {
-    return <div className="text-center py-4">加载中...</div>;
+    return <div className="text-center py-4">{t('learning.loading')}</div>;
   }
 
   if (skills.length === 0) {
@@ -68,7 +70,7 @@ export function ExtensionSkillManager({ userId }: ExtensionSkillManagerProps) {
         <CardContent className="py-8 text-center">
           <SparklesIcon className="size-8 mx-auto mb-2 text-muted-foreground" />
           <p className="text-muted-foreground">
-            暂无扩展技能。通过反馈帮助 Agent 学习。
+            {t('learning.noExtensionSkills')}
           </p>
         </CardContent>
       </Card>

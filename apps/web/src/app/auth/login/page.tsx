@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ import { logger } from '@mango/shared/utils';
  * 登录页面
  */
 export default function LoginPage() {
+  const t = useTranslations('auth');
   const router = useRouter();
   const supabase = createClient();
 
@@ -30,7 +32,7 @@ export default function LoginPage() {
     e.preventDefault();
 
     if (!email || !password) {
-      toast.error('请输入邮箱和密码');
+      toast.error(t('fillEmailPassword'));
       return;
     }
 
@@ -48,8 +50,8 @@ export default function LoginPage() {
 
       logger.info('User logged in', { userId: data.user?.id });
 
-      toast.success('登录成功', {
-        description: '欢迎回来!',
+      toast.success(t('loginSuccess'), {
+        description: t('welcomeBack'),
       });
 
       // 重定向到对话列表
@@ -58,8 +60,8 @@ export default function LoginPage() {
     } catch (error: any) {
       logger.error('Login failed', error);
 
-      toast.error('登录失败', {
-        description: error.message || '请检查您的邮箱和密码',
+      toast.error(t('loginFailed'), {
+        description: error.message || t('checkCredentials'),
       });
     } finally {
       setIsLoading(false);
@@ -70,14 +72,14 @@ export default function LoginPage() {
     <CenteredLayout maxWidth="sm">
       <div className="rounded-lg border bg-card p-8 shadow-lg">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold">登录 Mango</h1>
-          <p className="mt-2 text-sm text-muted-foreground">使用您的账号登录</p>
+          <h1 className="text-2xl font-bold">{t('title')}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{t('subtitle')}</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium">
-              邮箱
+              {t('email')}
             </label>
             <Input
               id="email"
@@ -92,7 +94,7 @@ export default function LoginPage() {
 
           <div className="space-y-2">
             <label htmlFor="password" className="text-sm font-medium">
-              密码
+              {t('password')}
             </label>
             <Input
               id="password"
@@ -106,14 +108,14 @@ export default function LoginPage() {
           </div>
 
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? '登录中...' : '登录'}
+            {isLoading ? t('loggingIn') : t('loginButton')}
           </Button>
         </form>
 
         <div className="mt-6 text-center text-sm">
-          <span className="text-muted-foreground">还没有账号? </span>
+          <span className="text-muted-foreground">{t('noAccount')} </span>
           <Link href="/auth/signup" className="font-medium text-primary hover:underline">
-            立即注册
+            {t('signupLink')}
           </Link>
         </div>
 
@@ -122,7 +124,7 @@ export default function LoginPage() {
             href="/auth/reset-password"
             className="text-sm text-muted-foreground hover:text-foreground hover:underline"
           >
-            忘记密码?
+            {t('forgotPassword')}
           </Link>
         </div>
       </div>

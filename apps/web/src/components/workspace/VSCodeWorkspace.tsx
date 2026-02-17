@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { ActivityBar, type ActivityBarItem } from './ActivityBar';
 import { Sidebar } from './Sidebar';
@@ -42,6 +43,7 @@ export function VSCodeWorkspace({
   currentWorkingDirectory,
   onWorkingDirectoryChange,
 }: VSCodeWorkspaceProps) {
+  const t = useTranslations('workspace');
   const [selectedDevice, setSelectedDevice] = useState<DeviceBinding | undefined>(undefined);
   const isInitializedRef = useRef(false);
   const isRestoringRef = useRef(false); // 标记是否正在恢复状态
@@ -258,19 +260,19 @@ export function VSCodeWorkspace({
   const getSidebarTitle = () => {
     switch (activeItem) {
       case 'resources':
-        return '会话资源';
+        return t('activityBar.sessionResources');
       case 'devices':
-        return '设备管理';
+        return t('activityBar.deviceManager');
       case 'files':
-        return '文件浏览器';
+        return t('activityBar.fileExplorer');
       case 'git':
-        return '源代码管理';
+        return t('activityBar.sourceControl');
       case 'terminal':
-        return '终端';
+        return t('activityBar.terminal');
       case 'settings':
-        return '设置';
+        return t('activityBar.settings');
       case 'apps':
-        return '应用管理';
+        return t('activityBar.appManager');
       default:
         return '';
     }

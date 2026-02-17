@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ interface SkillSyncStatusProps {
 }
 
 export function SkillSyncStatus({ deviceId, deviceUrl }: SkillSyncStatusProps) {
+  const t = useTranslations('devices');
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -54,25 +56,25 @@ export function SkillSyncStatus({ deviceId, deviceUrl }: SkillSyncStatusProps) {
   };
 
   if (loading) {
-    return <div className="text-sm text-muted-foreground">加载中...</div>;
+    return <div className="text-sm text-muted-foreground">{t('skillSyncStatus.loading')}</div>;
   }
 
   return (
     <Card>
       <CardHeader className="py-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm">Skill 同步状态</CardTitle>
+          <CardTitle className="text-sm">{t('skillSyncStatus.title')}</CardTitle>
           <StatusBadge status={status?.status || 'error'} />
         </div>
       </CardHeader>
       <CardContent className="pt-0 space-y-2">
         <div className="text-sm">
-          <span className="text-muted-foreground">已缓存:</span>{' '}
-          {status?.skillCount || 0} 个 Skill
+          <span className="text-muted-foreground">{t('skillSyncStatus.cached')}</span>{' '}
+          {status?.skillCount || 0} {t('skillSyncStatus.skills')}
         </div>
         {status?.lastSyncAt && (
           <div className="text-sm">
-            <span className="text-muted-foreground">上次同步:</span>{' '}
+            <span className="text-muted-foreground">{t('skillSyncStatus.lastSync')}</span>{' '}
             {new Date(status.lastSyncAt).toLocaleString()}
           </div>
         )}
@@ -83,7 +85,7 @@ export function SkillSyncStatus({ deviceId, deviceUrl }: SkillSyncStatusProps) {
           disabled={syncing}
         >
           <RefreshCwIcon className={`size-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-          {syncing ? '同步中...' : '立即同步'}
+          {syncing ? t('skillSyncStatus.syncing') : t('skillSyncStatus.syncNow')}
         </Button>
       </CardContent>
     </Card>
@@ -91,18 +93,19 @@ export function SkillSyncStatus({ deviceId, deviceUrl }: SkillSyncStatusProps) {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const t = useTranslations('devices');
   if (status === 'synced') {
     return (
       <Badge variant="outline" className="text-green-600">
         <CheckCircleIcon className="size-3 mr-1" />
-        已同步
+        {t('skillSyncStatus.synced')}
       </Badge>
     );
   }
   return (
     <Badge variant="outline" className="text-red-600">
       <AlertCircleIcon className="size-3 mr-1" />
-      未同步
+      {t('skillSyncStatus.notSynced')}
     </Badge>
   );
 }

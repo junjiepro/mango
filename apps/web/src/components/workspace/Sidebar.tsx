@@ -23,9 +23,9 @@ export function Sidebar({ title, children, onClose, className = '' }: SidebarPro
     <div className={`flex flex-col h-full w-full min-w-0 bg-background ${className}`}>
       {/* 标题栏 */}
       <div className="flex items-center justify-between h-12 px-4 border-b shrink-0">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground truncate">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground truncate">
           {title}
-        </h2>
+        </div>
         {onClose && (
           <Button variant="ghost" size="icon" onClick={onClose} className="h-6 w-6 shrink-0">
             <X className="h-4 w-4" />

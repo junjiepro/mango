@@ -9,6 +9,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { AppBridge } from '@/lib/miniapp/app-bridge';
 import { buildCSP } from '@/lib/miniapp/csp-builder';
@@ -51,6 +52,7 @@ export const MiniAppContainer = React.forwardRef<MiniAppContainerRef, MiniAppCon
   ({ miniApp, mcpClient, className, hostContext, cspConfig, htmlContent: htmlContentProp, sandboxOrigin, onError, onInitialized, onSizeChange, onOpenLink, onSendMessage, onConsole }, ref) => {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const bridgeRef = useRef<AppBridge | null>(null);
+    const t = useTranslations('miniapps');
     // 用 ref 持有回调 prop，避免回调变化触发 useEffect 重建 iframe
     const callbacksRef = useRef({ onError, onInitialized, onSizeChange, onOpenLink, onSendMessage, onConsole });
     callbacksRef.current = { onError, onInitialized, onSizeChange, onOpenLink, onSendMessage, onConsole };
@@ -170,7 +172,7 @@ export const MiniAppContainer = React.forwardRef<MiniAppContainerRef, MiniAppCon
         };
       } catch (err) {
         console.error('Error loading miniapp:', err);
-        setError('Failed to load mini app');
+        setError(t('loadMiniAppFailed'));
         setIsLoading(false);
         callbacksRef.current.onError?.(err as Error);
       }
@@ -207,7 +209,7 @@ export const MiniAppContainer = React.forwardRef<MiniAppContainerRef, MiniAppCon
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-              <p className="text-sm text-muted-foreground mt-2">Loading mini app...</p>
+              <p className="text-sm text-muted-foreground mt-2">{t('loadingMiniApp')}</p>
             </div>
           </div>
         )}
@@ -311,7 +313,7 @@ function getDefaultHTML(): string {
     .container { max-width: 800px; margin: 0 auto; }
     #app { min-height: 100px; }
     #app:empty::before {
-      content: 'MiniApp 输出区域';
+      content: 'MiniApp output area';
       color: var(--mango-gray-600);
       font-size: 14px;
     }

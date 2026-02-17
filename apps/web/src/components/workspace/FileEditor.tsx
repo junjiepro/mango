@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { MonacoEditor } from './MonacoEditor';
 import { Button } from '@/components/ui/button';
 import { Save, RotateCcw } from 'lucide-react';
@@ -22,6 +23,7 @@ interface FileEditorProps {
 }
 
 export function FileEditor({ file, device, onSave, className = '' }: FileEditorProps) {
+  const t = useTranslations('workspace');
   const { client, isReady } = useDeviceClient(device);
 
   const [content, setContent] = useState<string>('');
@@ -43,8 +45,8 @@ export function FileEditor({ file, device, onSave, className = '' }: FileEditorP
         setOriginalContent(fileContent);
         setIsDirty(false);
       } catch (error) {
-        toast.error('读取失败', {
-          description: error instanceof Error ? error.message : '未知错误',
+        toast.error(t('editor.readFailed'), {
+          description: error instanceof Error ? error.message : '',
         });
       } finally {
         setIsLoading(false);
@@ -72,12 +74,12 @@ export function FileEditor({ file, device, onSave, className = '' }: FileEditorP
       setOriginalContent(content);
       setIsDirty(false);
       onSave?.(file.path, content);
-      toast.success('保存成功', {
-        description: `文件 ${file.name} 已保存`,
+      toast.success(t('editor.saveSuccess'), {
+        description: t('editor.saveSuccessDesc', { name: file.name }),
       });
     } catch (error) {
-      toast.error('保存失败', {
-        description: error instanceof Error ? error.message : '未知错误',
+      toast.error(t('editor.saveFailed'), {
+        description: error instanceof Error ? error.message : '',
       });
     } finally {
       setIsSaving(false);
@@ -93,7 +95,7 @@ export function FileEditor({ file, device, onSave, className = '' }: FileEditorP
   if (isLoading) {
     return (
       <div className={`flex items-center justify-center h-full ${className}`}>
-        <div className="text-sm text-muted-foreground">加载文件中...</div>
+        <div className="text-sm text-muted-foreground">{t('editor.loadingFile')}</div>
       </div>
     );
   }
@@ -104,13 +106,13 @@ export function FileEditor({ file, device, onSave, className = '' }: FileEditorP
       <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/20 shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">{file.name}</span>
-          {isDirty && <span className="text-xs text-orange-500">● 未保存</span>}
+          {isDirty && <span className="text-xs text-orange-500">● {t('editor.unsaved')}</span>}
         </div>
         <div className="flex items-center gap-2">
           {isDirty && (
             <Button variant="ghost" size="sm" onClick={handleReset} className="h-7 text-xs">
               <RotateCcw className="h-3 w-3 mr-1" />
-              重置
+              {t('editor.reset')}
             </Button>
           )}
           <Button
@@ -121,7 +123,7 @@ export function FileEditor({ file, device, onSave, className = '' }: FileEditorP
             className="h-7 text-xs"
           >
             <Save className="h-3 w-3 mr-1" />
-            {isSaving ? '保存中...' : '保存'}
+            {isSaving ? t('editor.saving') : t('editor.save')}
           </Button>
         </div>
       </div>

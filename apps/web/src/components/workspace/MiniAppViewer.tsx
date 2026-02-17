@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { Package, Code, FileText, Save, Loader2, Terminal, Play, History, Layers, Plus, Trash2, Pencil, PanelTop, PanelTopClose } from 'lucide-react';
 import type { MiniAppEditMode } from '@mango/shared/types/workspace.types';
 import { Button } from '@/components/ui/button';
@@ -204,6 +205,7 @@ export function MiniAppViewer({
   onSaved,
   onCreated,
 }: MiniAppViewerProps) {
+  const t = useTranslations('workspace');
   const hasHtmlResource = miniApp && Object.keys((miniApp as any).html || {}).length > 0;
   const [activeTab, setActiveTab] = useState<MiniAppEditMode>(
     isCreateMode ? 'code'
@@ -413,13 +415,13 @@ export function MiniAppViewer({
                   value={displayName}
                   onChange={(e) => handleFieldChange('displayName', e.target.value)}
                   className="h-7 font-semibold text-base"
-                  placeholder="应用名称"
+                  placeholder={t('miniAppViewer.appNamePlaceholder')}
                 />
                 <Input
                   value={description}
                   onChange={(e) => handleFieldChange('description', e.target.value)}
                   className="h-6 text-sm text-muted-foreground"
-                  placeholder="应用描述"
+                  placeholder={t('miniAppViewer.appDescPlaceholder')}
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -427,7 +429,7 @@ export function MiniAppViewer({
                   v{(miniApp.manifest as any)?.version || '1.0.0'}
                 </span>
                 {isDirty && (
-                  <span className="text-xs text-orange-500">未保存</span>
+                  <span className="text-xs text-orange-500">{t('miniAppViewer.unsaved')}</span>
                 )}
                 <Button
                   size="sm"
@@ -439,7 +441,7 @@ export function MiniAppViewer({
                   ) : (
                     <Save className="h-4 w-4" />
                   )}
-                  <span className="ml-1">保存</span>
+                  <span className="ml-1">{t('miniAppViewer.save')}</span>
                 </Button>
               </div>
             </>
@@ -502,16 +504,17 @@ function EditorTabs({
   onToggleHeader?: () => void;
   isDirty?: boolean;
 }) {
+  const t = useTranslations('workspace');
   // 创建模式：仅 Code/Skill
   // 拥有者：Code/Skill/MCP/交互
   // 非拥有者：交互/MCP
   const allTabs: { key: MiniAppEditMode; label: string; icon: React.ReactNode }[] = [
     { key: 'code', label: 'Code', icon: <Code className="h-4 w-4" /> },
-    { key: 'resources', label: '资源', icon: <Layers className="h-4 w-4" /> },
+    { key: 'resources', label: t('miniAppViewer.resourcesTab'), icon: <Layers className="h-4 w-4" /> },
     { key: 'skill', label: 'Skill', icon: <FileText className="h-4 w-4" /> },
     { key: 'mcp', label: 'MCP', icon: <Terminal className="h-4 w-4" /> },
-    { key: 'interact', label: '交互', icon: <Play className="h-4 w-4" /> },
-    { key: 'history', label: '版本', icon: <History className="h-4 w-4" /> },
+    { key: 'interact', label: t('miniAppViewer.interactTab'), icon: <Play className="h-4 w-4" /> },
+    { key: 'history', label: t('miniAppViewer.historyTab'), icon: <History className="h-4 w-4" /> },
   ];
 
   let visibleTabs: typeof allTabs;
@@ -550,7 +553,7 @@ function EditorTabs({
             'shrink-0 ml-auto flex items-center gap-1 px-3 py-2 text-xs transition-colors',
             'text-muted-foreground hover:text-foreground',
           )}
-          title={headerVisible ? '隐藏信息栏' : '显示信息栏'}
+          title={headerVisible ? t('miniAppViewer.hideInfoBar') : t('miniAppViewer.showInfoBar')}
         >
           {headerVisible
             ? <PanelTopClose className="h-4 w-4" />
@@ -579,6 +582,7 @@ function CreateModeHeader({
   onSave: () => void;
   canSave: boolean;
 }) {
+  const t = useTranslations('workspace');
   return (
     <div className="flex items-center gap-3 p-4 border-b shrink-0">
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -586,15 +590,15 @@ function CreateModeHeader({
       </div>
       <div className="flex-1 min-w-0">
         <h2 className="font-semibold">
-          {displayName || '新建小应用'}
+          {displayName || t('miniAppViewer.newMiniApp')}
         </h2>
         <p className="text-sm text-muted-foreground">
-          填写应用信息并编写代码
+          {t('miniAppViewer.fillInfoAndCode')}
         </p>
       </div>
       <div className="flex items-center gap-2">
         {isDirty && (
-          <span className="text-xs text-orange-500">未保存</span>
+          <span className="text-xs text-orange-500">{t('miniAppViewer.unsaved')}</span>
         )}
         <Button
           size="sm"
@@ -606,7 +610,7 @@ function CreateModeHeader({
           ) : (
             <Save className="h-4 w-4" />
           )}
-          <span className="ml-1">创建</span>
+          <span className="ml-1">{t('miniAppViewer.create')}</span>
         </Button>
       </div>
     </div>
@@ -627,13 +631,14 @@ function CreateModeForm({
   onFieldChange: (field: string, value: string) => void;
   onTemplateSelect?: (template: MiniAppTemplate) => void;
 }) {
+  const t = useTranslations('workspace');
   const [selectedTemplateId, setSelectedTemplateId] = useState(MINIAPP_TEMPLATES[0].id);
 
   return (
     <div className="p-4 border-b space-y-3 shrink-0">
       {/* 模板选择 */}
       <div className="space-y-1">
-        <Label className="text-xs">代码模板</Label>
+        <Label className="text-xs">{t('miniAppViewer.codeTemplate')}</Label>
         <div className="flex gap-2">
           {MINIAPP_TEMPLATES.map((tpl) => (
             <button
@@ -658,38 +663,38 @@ function CreateModeForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label htmlFor="name" className="text-xs">
-            应用标识 <span className="text-red-500">*</span>
+            {t('miniAppViewer.appId')} <span className="text-red-500">*</span>
           </Label>
           <Input
             id="name"
             value={name}
             onChange={(e) => onFieldChange('name', e.target.value)}
-            placeholder="my-app (字母、数字、下划线、连字符)"
+            placeholder={t('miniAppViewer.appIdPlaceholder')}
             className="h-8"
           />
         </div>
         <div className="space-y-1">
           <Label htmlFor="displayName" className="text-xs">
-            显示名称 <span className="text-red-500">*</span>
+            {t('miniAppViewer.displayName')} <span className="text-red-500">*</span>
           </Label>
           <Input
             id="displayName"
             value={displayName}
             onChange={(e) => onFieldChange('displayName', e.target.value)}
-            placeholder="我的应用"
+            placeholder={t('miniAppViewer.displayNamePlaceholder')}
             className="h-8"
           />
         </div>
       </div>
       <div className="space-y-1">
         <Label htmlFor="description" className="text-xs">
-          应用描述 <span className="text-red-500">*</span>
+          {t('miniAppViewer.appDesc')} <span className="text-red-500">*</span>
         </Label>
         <Textarea
           id="description"
           value={description}
           onChange={(e) => onFieldChange('description', e.target.value)}
-          placeholder="描述你的应用功能..."
+          placeholder={t('miniAppViewer.appDescInputPlaceholder')}
           className="h-16 resize-none"
         />
       </div>
@@ -721,6 +726,7 @@ function EditorContent({
   isCreateMode?: boolean;
   onRollback?: () => void;
 }) {
+  const t = useTranslations('workspace');
   const basePath = isCreateMode ? 'new-miniapp' : miniAppId || 'miniapp';
 
   switch (activeTab) {
@@ -766,7 +772,7 @@ function EditorContent({
             <MCPDebugPanel miniAppId={miniAppId} />
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-              请先保存应用后使用 MCP 调试
+              {t('miniAppViewer.saveMcpFirst')}
             </div>
           )}
         </div>
@@ -778,7 +784,7 @@ function EditorContent({
             <InteractPanel miniAppId={miniAppId} />
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-              请先保存应用后使用交互模式
+              {t('miniAppViewer.saveInteractFirst')}
             </div>
           )}
         </div>
@@ -790,7 +796,7 @@ function EditorContent({
             <VersionHistoryPanel miniAppId={miniAppId} onRollback={onRollback} />
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-              请先保存应用后查看版本历史
+              {t('miniAppViewer.saveHistoryFirst')}
             </div>
           )}
         </div>
@@ -808,6 +814,7 @@ function ResourceEditor({
   onChange: (value: Record<string, string>) => void;
   basePath: string;
 }) {
+  const t = useTranslations('workspace');
   const keys = Object.keys(resources);
   const [selectedKey, setSelectedKey] = useState<string>(keys[0] || 'main');
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
@@ -868,11 +875,11 @@ function ResourceEditor({
       {/* 左侧：资源列表 */}
       <div className="w-48 border-r flex flex-col shrink-0">
         <div className="p-2 border-b flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">资源列表</span>
+          <span className="text-xs font-medium text-muted-foreground">{t('miniAppViewer.resourceList')}</span>
           <button
             onClick={() => setAddingNew(true)}
             className="p-1 rounded hover:bg-muted transition-colors"
-            title="添加资源"
+            title={t('miniAppViewer.addResource')}
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
@@ -883,7 +890,7 @@ function ResourceEditor({
             <Input
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
-              placeholder="资源名"
+              placeholder={t('miniAppViewer.resourceName')}
               className="h-7 text-xs"
               autoFocus
               onKeyDown={(e) => {
@@ -900,7 +907,7 @@ function ResourceEditor({
         <div className="flex-1 overflow-y-auto">
           {keys.length === 0 ? (
             <div className="p-3 text-xs text-muted-foreground text-center">
-              暂无资源，点击 + 添加
+              {t('miniAppViewer.noResources')}
             </div>
           ) : (
             keys.map((key) => (
@@ -937,7 +944,7 @@ function ResourceEditor({
                         setRenamingKey(key);
                         setRenameValue(key);
                       }}
-                      title="重命名"
+                      title={t('miniAppViewer.rename')}
                     >
                       <Pencil className="h-3 w-3" />
                     </button>
@@ -947,7 +954,7 @@ function ResourceEditor({
                         e.stopPropagation();
                         handleDeleteResource(key);
                       }}
-                      title="删除"
+                      title={t('miniAppViewer.delete')}
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
@@ -971,7 +978,7 @@ function ResourceEditor({
           />
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            {keys.length === 0 ? '添加资源开始编辑' : '选择左侧资源进行编辑'}
+            {keys.length === 0 ? t('miniAppViewer.addResourceToEdit') : t('miniAppViewer.selectResourceToEdit')}
           </div>
         )}
       </div>
@@ -1005,6 +1012,7 @@ function VersionHistoryPanel({
   miniAppId: string;
   onRollback?: () => void;
 }) {
+  const t = useTranslations('workspace');
   const [versions, setVersions] = useState<VersionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
@@ -1085,7 +1093,7 @@ function VersionHistoryPanel({
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
         <Loader2 className="h-4 w-4 animate-spin mr-2" />
-        加载版本历史...
+        {t('miniAppViewer.loadingVersionHistory')}
       </div>
     );
   }
@@ -1093,7 +1101,7 @@ function VersionHistoryPanel({
   if (versions.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-        暂无版本记录。保存代码或 Skill 变更后将自动创建版本。
+        {t('miniAppViewer.noVersions')}
       </div>
     );
   }
@@ -1130,12 +1138,13 @@ function VersionList({
   selectedVersion: string | null;
   onSelect: (version: string) => void;
 }) {
+  const t = useTranslations('workspace');
   return (
     <div className="w-64 border-r overflow-y-auto shrink-0">
       <div className="p-3 border-b">
-        <h3 className="text-sm font-medium">版本历史</h3>
+        <h3 className="text-sm font-medium">{t('miniAppViewer.versionHistory')}</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
-          共 {versions.length} 个版本
+          {t('miniAppViewer.totalVersions', { count: versions.length })}
         </p>
       </div>
       <div className="divide-y">
@@ -1174,6 +1183,7 @@ function VersionPreviewTabs({
   previewTab: 'code' | 'skill' | 'resources';
   onPreviewTabChange: (tab: 'code' | 'skill' | 'resources') => void;
 }) {
+  const t = useTranslations('workspace');
   return (
     <div className="flex border-b shrink-0">
       <button
@@ -1210,7 +1220,7 @@ function VersionPreviewTabs({
         )}
       >
         <Layers className="h-3.5 w-3.5" />
-        资源
+        {t('miniAppViewer.resourcesTab')}
       </button>
     </div>
   );
@@ -1232,11 +1242,12 @@ function VersionDetailView({
   rolling: boolean;
   onRollback: () => void;
 }) {
+  const t = useTranslations('workspace');
   if (detailLoading) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
         <Loader2 className="h-4 w-4 animate-spin mr-2" />
-        加载版本详情...
+        {t('miniAppViewer.loadingVersionDetail')}
       </div>
     );
   }
@@ -1244,7 +1255,7 @@ function VersionDetailView({
   if (!detail) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-        选择左侧版本查看详情
+        {t('miniAppViewer.selectVersionToView')}
       </div>
     );
   }
@@ -1298,7 +1309,7 @@ function VersionDetailView({
           ) : (
             <History className="h-3.5 w-3.5 mr-1" />
           )}
-          回滚到此版本
+          {t('miniAppViewer.rollbackToVersion')}
         </Button>
       </div>
 

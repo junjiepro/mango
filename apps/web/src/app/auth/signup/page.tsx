@@ -8,6 +8,7 @@
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,7 @@ import { logger } from '@mango/shared/utils'
  * 注册页面
  */
 export default function SignupPage() {
+  const t = useTranslations('auth.signup')
   const router = useRouter()
   const supabase = createClient()
 
@@ -33,17 +35,17 @@ export default function SignupPage() {
 
     // 验证输入
     if (!email || !password || !confirmPassword) {
-      toast.error('请填写所有必填字段')
+      toast.error(t('fillAllFields'))
       return
     }
 
     if (password !== confirmPassword) {
-      toast.error('两次输入的密码不一致')
+      toast.error(t('passwordMismatch'))
       return
     }
 
     if (password.length < 6) {
-      toast.error('密码至少需要6个字符')
+      toast.error(t('passwordTooShort'))
       return
     }
 
@@ -67,8 +69,8 @@ export default function SignupPage() {
 
       logger.info('User signed up', { userId: data.user?.id })
 
-      toast.success('注册成功', {
-        description: '请检查您的邮箱以验证账号',
+      toast.success(t('signupSuccess'), {
+        description: t('checkEmailToVerify'),
       })
 
       // 重定向到登录页
@@ -78,8 +80,8 @@ export default function SignupPage() {
     } catch (error: any) {
       logger.error('Signup failed', error)
 
-      toast.error('注册失败', {
-        description: error.message || '请稍后重试',
+      toast.error(t('signupFailed'), {
+        description: error.message || t('retryLater'),
       })
     } finally {
       setIsLoading(false)
@@ -90,16 +92,16 @@ export default function SignupPage() {
     <CenteredLayout maxWidth="sm">
       <div className="rounded-lg border bg-card p-8 shadow-lg">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold">注册 Mango</h1>
+          <h1 className="text-2xl font-bold">{t('title')}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            创建您的账号开始使用
+            {t('subtitle')}
           </p>
         </div>
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium">
-              邮箱 <span className="text-destructive">*</span>
+              {t('email')} <span className="text-destructive">*</span>
             </label>
             <Input
               id="email"
@@ -114,29 +116,29 @@ export default function SignupPage() {
 
           <div className="space-y-2">
             <label htmlFor="displayName" className="text-sm font-medium">
-              显示名称
+              {t('displayName')}
             </label>
             <Input
               id="displayName"
               type="text"
-              placeholder="您的名字"
+              placeholder={t('displayNamePlaceholder')}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground">
-              可选,默认使用邮箱前缀
+              {t('displayNameHint')}
             </p>
           </div>
 
           <div className="space-y-2">
             <label htmlFor="password" className="text-sm font-medium">
-              密码 <span className="text-destructive">*</span>
+              {t('password')} <span className="text-destructive">*</span>
             </label>
             <Input
               id="password"
               type="password"
-              placeholder="至少6个字符"
+              placeholder={t('passwordPlaceholder')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
@@ -146,12 +148,12 @@ export default function SignupPage() {
 
           <div className="space-y-2">
             <label htmlFor="confirmPassword" className="text-sm font-medium">
-              确认密码 <span className="text-destructive">*</span>
+              {t('confirmPassword')} <span className="text-destructive">*</span>
             </label>
             <Input
               id="confirmPassword"
               type="password"
-              placeholder="再次输入密码"
+              placeholder={t('confirmPasswordPlaceholder')}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={isLoading}
@@ -164,28 +166,28 @@ export default function SignupPage() {
             className="w-full"
             disabled={isLoading}
           >
-            {isLoading ? '注册中...' : '注册'}
+            {isLoading ? t('signingUp') : t('signupButton')}
           </Button>
         </form>
 
         <div className="mt-6 text-center text-sm">
-          <span className="text-muted-foreground">已有账号? </span>
+          <span className="text-muted-foreground">{t('hasAccount')} </span>
           <Link
             href="/auth/login"
             className="font-medium text-primary hover:underline"
           >
-            立即登录
+            {t('loginLink')}
           </Link>
         </div>
 
         <div className="mt-6 text-center text-xs text-muted-foreground">
-          注册即表示您同意我们的
+          {t('agreeToTermsPrefix')}
           <Link href="/terms" className="underline hover:text-foreground">
-            服务条款
+            {t('termsOfService')}
           </Link>
-          和
+          {t('and')}
           <Link href="/privacy" className="underline hover:text-foreground">
-            隐私政策
+            {t('privacyPolicy')}
           </Link>
         </div>
       </div>

@@ -7,6 +7,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -47,6 +48,8 @@ export function FileContextMenu({
   onDownload,
   onUpload,
 }: FileContextMenuProps) {
+  const t = useTranslations('workspace');
+  const tc = useTranslations('common');
   const isDirectory = node.type === 'directory';
 
   return (
@@ -59,16 +62,16 @@ export function FileContextMenu({
           <>
             <ContextMenuItem onClick={() => onCreateFile?.(node.path)}>
               <FilePlus className="mr-2 h-4 w-4" />
-              新建文件
+              {t('fileExplorer.newFile')}
             </ContextMenuItem>
             <ContextMenuItem onClick={() => onCreateFolder?.(node.path)}>
               <FolderPlus className="mr-2 h-4 w-4" />
-              新建文件夹
+              {t('fileExplorer.newFolder')}
             </ContextMenuItem>
             {onUpload && (
               <ContextMenuItem onClick={() => onUpload?.(node.path)}>
                 <Upload className="mr-2 h-4 w-4" />
-                上传文件
+                {t('fileExplorer.uploadFile')}
               </ContextMenuItem>
             )}
             <ContextMenuSeparator />
@@ -78,14 +81,14 @@ export function FileContextMenu({
           <>
             <ContextMenuItem onClick={() => onDownload?.(node)}>
               <Download className="mr-2 h-4 w-4" />
-              下载
+              {tc('actions.download')}
             </ContextMenuItem>
             <ContextMenuSeparator />
           </>
         )}
         <ContextMenuItem onClick={() => onRename?.(node)}>
           <Edit3 className="mr-2 h-4 w-4" />
-          重命名
+          {tc('actions.rename')}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
@@ -93,7 +96,7 @@ export function FileContextMenu({
           className="text-destructive focus:text-destructive"
         >
           <Trash2 className="mr-2 h-4 w-4" />
-          删除
+          {tc('actions.delete')}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

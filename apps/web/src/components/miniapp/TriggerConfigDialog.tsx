@@ -6,6 +6,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -59,6 +60,8 @@ export function TriggerConfigDialog({
   existingTrigger,
   onSave,
 }: TriggerConfigDialogProps) {
+  const t = useTranslations('miniapps');
+  const tc = useTranslations('common');
   const [trigger, setTrigger] = useState<TriggerConfig>({
     type: 'schedule',
     enabled: true,
@@ -90,22 +93,22 @@ export function TriggerConfigDialog({
       // 验证配置
       if (trigger.type === 'schedule') {
         if (!trigger.interval && !trigger.cron) {
-          throw new Error('请设置触发间隔或 Cron 表达式')
+          throw new Error(t('trigger.intervalOrCronRequired'))
         }
         if (trigger.interval && trigger.interval < 1) {
-          throw new Error('触发间隔必须大于 0 分钟')
+          throw new Error(t('trigger.intervalMinError'))
         }
       }
 
       if (trigger.type === 'event' && !trigger.eventType) {
-        throw new Error('请选择事件类型')
+        throw new Error(t('trigger.eventTypeRequired'))
       }
 
       await onSave(trigger)
       onOpenChange(false)
     } catch (err) {
       console.error('Failed to save trigger:', err)
-      setError(err instanceof Error ? err.message : '保存失败')
+      setError(err instanceof Error ? err.message : t('trigger.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -126,16 +129,16 @@ export function TriggerConfigDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>配置触发器</DialogTitle>
+          <DialogTitle>{t('trigger.configTitle')}</DialogTitle>
           <DialogDescription>
-            设置小应用的自动触发规则,支持定时触发和事件触发
+            {t('trigger.configDescription')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           {/* 启用开关 */}
           <div className="flex items-center justify-between">
-            <Label htmlFor="enabled">启用触发器</Label>
+            <Label htmlFor="enabled">{t('trigger.enableTrigger')}</Label>
             <Switch
               id="enabled"
               checked={trigger.enabled}
@@ -147,7 +150,7 @@ export function TriggerConfigDialog({
 
           {/* 触发器类型 */}
           <div className="space-y-2">
-            <Label htmlFor="type">触发器类型</Label>
+            <Label htmlFor="type">{t('trigger.triggerType')}</Label>
             <Select
               value={trigger.type}
               onValueChange={(value: 'schedule' | 'event' | 'manual') =>
@@ -155,12 +158,12 @@ export function TriggerConfigDialog({
               }
             >
               <SelectTrigger id="type">
-                <SelectValue placeholder="选择触发器类型" />
+                <SelectValue placeholder={t('trigger.selectTriggerType')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="schedule">定时触发</SelectItem>
-                <SelectItem value="event">事件触发</SelectItem>
-                <SelectItem value="manual">手动触发</SelectItem>
+                <SelectItem value="schedule">{t('trigger.schedule')}</SelectItem>
+                <SelectItem value="event">{t('trigger.event')}</SelectItem>
+                <SelectItem value="manual">{t('trigger.manual')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -169,43 +172,43 @@ export function TriggerConfigDialog({
           {trigger.type === 'schedule' && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="interval">触发间隔 (分钟)</Label>
+                <Label htmlFor="interval">{t('trigger.intervalMinutes')}</Label>
                 <Input
                   id="interval"
                   type="number"
                   min="1"
                   value={trigger.interval || ''}
                   onChange={(e) => handleIntervalChange(e.target.value)}
-                  placeholder="例如: 60 (每小时)"
+                  placeholder={t('trigger.intervalPlaceholder')}
                   disabled={!!trigger.cron}
                 />
                 <p className="text-xs text-muted-foreground">
-                  设置触发间隔,单位为分钟。例如 60 表示每小时触发一次
+                  {t('trigger.intervalHint')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="cron">或使用 Cron 表达式</Label>
+                <Label htmlFor="cron">{t('trigger.orUseCron')}</Label>
                 <Select
                   value={trigger.cron || 'custom'}
                   onValueChange={handleCronPresetChange}
                   disabled={!!trigger.interval}
                 >
                   <SelectTrigger id="cron">
-                    <SelectValue placeholder="选择预设时间" />
+                    <SelectValue placeholder={t('trigger.selectPresetTime')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="custom">自定义间隔</SelectItem>
-                    <SelectItem value="0 * * * *">每小时</SelectItem>
-                    <SelectItem value="0 0 * * *">每天 00:00</SelectItem>
-                    <SelectItem value="0 9 * * *">每天 09:00</SelectItem>
-                    <SelectItem value="0 12 * * *">每天 12:00</SelectItem>
-                    <SelectItem value="0 18 * * *">每天 18:00</SelectItem>
-                    <SelectItem value="0 0 * * 1">每周一 00:00</SelectItem>
+                    <SelectItem value="custom">{t('trigger.customInterval')}</SelectItem>
+                    <SelectItem value="0 * * * *">{t('trigger.everyHour')}</SelectItem>
+                    <SelectItem value="0 0 * * *">{t('trigger.dailyMidnight')}</SelectItem>
+                    <SelectItem value="0 9 * * *">{t('trigger.daily9am')}</SelectItem>
+                    <SelectItem value="0 12 * * *">{t('trigger.dailyNoon')}</SelectItem>
+                    <SelectItem value="0 18 * * *">{t('trigger.daily6pm')}</SelectItem>
+                    <SelectItem value="0 0 * * 1">{t('trigger.weeklyMonday')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  使用 Cron 表达式可以设置更精确的触发时间
+                  {t('trigger.cronHint')}
                 </p>
               </div>
             </>
@@ -214,7 +217,7 @@ export function TriggerConfigDialog({
           {/* 事件触发配置 */}
           {trigger.type === 'event' && (
             <div className="space-y-2">
-              <Label htmlFor="eventType">事件类型</Label>
+              <Label htmlFor="eventType">{t('trigger.eventType')}</Label>
               <Select
                 value={trigger.eventType || ''}
                 onValueChange={(value) =>
@@ -222,35 +225,35 @@ export function TriggerConfigDialog({
                 }
               >
                 <SelectTrigger id="eventType">
-                  <SelectValue placeholder="选择事件类型" />
+                  <SelectValue placeholder={t('trigger.selectEventType')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="message.received">收到新消息</SelectItem>
-                  <SelectItem value="task.completed">任务完成</SelectItem>
-                  <SelectItem value="conversation.created">创建新对话</SelectItem>
-                  <SelectItem value="user.login">用户登录</SelectItem>
+                  <SelectItem value="message.received">{t('trigger.eventMessageReceived')}</SelectItem>
+                  <SelectItem value="task.completed">{t('trigger.eventTaskCompleted')}</SelectItem>
+                  <SelectItem value="conversation.created">{t('trigger.eventConversationCreated')}</SelectItem>
+                  <SelectItem value="user.login">{t('trigger.eventUserLogin')}</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                当指定事件发生时,自动触发小应用
+                {t('trigger.eventHint')}
               </p>
             </div>
           )}
 
           {/* 触发消息 */}
           <div className="space-y-2">
-            <Label htmlFor="message">触发消息</Label>
+            <Label htmlFor="message">{t('trigger.triggerMessage')}</Label>
             <Textarea
               id="message"
               value={trigger.message || ''}
               onChange={(e) =>
                 setTrigger({ ...trigger, message: e.target.value })
               }
-              placeholder="触发时显示的消息内容"
+              placeholder={t('trigger.messagePlaceholder')}
               rows={3}
             />
             <p className="text-xs text-muted-foreground">
-              触发时会通过通知显示此消息
+              {t('trigger.messageHint')}
             </p>
           </div>
 
@@ -268,10 +271,10 @@ export function TriggerConfigDialog({
             onClick={() => onOpenChange(false)}
             disabled={saving}
           >
-            取消
+            {tc('actions.cancel')}
           </Button>
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? '保存中...' : '保存'}
+            {saving ? tc('actions.saving') : tc('actions.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { X, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -61,6 +62,7 @@ export function EnhancedEditorTabs({
   onMarkTabDirty,
   className = '',
 }: EnhancedEditorTabsProps) {
+  const t = useTranslations('workspace');
   // 关闭确认对话框状态
   const [closeConfirmTab, setCloseConfirmTab] = useState<EditorTab | null>(null);
 
@@ -205,8 +207,8 @@ export function EnhancedEditorTabs({
     return (
       <div className={`flex items-center justify-center h-full text-muted-foreground ${className}`}>
         <div className="text-center">
-          <p className="text-sm">选择右侧的资源或文件以查看内容</p>
-          <p className="text-xs mt-2">点击文件可在编辑器中打开</p>
+          <p className="text-sm">{t('editor.selectResource')}</p>
+          <p className="text-xs mt-2">{t('editor.clickToOpen')}</p>
         </div>
       </div>
     );
@@ -292,13 +294,13 @@ export function EnhancedEditorTabs({
                 {activeTabId && (
                   <>
                     <DropdownMenuItem onClick={handleCloseCurrentTab}>
-                      关闭当前标签页
+                      {t('editor.closeCurrentTab')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleCloseOthers}>关闭其他标签页</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleCloseOthers}>{t('editor.closeOtherTabs')}</DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
                 )}
-                <DropdownMenuItem onClick={handleCloseAll}>关闭所有标签页</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCloseAll}>{t('editor.closeAllTabs')}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -332,7 +334,7 @@ export function EnhancedEditorTabs({
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
-                  <p className="text-sm">无法显示此内容</p>
+                  <p className="text-sm">{t('editor.cannotDisplay')}</p>
                 </div>
               )}
             </TabsContent>
@@ -344,14 +346,14 @@ export function EnhancedEditorTabs({
       <AlertDialog open={!!closeConfirmTab} onOpenChange={() => setCloseConfirmTab(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>未保存的更改</AlertDialogTitle>
+            <AlertDialogTitle>{t('editor.unsavedChangesTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              文件 "{closeConfirmTab?.title}" 有未保存的更改。关闭后这些更改将丢失。
+              {t('editor.unsavedChangesDesc', { name: closeConfirmTab?.title || '' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmClose}>关闭</AlertDialogAction>
+            <AlertDialogCancel>{t('editor.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmClose}>{t('editor.close')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

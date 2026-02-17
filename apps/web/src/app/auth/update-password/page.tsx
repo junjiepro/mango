@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,7 @@ import { logger } from '@mango/shared/utils'
  * 更新密码页面
  */
 export default function UpdatePasswordPage() {
+  const t = useTranslations('auth.updatePassword')
   const router = useRouter()
   const supabase = createClient()
 
@@ -41,8 +43,8 @@ export default function UpdatePasswordPage() {
         if (session) {
           setIsValidSession(true)
         } else {
-          toast.error('会话无效', {
-            description: '请重新请求密码重置链接',
+          toast.error(t('sessionInvalid'), {
+            description: t('requestNewLink'),
           })
           setTimeout(() => {
             router.push('/auth/reset-password')
@@ -50,8 +52,8 @@ export default function UpdatePasswordPage() {
         }
       } catch (error: any) {
         logger.error('Session check failed', error)
-        toast.error('验证失败', {
-          description: '请重新请求密码重置链接',
+        toast.error(t('verifyFailed'), {
+          description: t('requestNewLink'),
         })
         setTimeout(() => {
           router.push('/auth/reset-password')
@@ -69,17 +71,17 @@ export default function UpdatePasswordPage() {
 
     // 验证输入
     if (!password || !confirmPassword) {
-      toast.error('请填写所有字段')
+      toast.error(t('fillAllFields'))
       return
     }
 
     if (password !== confirmPassword) {
-      toast.error('两次输入的密码不一致')
+      toast.error(t('passwordMismatch'))
       return
     }
 
     if (password.length < 6) {
-      toast.error('密码至少需要6个字符')
+      toast.error(t('passwordTooShort'))
       return
     }
 
@@ -96,8 +98,8 @@ export default function UpdatePasswordPage() {
 
       logger.info('Password updated successfully')
 
-      toast.success('密码更新成功', {
-        description: '您现在可以使用新密码登录',
+      toast.success(t('updateSuccess'), {
+        description: t('canLoginWithNewPassword'),
       })
 
       // 重定向到登录页
@@ -107,8 +109,8 @@ export default function UpdatePasswordPage() {
     } catch (error: any) {
       logger.error('Password update failed', error)
 
-      toast.error('更新失败', {
-        description: error.message || '请稍后重试',
+      toast.error(t('updateFailed'), {
+        description: error.message || t('retryLater'),
       })
     } finally {
       setIsLoading(false)
@@ -122,7 +124,7 @@ export default function UpdatePasswordPage() {
         <div className="rounded-lg border bg-card p-8 shadow-lg">
           <div className="flex flex-col items-center justify-center space-y-4">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-            <p className="text-sm text-muted-foreground">验证中...</p>
+            <p className="text-sm text-muted-foreground">{t('verifying')}</p>
           </div>
         </div>
       </CenteredLayout>
@@ -138,21 +140,21 @@ export default function UpdatePasswordPage() {
     <CenteredLayout maxWidth="sm">
       <div className="rounded-lg border bg-card p-8 shadow-lg">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold">设置新密码</h1>
+          <h1 className="text-2xl font-bold">{t('title')}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            请输入您的新密码
+            {t('subtitle')}
           </p>
         </div>
 
         <form onSubmit={handleUpdatePassword} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="password" className="text-sm font-medium">
-              新密码 <span className="text-destructive">*</span>
+              {t('newPassword')} <span className="text-destructive">*</span>
             </label>
             <Input
               id="password"
               type="password"
-              placeholder="至少6个字符"
+              placeholder={t('passwordPlaceholder')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
@@ -163,12 +165,12 @@ export default function UpdatePasswordPage() {
 
           <div className="space-y-2">
             <label htmlFor="confirmPassword" className="text-sm font-medium">
-              确认新密码 <span className="text-destructive">*</span>
+              {t('confirmNewPassword')} <span className="text-destructive">*</span>
             </label>
             <Input
               id="confirmPassword"
               type="password"
-              placeholder="再次输入新密码"
+              placeholder={t('confirmPasswordPlaceholder')}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={isLoading}
@@ -177,10 +179,10 @@ export default function UpdatePasswordPage() {
           </div>
 
           <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
-            <p className="mb-1 font-medium text-foreground">密码要求：</p>
+            <p className="mb-1 font-medium text-foreground">{t('passwordRequirements')}</p>
             <ul className="list-inside list-disc space-y-0.5">
-              <li>至少6个字符</li>
-              <li>建议包含大小写字母、数字和特殊字符</li>
+              <li>{t('minChars')}</li>
+              <li>{t('recommendedChars')}</li>
             </ul>
           </div>
 
@@ -189,7 +191,7 @@ export default function UpdatePasswordPage() {
             className="w-full"
             disabled={isLoading}
           >
-            {isLoading ? '更新中...' : '更新密码'}
+            {isLoading ? t('updating') : t('updateButton')}
           </Button>
         </form>
 
@@ -198,7 +200,7 @@ export default function UpdatePasswordPage() {
             href="/auth/login"
             className="text-muted-foreground hover:text-foreground hover:underline"
           >
-            返回登录
+            {t('backToLogin')}
           </Link>
         </div>
       </div>

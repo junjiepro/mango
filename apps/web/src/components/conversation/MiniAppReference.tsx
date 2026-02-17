@@ -6,6 +6,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Database } from '@/types/database.types';
@@ -32,6 +33,7 @@ export function MiniAppReference({
   className,
   compact = false,
 }: MiniAppReferenceProps) {
+  const t = useTranslations('conversations');
   const handleClick = () => {
     onOpen?.(miniApp, installation);
   };
@@ -98,7 +100,7 @@ export function MiniAppReference({
             {installation.custom_name || miniApp.display_name}
           </span>
           <span className="text-xs px-2 py-0.5 rounded-full bg-purple-200 dark:bg-purple-800 text-purple-700 dark:text-purple-300 flex-shrink-0">
-            小应用
+            {t('miniAppReference.badge')}
           </span>
         </div>
         <p className="text-xs text-purple-700 dark:text-purple-300 line-clamp-2">

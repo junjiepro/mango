@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   WebPreview,
   WebPreviewNavigation,
@@ -129,6 +130,7 @@ export function parseContentSegments(content: string): ContentSegment[] {
 function HtmlSegmentRenderer({ content, index }: { content: string; index: number }) {
   const [viewMode, setViewMode] = useState<'preview' | 'source'>('preview');
   const [copied, setCopied] = useState(false);
+  const t = useTranslations('conversations');
 
   // 创建 blob URL 用于 iframe 预览
   const previewUrl = useMemo(() => {
@@ -166,7 +168,7 @@ function HtmlSegmentRenderer({ content, index }: { content: string; index: numbe
         <WebPreviewNavigation>
           <div className="flex items-center gap-2 flex-1">
             <span className="text-xs font-medium text-muted-foreground">
-              HTML 内容 {index > 0 ? `#${index + 1}` : ''}
+              {t('htmlRenderer.htmlContent')} {index > 0 ? `#${index + 1}` : ''}
             </span>
             <div className="flex items-center gap-1 ml-auto">
               <Button
@@ -176,7 +178,7 @@ function HtmlSegmentRenderer({ content, index }: { content: string; index: numbe
                 className="h-8 px-3"
               >
                 <EyeIcon className="size-4 mr-1" />
-                预览
+                {t('htmlRenderer.preview')}
               </Button>
               <Button
                 size="sm"
@@ -185,7 +187,7 @@ function HtmlSegmentRenderer({ content, index }: { content: string; index: numbe
                 className="h-8 px-3"
               >
                 <CodeIcon className="size-4 mr-1" />
-                源码
+                {t('htmlRenderer.source')}
               </Button>
             </div>
           </div>
@@ -200,7 +202,7 @@ function HtmlSegmentRenderer({ content, index }: { content: string; index: numbe
               variant="ghost"
               onClick={handleCopy}
               className="absolute top-2 right-2 h-8 w-8 p-0"
-              title={copied ? '已复制' : '复制源码'}
+              title={copied ? t('htmlRenderer.copied') : t('htmlRenderer.copySource')}
             >
               {copied ? (
                 <CheckIcon className="size-4 text-green-500" />

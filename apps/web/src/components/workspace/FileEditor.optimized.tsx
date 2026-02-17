@@ -13,6 +13,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { MonacoEditor } from './MonacoEditor';
 import { Button } from '@/components/ui/button';
 import { Save, RotateCcw, RefreshCw } from 'lucide-react';
@@ -42,6 +43,7 @@ interface FileEditorProps {
 }
 
 export function FileEditor({ file, device, tabId, isActive = false, onSave, onMarkDirty, externalChangeTimestamp, className = '' }: FileEditorProps) {
+  const t = useTranslations('workspace');
   const { client, isReady } = useDeviceClient(device);
   const fileCache = useFileContentCache();
 
@@ -141,8 +143,8 @@ export function FileEditor({ file, device, tabId, isActive = false, onSave, onMa
 
             // 如果用户有未保存的编辑,提示用户
             if (isDirty) {
-              toast.warning('文件冲突', {
-                description: '文件已被外部修改，但您有未保存的编辑。请先保存或放弃您的更改。',
+              toast.warning(t('editor.fileConflict'), {
+                description: t('editor.fileConflictDesc'),
                 duration: 5000,
               });
               setIsLoading(false);
@@ -150,8 +152,8 @@ export function FileEditor({ file, device, tabId, isActive = false, onSave, onMa
             }
 
             // 如果没有未保存的编辑,提示并继续加载
-            toast.info('文件已更新', {
-              description: '文件已被外部修改，正在重新加载...',
+            toast.info(t('editor.fileUpdated'), {
+              description: t('editor.fileUpdatedDesc'),
             });
           }
         } catch (statError) {
@@ -189,8 +191,8 @@ export function FileEditor({ file, device, tabId, isActive = false, onSave, onMa
 
       console.log(`[FileEditor] 文件加载完成: ${file.path}, 修改时间: ${fileModified}`);
     } catch (error) {
-      toast.error('读取失败', {
-        description: error instanceof Error ? error.message : '未知错误',
+      toast.error(t('editor.readFailed'), {
+        description: error instanceof Error ? error.message : '',
       });
     } finally {
       setIsLoading(false);
@@ -229,10 +231,10 @@ export function FileEditor({ file, device, tabId, isActive = false, onSave, onMa
 
     if (file.modified !== lastModified && !isDirty) {
       // 文件在外部被修改,提示用户重新加载
-      toast.info('文件已更新', {
-        description: '文件在外部被修改,点击刷新按钮重新加载',
+      toast.info(t('editor.fileUpdated'), {
+        description: t('editor.fileUpdatedToast'),
         action: {
-          label: '刷新',
+          label: t('editor.refresh'),
           onClick: () => loadFile(true),
         },
       });
@@ -336,12 +338,12 @@ export function FileEditor({ file, device, tabId, isActive = false, onSave, onMa
       }
 
       onSave?.(file.path, contentToSave);
-      toast.success('保存成功', {
-        description: `文件 ${file.name} 已保存`,
+      toast.success(t('editor.saveSuccess'), {
+        description: t('editor.saveSuccessDesc', { name: file.name }),
       });
     } catch (error) {
-      toast.error('保存失败', {
-        description: error instanceof Error ? error.message : '未知错误',
+      toast.error(t('editor.saveFailed'), {
+        description: error instanceof Error ? error.message : '',
       });
     } finally {
       setIsSaving(false);
@@ -376,7 +378,7 @@ export function FileEditor({ file, device, tabId, isActive = false, onSave, onMa
   if (isLoading) {
     return (
       <div className={`flex items-center justify-center h-full ${className}`}>
-        <div className="text-sm text-muted-foreground">加载文件中...</div>
+        <div className="text-sm text-muted-foreground">{t('editor.loadingFile')}</div>
       </div>
     );
   }
@@ -387,7 +389,7 @@ export function FileEditor({ file, device, tabId, isActive = false, onSave, onMa
       <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/20 shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">{file.name}</span>
-          {isDirty && <span className="text-xs text-orange-500">● 未保存</span>}
+          {isDirty && <span className="text-xs text-orange-500">● {t('editor.unsaved')}</span>}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -395,14 +397,14 @@ export function FileEditor({ file, device, tabId, isActive = false, onSave, onMa
             size="sm"
             onClick={handleRefresh}
             className="h-7 text-xs"
-            title="刷新文件"
+            title={t('editor.refreshFile')}
           >
             <RefreshCw className="h-3 w-3" />
           </Button>
           {isDirty && (
             <Button variant="ghost" size="sm" onClick={handleReset} className="h-7 text-xs">
               <RotateCcw className="h-3 w-3 mr-1" />
-              重置
+              {t('editor.reset')}
             </Button>
           )}
           <Button
@@ -413,7 +415,7 @@ export function FileEditor({ file, device, tabId, isActive = false, onSave, onMa
             className="h-7 text-xs"
           >
             <Save className="h-3 w-3 mr-1" />
-            {isSaving ? '保存中...' : '保存'}
+            {isSaving ? t('editor.saving') : t('editor.save')}
           </Button>
         </div>
       </div>

@@ -7,6 +7,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { userService } from '@/services/UserService'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,7 @@ type UserProfile = Database['public']['Tables']['user_profiles']['Row']
  * 用户配置页面
  */
 export default function ProfilePage() {
+  const t = useTranslations('profile')
   const router = useRouter()
   const supabase = createClient()
 
@@ -55,8 +57,8 @@ export default function ProfilePage() {
       }
     } catch (error) {
       logger.error('Failed to load profile', error as Error)
-      toast.error('加载失败', {
-        description: '无法加载用户配置',
+      toast.error(t('toast.loadFailed'), {
+        description: t('toast.loadFailedDesc'),
       })
     } finally {
       setIsLoading(false)
@@ -82,15 +84,15 @@ export default function ProfilePage() {
         bio: bio.trim() || null,
       })
 
-      toast.success('保存成功', {
-        description: '您的配置已更新',
+      toast.success(t('toast.saveSuccess'), {
+        description: t('toast.saveSuccessDesc'),
       })
 
       loadProfile()
     } catch (error) {
       logger.error('Failed to save profile', error as Error)
-      toast.error('保存失败', {
-        description: '无法保存配置,请稍后重试',
+      toast.error(t('toast.saveFailed'), {
+        description: t('toast.saveFailedDesc'),
       })
     } finally {
       setIsSaving(false)
@@ -104,8 +106,8 @@ export default function ProfilePage() {
       router.refresh()
     } catch (error) {
       logger.error('Logout failed', error as Error)
-      toast.error('登出失败', {
-        description: '请稍后重试',
+      toast.error(t('toast.logoutFailed'), {
+        description: t('toast.logoutFailedDesc'),
       })
     }
   }
@@ -138,32 +140,32 @@ export default function ProfilePage() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="rounded-lg border bg-card p-4 text-center">
                   <div className="text-2xl font-bold">{stats.conversationCount}</div>
-                  <div className="text-sm text-muted-foreground">对话</div>
+                  <div className="text-sm text-muted-foreground">{t('stats.conversations')}</div>
                 </div>
                 <div className="rounded-lg border bg-card p-4 text-center">
                   <div className="text-2xl font-bold">{stats.messageCount}</div>
-                  <div className="text-sm text-muted-foreground">消息</div>
+                  <div className="text-sm text-muted-foreground">{t('stats.messages')}</div>
                 </div>
                 <div className="rounded-lg border bg-card p-4 text-center">
                   <div className="text-2xl font-bold">{stats.taskCount}</div>
-                  <div className="text-sm text-muted-foreground">任务</div>
+                  <div className="text-sm text-muted-foreground">{t('stats.tasks')}</div>
                 </div>
               </div>
             )}
 
             {/* 配置表单 */}
             <div className="rounded-lg border bg-card p-6">
-              <h2 className="mb-4 text-lg font-semibold">个人信息</h2>
+              <h2 className="mb-4 text-lg font-semibold">{t('title')}</h2>
 
               <form onSubmit={handleSave} className="space-y-4">
                 <div className="space-y-2">
                   <label htmlFor="displayName" className="text-sm font-medium">
-                    显示名称
+                    {t('form.displayName')}
                   </label>
                   <Input
                     id="displayName"
                     type="text"
-                    placeholder="您的名字"
+                    placeholder={t('form.displayNamePlaceholder')}
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     disabled={isSaving}
@@ -172,11 +174,11 @@ export default function ProfilePage() {
 
                 <div className="space-y-2">
                   <label htmlFor="bio" className="text-sm font-medium">
-                    个人简介
+                    {t('form.bio')}
                   </label>
                   <textarea
                     id="bio"
-                    placeholder="介绍一下自己..."
+                    placeholder={t('form.bioPlaceholder')}
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                     disabled={isSaving}
@@ -187,7 +189,7 @@ export default function ProfilePage() {
 
                 <div className="flex gap-2">
                   <Button type="submit" disabled={isSaving}>
-                    {isSaving ? '保存中...' : '保存更改'}
+                    {isSaving ? t('form.saving') : t('form.saveChanges')}
                   </Button>
                   <Button
                     type="button"
@@ -195,7 +197,7 @@ export default function ProfilePage() {
                     onClick={loadProfile}
                     disabled={isSaving}
                   >
-                    取消
+                    {t('form.cancel')}
                   </Button>
                 </div>
               </form>
@@ -203,7 +205,7 @@ export default function ProfilePage() {
 
             {/* 账号操作 */}
             <div className="rounded-lg border bg-card p-6">
-              <h2 className="mb-4 text-lg font-semibold">账号操作</h2>
+              <h2 className="mb-4 text-lg font-semibold">{t('account.title')}</h2>
 
               <div className="space-y-3">
                 <Button
@@ -211,7 +213,7 @@ export default function ProfilePage() {
                   onClick={handleLogout}
                   className="w-full"
                 >
-                  登出
+                  {t('account.logout')}
                 </Button>
               </div>
             </div>

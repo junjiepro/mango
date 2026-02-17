@@ -53,7 +53,7 @@ const DEFAULT_STATE: WorkspaceState = {
   activeItem: 'resources',
   showSidebar: true,
   showBottomPanel: false,
-  terminals: [{ id: '1', title: '终端 1' }],
+  terminals: [{ id: '1', title: 'Terminal 1' }],
   activeTerminalId: '1',
   tabs: [],
   activeTabId: null,
@@ -105,32 +105,35 @@ export function useWorkspaceState(conversationId: string | undefined) {
   /**
    * 保存状态到 localStorage
    */
-  const saveState = useCallback((state: Partial<WorkspaceState>) => {
-    if (!conversationId) return;
+  const saveState = useCallback(
+    (state: Partial<WorkspaceState>) => {
+      if (!conversationId) return;
 
-    // 防抖：延迟保存
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    saveTimeoutRef.current = setTimeout(() => {
-      try {
-        const key = getStorageKey(conversationId);
-        const existingState = loadState() || DEFAULT_STATE;
-
-        const newState: WorkspaceState = {
-          ...existingState,
-          ...state,
-          savedAt: Date.now(),
-        };
-
-        localStorage.setItem(key, JSON.stringify(newState));
-        console.log(`[WorkspaceState] 保存状态:`, state);
-      } catch (error) {
-        console.error('[WorkspaceState] 保存状态失败:', error);
+      // 防抖：延迟保存
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
       }
-    }, 300);
-  }, [conversationId, loadState]);
+
+      saveTimeoutRef.current = setTimeout(() => {
+        try {
+          const key = getStorageKey(conversationId);
+          const existingState = loadState() || DEFAULT_STATE;
+
+          const newState: WorkspaceState = {
+            ...existingState,
+            ...state,
+            savedAt: Date.now(),
+          };
+
+          localStorage.setItem(key, JSON.stringify(newState));
+          console.log(`[WorkspaceState] 保存状态:`, state);
+        } catch (error) {
+          console.error('[WorkspaceState] 保存状态失败:', error);
+        }
+      }, 300);
+    },
+    [conversationId, loadState]
+  );
 
   /**
    * 清除状态

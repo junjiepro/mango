@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +53,7 @@ interface DeviceBinding {
 
 export default function DeviceDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const t = useTranslations('devices');
   const deviceId = params.id;
 
   const [device, setDevice] = useState<DeviceBinding | null>(null);
@@ -73,15 +75,15 @@ export default function DeviceDetailPage({ params }: { params: { id: string } })
 
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error('设备未找到');
+          throw new Error(t('detail.notFound'));
         }
-        throw new Error('加载设备信息失败');
+        throw new Error(t('detail.loadFailed'));
       }
 
       const data = await response.json();
       setDevice(data.device);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '未知错误');
+      setError(err instanceof Error ? err.message : t('detail.unknownError'));
     } finally {
       setIsLoading(false);
     }
@@ -96,12 +98,12 @@ export default function DeviceDetailPage({ params }: { params: { id: string } })
       });
 
       if (!response.ok) {
-        throw new Error('解绑设备失败');
+        throw new Error(t('detail.unbindFailed'));
       }
 
       router.push('/settings/devices');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '解绑设备失败');
+      setError(err instanceof Error ? err.message : t('detail.unbindFailed'));
       setIsDeleting(false);
       setDeleteDialogOpen(false);
     }
@@ -109,7 +111,7 @@ export default function DeviceDetailPage({ params }: { params: { id: string } })
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleString('zh-CN');
+    return date.toLocaleString();
   };
 
   if (isLoading) {
@@ -131,7 +133,7 @@ export default function DeviceDetailPage({ params }: { params: { id: string } })
         <AppHeader />
         <div className="container mx-auto max-w-6xl py-8 px-4">
           <Alert variant="destructive">
-            <AlertDescription>{error || '设备未找到'}</AlertDescription>
+            <AlertDescription>{error || t('detail.notFound')}</AlertDescription>
           </Alert>
           <Button
             variant="outline"
@@ -139,7 +141,7 @@ export default function DeviceDetailPage({ params }: { params: { id: string } })
             className="mt-4"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            返回设备列表
+            {t('detail.backToList')}
           </Button>
         </div>
       </div>
@@ -165,23 +167,23 @@ export default function DeviceDetailPage({ params }: { params: { id: string } })
           </div>
           <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
             <Trash2 className="mr-2 h-4 w-4" />
-            解绑设备
+            {t('detail.unbindDevice')}
           </Button>
         </div>
 
         {/* Basic Info Card */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-lg">基本信息</CardTitle>
+            <CardTitle className="text-lg">{t('detail.basicInfo')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="text-muted-foreground">设备 ID</p>
+                <p className="text-muted-foreground">{t('detail.deviceId')}</p>
                 <p className="font-mono text-xs mt-1 break-all">{device.device_id}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">状态</p>
+                <p className="text-muted-foreground">{t('detail.statusLabel')}</p>
                 <div className="mt-1">
                   <Badge variant={device.status === 'active' ? 'default' : 'secondary'}>
                     {device.status}
@@ -189,17 +191,17 @@ export default function DeviceDetailPage({ params }: { params: { id: string } })
                 </div>
               </div>
               <div>
-                <p className="text-muted-foreground">创建时间</p>
+                <p className="text-muted-foreground">{t('detail.createdAt')}</p>
                 <p className="mt-1">{formatDate(device.created_at)}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">最后更新</p>
+                <p className="text-muted-foreground">{t('detail.updatedAt')}</p>
                 <p className="mt-1">{formatDate(device.updated_at)}</p>
               </div>
             </div>
 
             <div className="mt-4 space-y-1">
-              <p className="text-sm text-muted-foreground">设备 URL</p>
+              <p className="text-sm text-muted-foreground">{t('detail.deviceUrl')}</p>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(device.device_url || {}).map(
                   ([key, value]) =>
@@ -217,9 +219,9 @@ export default function DeviceDetailPage({ params }: { params: { id: string } })
         {/* Tabs for different sections */}
         <Tabs defaultValue="status" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="status">状态监控</TabsTrigger>
-            <TabsTrigger value="config">配置管理</TabsTrigger>
-            <TabsTrigger value="mcp-debug">MCP 调试</TabsTrigger>
+            <TabsTrigger value="status">{t('detail.statusMonitor')}</TabsTrigger>
+            <TabsTrigger value="config">{t('detail.configManagement')}</TabsTrigger>
+            <TabsTrigger value="mcp-debug">{t('detail.mcpDebug')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="status" className="space-y-6">
@@ -256,13 +258,13 @@ export default function DeviceDetailPage({ params }: { params: { id: string } })
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>解绑设备</AlertDialogTitle>
+              <AlertDialogTitle>{t('detail.unbindTitle')}</AlertDialogTitle>
               <AlertDialogDescription>
-                确定要解绑此设备吗？这将删除所有关联的 MCP 服务配置。此操作无法撤销。
+                {t('detail.unbindDescription')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>取消</AlertDialogCancel>
+              <AlertDialogCancel disabled={isDeleting}>{t('detail.cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDelete}
                 disabled={isDeleting}
@@ -271,10 +273,10 @@ export default function DeviceDetailPage({ params }: { params: { id: string } })
                 {isDeleting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    解绑中...
+                    {t('detail.unbinding')}
                   </>
                 ) : (
-                  '确认解绑'
+                  t('detail.confirmUnbind')
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>

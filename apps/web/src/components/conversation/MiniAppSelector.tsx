@@ -8,6 +8,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -33,6 +34,7 @@ interface MiniAppSelectorProps {
  * 显示已安装的小应用列表供用户选择,支持切换到应用商店
  */
 export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorProps) {
+  const t = useTranslations('conversations')
   const [open, setOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'installed' | 'discover'>('installed')
   const [installations, setInstallations] = useState<any[]>([])
@@ -113,13 +115,13 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
       if (result.success) {
         // 重新加载已安装列表
         await loadInstallations()
-        alert('小应用安装成功!')
+        alert(t('miniAppSelector.installSuccess'))
       } else {
-        alert(`安装失败: ${result.error}`)
+        alert(t('miniAppSelector.installFailed', { error: result.error }))
       }
     } catch (error) {
       console.error('Failed to install mini app:', error)
-      alert('安装小应用失败')
+      alert(t('miniAppSelector.installError'))
     }
   }
 
@@ -153,7 +155,7 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
         onClick={() => setOpen(true)}
         disabled={disabled}
         className="h-8 w-8 p-0"
-        title="调用小应用"
+        title={t('miniAppSelector.invokeMiniApp')}
       >
         <svg
           className="h-4 w-4"
@@ -173,11 +175,11 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>选择小应用</DialogTitle>
+            <DialogTitle>{t('miniAppSelector.selectMiniApp')}</DialogTitle>
             <DialogDescription>
               {viewMode === 'installed'
-                ? '选择一个已安装的小应用在对话中调用'
-                : '浏览并安装公开的小应用'}
+                ? t('miniAppSelector.installedDesc')
+                : t('miniAppSelector.discoverDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -189,7 +191,7 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
               onClick={() => setViewMode('installed')}
               className="flex-1"
             >
-              已安装
+              {t('miniAppSelector.installed')}
             </Button>
             <Button
               variant={viewMode === 'discover' ? 'default' : 'outline'}
@@ -197,7 +199,7 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
               onClick={() => setViewMode('discover')}
               className="flex-1"
             >
-              应用商店
+              {t('miniAppSelector.appStore')}
             </Button>
           </div>
 
@@ -205,7 +207,7 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
           <div className="mb-4">
             <Input
               type="search"
-              placeholder="搜索小应用..."
+              placeholder={t('miniAppSelector.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
@@ -237,7 +239,7 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
               // 已安装视图
               filteredInstallations.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  {searchQuery ? '未找到匹配的小应用' : '暂无已安装的小应用'}
+                  {searchQuery ? t('miniAppSelector.noMatchInstalled') : t('miniAppSelector.noInstalledApps')}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -310,7 +312,7 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
               // 应用商店视图
               filteredPublicApps.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  {searchQuery ? '未找到匹配的小应用' : '暂无公开的小应用'}
+                  {searchQuery ? t('miniAppSelector.noMatchPublic') : t('miniAppSelector.noPublicApps')}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -360,7 +362,7 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
 
                         {isInstalled ? (
                           <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded">
-                            已安装
+                            {t('miniAppSelector.alreadyInstalled')}
                           </span>
                         ) : (
                           <Button
@@ -368,7 +370,7 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
                             variant="outline"
                             onClick={() => handleInstall(miniApp)}
                           >
-                            安装
+                            {t('miniAppSelector.install')}
                           </Button>
                         )}
                       </div>
@@ -383,14 +385,14 @@ export function MiniAppSelector({ onSelect, disabled = false }: MiniAppSelectorP
           {!loading && viewMode === 'installed' && installations.length === 0 && (
             <div className="text-center py-4 border-t">
               <p className="text-sm text-muted-foreground mb-2">
-                还没有安装任何小应用
+                {t('miniAppSelector.noAppsHint')}
               </p>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setViewMode('discover')}
               >
-                浏览应用商店
+                {t('miniAppSelector.browseStore')}
               </Button>
             </div>
           )}

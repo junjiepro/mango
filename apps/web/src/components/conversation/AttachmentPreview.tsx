@@ -8,6 +8,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { logger } from '@mango/shared/utils'
@@ -56,6 +57,7 @@ export function AttachmentPreview({
 }: AttachmentPreviewProps) {
   const [imageError, setImageError] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const t = useTranslations('conversations')
 
   // 判断是否为图片
   const isImage = attachment.fileType.startsWith('image/')
@@ -177,7 +179,7 @@ export function AttachmentPreview({
             onClick={handleRemove}
             className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
             type="button"
-            title="删除附件"
+            title={t('attachment.delete')}
           >
             ×
           </button>
@@ -234,7 +236,7 @@ export function AttachmentPreview({
               size="sm"
               onClick={handleRemove}
               className="h-8 w-8 p-0 flex-shrink-0"
-              title="删除附件"
+              title={t('attachment.delete')}
             >
               🗑️
             </Button>

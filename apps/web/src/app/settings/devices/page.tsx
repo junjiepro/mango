@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +47,7 @@ interface DeviceBinding {
 
 export default function DeviceManagementPage() {
   const router = useRouter();
+  const t = useTranslations('devices');
 
   const [devices, setDevices] = useState<DeviceBinding[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,13 +68,13 @@ export default function DeviceManagementPage() {
       const response = await fetch(url);
 
       if (!response.ok) {
-        throw new Error('Failed to load devices');
+        throw new Error(t('management.loadFailed'));
       }
 
       const data = await response.json();
       setDevices(data.devices || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : t('management.errorOccurred'));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -99,7 +101,7 @@ export default function DeviceManagementPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to unbind device');
+        throw new Error(t('management.unbindFailed'));
       }
 
       // 从列表中移除已删除的设备
@@ -107,7 +109,7 @@ export default function DeviceManagementPage() {
       setDeleteDialogOpen(false);
       setDeviceToDelete(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to unbind device');
+      setError(err instanceof Error ? err.message : t('management.unbindFailed'));
     } finally {
       setIsDeleting(false);
     }
@@ -120,13 +122,13 @@ export default function DeviceManagementPage() {
 
   const getStatusBadge = (binding: DeviceBinding) => {
     if (binding.status !== 'active') {
-      return <Badge variant="secondary">Inactive</Badge>;
+      return <Badge variant="secondary">{t('management.inactive')}</Badge>;
     }
     if (binding.is_online === true) {
       return (
         <Badge variant="default" className="bg-green-500">
           <Circle className="mr-1 h-2 w-2 fill-current" />
-          Online
+          {t('online')}
         </Badge>
       );
     }
@@ -134,11 +136,11 @@ export default function DeviceManagementPage() {
       return (
         <Badge variant="destructive">
           <Circle className="mr-1 h-2 w-2 fill-current" />
-          Offline
+          {t('offline')}
         </Badge>
       );
     }
-    return <Badge variant="outline">Unknown</Badge>;
+    return <Badge variant="outline">{t('unknown')}</Badge>;
   };
 
   if (isLoading) {
@@ -160,9 +162,9 @@ export default function DeviceManagementPage() {
       <div className="container mx-auto max-w-6xl py-8 px-4">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold">Device Management</h1>
+            <h1 className="text-3xl font-bold">{t('management.title')}</h1>
             <p className="text-muted-foreground mt-1">
-              Manage your connected devices and local services
+              {t('management.description')}
             </p>
           </div>
           <div className="flex gap-2">
@@ -171,7 +173,7 @@ export default function DeviceManagementPage() {
             </Button>
             <Button onClick={() => router.push('/devices/bind')}>
               <Plus className="mr-2 h-4 w-4" />
-              Bind New Device
+              {t('management.bindNewDevice')}
             </Button>
           </div>
         </div>
@@ -187,14 +189,14 @@ export default function DeviceManagementPage() {
             <CardContent className="py-12">
               <div className="text-center space-y-4">
                 <div className="text-muted-foreground">
-                  <p className="text-lg font-medium">No devices connected</p>
+                  <p className="text-lg font-medium">{t('management.noDevices')}</p>
                   <p className="text-sm mt-2">
-                    Start the Mango CLI tool on your local machine and bind it to your account
+                    {t('management.noDevicesHint')}
                   </p>
                 </div>
                 <Button onClick={() => router.push('/devices/bind')}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Bind Your First Device
+                  {t('management.bindFirstDevice')}
                 </Button>
               </div>
             </CardContent>
@@ -211,7 +213,7 @@ export default function DeviceManagementPage() {
                         {getStatusBadge(binding)}
                       </CardTitle>
                       <CardDescription>
-                        Platform: {binding.platform} • Bound on {formatDate(binding.created_at)}
+                        {t('management.platform', { platform: binding.platform })} • {t('management.boundOn', { date: formatDate(binding.created_at) })}
                       </CardDescription>
                     </div>
                     <div className="flex gap-2">
@@ -219,7 +221,7 @@ export default function DeviceManagementPage() {
                         variant="outline"
                         size="icon"
                         onClick={() => router.push(`/devices/${binding.id}`)}
-                        title="View Details"
+                        title={t('management.viewDetails')}
                       >
                         <Settings className="h-4 w-4" />
                       </Button>
@@ -228,7 +230,7 @@ export default function DeviceManagementPage() {
                         size="icon"
                         onClick={() => handleDeleteClick(binding.id)}
                         className="text-destructive hover:text-destructive"
-                        title="Unbind Device"
+                        title={t('management.unbindDevice')}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -238,27 +240,27 @@ export default function DeviceManagementPage() {
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <p className="text-muted-foreground">Device ID</p>
+                      <p className="text-muted-foreground">{t('management.deviceId')}</p>
                       <p className="font-mono text-xs mt-1">
                         {binding.device_id.substring(0, 16)}...
                       </p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">Hostname</p>
+                      <p className="text-muted-foreground">{t('management.hostname')}</p>
                       <p className="mt-1">{binding.hostname || 'N/A'}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">Last Seen</p>
+                      <p className="text-muted-foreground">{t('management.lastSeen')}</p>
                       <p className="mt-1">{formatDate(binding.last_seen_at)}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">Status</p>
+                      <p className="text-muted-foreground">{t('management.statusLabel')}</p>
                       <p className="mt-1 capitalize">{binding.status}</p>
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Device URL</p>
+                    <p className="text-sm text-muted-foreground">{t('management.deviceUrl')}</p>
                     <div className="flex items-center gap-2">
                       {Object.entries(binding.device_url).map(
                         ([key, value]) =>
@@ -274,8 +276,7 @@ export default function DeviceManagementPage() {
                   {binding.status === 'active' && binding.is_online === false && (
                     <Alert>
                       <AlertDescription className="text-sm">
-                        This device appears to be offline. Make sure the Mango CLI tool is running
-                        and the device URL is accessible.
+                        {t('management.offlineAlert')}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -288,14 +289,13 @@ export default function DeviceManagementPage() {
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Unbind Device</AlertDialogTitle>
+              <AlertDialogTitle>{t('dialog.unbindTitle')}</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to unbind this device? This will remove all associated MCP
-                service configurations. This action cannot be undone.
+                {t('dialog.unbindDescription')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={isDeleting}>{t('dialog.cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDeleteConfirm}
                 disabled={isDeleting}
@@ -304,10 +304,10 @@ export default function DeviceManagementPage() {
                 {isDeleting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Unbinding...
+                    {t('dialog.unbinding')}
                   </>
                 ) : (
-                  'Unbind Device'
+                  t('dialog.unbindConfirm')
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>

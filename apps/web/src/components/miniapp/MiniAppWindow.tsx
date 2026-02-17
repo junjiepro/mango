@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
+import { useTranslations } from 'next-intl';
 import { MiniAppContainer } from './MiniAppContainer';
 import type { MiniAppContainerRef } from './MiniAppContainer';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ interface MiniAppWindowProps {
  * 通过 MCP Client + AppBridge 自动处理所有 API 请求
  */
 export function MiniAppWindow({ miniApp, onClose, onSendMessage, className }: MiniAppWindowProps) {
+  const tc = useTranslations('common');
   const [refreshKey, setRefreshKey] = useState(0);
   const [mcpClient, setMcpClient] = useState<MiniAppMCPClient | null>(null);
   const [htmlContent, setHtmlContent] = useState<string | undefined>(undefined);
@@ -130,7 +132,7 @@ export function MiniAppWindow({ miniApp, onClose, onSendMessage, className }: Mi
             variant="ghost"
             onClick={handleRefresh}
             className="h-7 w-7 p-0 mr-6"
-            title="刷新"
+            title={tc('actions.refresh')}
           >
             <RefreshCw className="h-4 w-4" />
           </Button>

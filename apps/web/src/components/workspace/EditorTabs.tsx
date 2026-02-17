@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -34,12 +35,14 @@ export function EditorTabs({
   onTabClose,
   className = '',
 }: EditorTabsProps) {
+  const t = useTranslations('workspace');
+
   if (tabs.length === 0) {
     return (
       <div className={`flex items-center justify-center h-full text-muted-foreground ${className}`}>
         <div className="text-center">
-          <p className="text-sm">选择左侧的资源或文件以查看内容</p>
-          <p className="text-xs mt-2">或在终端中执行命令</p>
+          <p className="text-sm">{t('editor.selectResource')}</p>
+          <p className="text-xs mt-2">{t('editor.orRunCommand')}</p>
         </div>
       </div>
     );

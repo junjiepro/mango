@@ -7,6 +7,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { FileNode } from '@/hooks/useDeviceFiles';
@@ -225,8 +226,10 @@ export function FileTree({
   onDownload,
   onUpload,
 }: FileTreeProps) {
+  const t = useTranslations('workspace');
+
   if (files.length === 0) {
-    return <div className={`p-4 text-sm text-muted-foreground ${className}`}>暂无文件</div>;
+    return <div className={`p-4 text-sm text-muted-foreground ${className}`}>{t('fileExplorer.noFiles')}</div>;
   }
 
   return (

@@ -1,22 +1,32 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/sonner';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 
-export const metadata: Metadata = {
-  title: 'Mango - 智能Agent对话平台',
-  description: '支持多模态对话、后台任务执行、小应用生态的智能Agent平台',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('common');
+  return {
+    title: 'Mango - ' + (t.has('siteTitle') ? t('siteTitle') : 'AI Agent Platform'),
+    description: t.has('siteDescription') ? t('siteDescription') : 'Intelligent AI Agent platform with multimodal conversations',
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="zh-CN">
+    <html lang={locale}>
       <body className="antialiased">
-        {children}
-        <Toaster />
+        <NextIntlClientProvider messages={messages}>
+          {children}
+          <Toaster />
+        </NextIntlClientProvider>
       </body>
     </html>
   );

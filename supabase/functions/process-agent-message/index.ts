@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Parse request
-    const { conversationId, messageId, userId, deviceId, continuation } =
+    const { conversationId, messageId, userId, deviceId, locale, continuation } =
       (await req.json()) as AgentMessagePayload;
 
     if (!conversationId || !messageId || !userId) {
@@ -148,7 +148,8 @@ Deno.serve(async (req) => {
             runCount: currentRunCount,
             partialContent: continuation?.partialContent,
             totalTokens: continuation?.totalTokens,
-          }
+          },
+          locale
         );
       } catch (error) {
         console.error('Agent response error:', error);
@@ -156,7 +157,9 @@ Deno.serve(async (req) => {
         await supabase
           .from('messages')
           .update({
-            content: '抱歉，我遇到了一些问题，无法回复您的消息。',
+            content: locale === 'en'
+              ? 'Sorry, I encountered some issues and was unable to reply to your message.'
+              : '抱歉，我遇到了一些问题，无法回复您的消息。',
             status: 'failed',
             agent_metadata: {
               error: error instanceof Error ? error.message : 'Unknown error',
@@ -208,7 +211,8 @@ async function streamAgentResponse(
     runCount: number;
     partialContent?: string;
     totalTokens?: number;
-  }
+  },
+  locale?: string
 ): Promise<void> {
   const startTime = Date.now();
   const runCount = continuationState?.runCount || 1;
@@ -293,7 +297,7 @@ async function streamAgentResponse(
     );
 
     // 系统提示词（使用模块化提示词）
-    let systemPrompt = getSystemPrompt(learningContext);
+    let systemPrompt = getSystemPrompt(learningContext, locale);
 
     // 订阅 channel（确保已连接）
     await new Promise((resolve) => {
@@ -361,8 +365,31 @@ async function streamAgentResponse(
     if (miniAppInfo) {
       const manifest = miniAppInfo.miniApp.manifest || {};
       const mcpTools = manifest.tools || [];
+      const lang = locale === 'en' ? 'en' : 'zh';
 
-      systemPrompt += `
+      if (lang === 'en') {
+        systemPrompt += `
+
+**Important**: The user selected the MiniApp "${miniAppInfo.miniApp.display_name}" in this message.
+
+**MiniApp Info**:
+- Name: ${miniAppInfo.miniApp.display_name}
+- Description: ${miniAppInfo.miniApp.description}
+- MiniApp ID: ${miniAppInfo.miniApp.id}
+${mcpTools.length > 0 ? `- Available tools: ${mcpTools.map((t: any) => t.name).join(', ')}` : ''}
+
+**Invocation Guide**:
+Use the \`invoke_miniapp\` tool to call this MiniApp via MCP protocol:
+- miniAppId: "${miniAppInfo.miniApp.id}"
+- toolName: the tool name to call
+- args: tool arguments
+
+**Response Format**:
+- After calling the MiniApp to get data, use the \`generate_a2ui\` tool to visually present results
+- Use \`list\` component for list data, \`card\` component for single items
+- Include a brief text description of the operation result`;
+      } else {
+        systemPrompt += `
 
 **重要提示**: 用户在这条消息中选择了小应用 "${miniAppInfo.miniApp.display_name}"。
 
@@ -382,6 +409,7 @@ ${mcpTools.length > 0 ? `- 可用工具: ${mcpTools.map((t: any) => t.name).join
 - 调用小应用获取数据后，使用 \`generate_a2ui\` 工具可视化展示结果
 - 列表数据使用 \`list\` 组件，单个项目使用 \`card\` 组件
 - 同时用简短文字说明操作结果`;
+      }
     }
 
     // MiniApp 工具上下文
@@ -891,6 +919,7 @@ ${mcpTools.length > 0 ? `- 可用工具: ${mcpTools.map((t: any) => t.name).join
           messageId: conversationHistory.find((m: any) => m.sender_type === 'user')?.id,
           userId,
           deviceId,
+          locale,
           continuation: {
             agentMessageId: messageId,
             runCount: runCount + 1,
@@ -917,7 +946,9 @@ ${mcpTools.length > 0 ? `- 可用工具: ${mcpTools.map((t: any) => t.name).join
 
       // 达到最大运行次数，保存当前内容并完成
       console.warn('Max continuation runs reached:', { runCount });
-      const finalContent = fullContent || '抱歉，处理您的请求需要较长时间，已达到最大处理次数。';
+      const finalContent = fullContent || (locale === 'en'
+        ? 'Sorry, your request took too long to process and has reached the maximum number of retries.'
+        : '抱歉，处理您的请求需要较长时间，已达到最大处理次数。');
 
       await supabase
         .from('messages')
@@ -936,9 +967,13 @@ ${mcpTools.length > 0 ? `- 可用工具: ${mcpTools.map((t: any) => t.name).join
 
       return;
     }
-    const errorContent = `抱歉，我在处理您的消息时遇到了问题。错误信息：${
-      error instanceof Error ? error.message : '未知错误'
-    }`;
+    const errorContent = locale === 'en'
+      ? `Sorry, I encountered an issue while processing your message. Error: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      : `抱歉，我在处理您的消息时遇到了问题。错误信息：${
+          error instanceof Error ? error.message : '未知错误'
+        }`;
 
     // 通过 Realtime Channel 通知前端错误
     try {

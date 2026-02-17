@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import Editor from '@monaco-editor/react';
 import { useDeviceFiles, type FileNode } from '@/hooks/useDeviceFiles';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,8 @@ interface FileExplorerProps {
 }
 
 export function FileExplorer({ deviceId, className }: FileExplorerProps) {
+  const t = useTranslations('workspace');
+  const tc = useTranslations('common');
   const {
     files,
     currentPath,
@@ -82,7 +85,7 @@ export function FileExplorer({ deviceId, className }: FileExplorerProps) {
       <div className="w-64 border-r bg-muted/40">
         <div className="p-2 border-b">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold">文件浏览器</span>
+            <span className="text-sm font-semibold">{t('fileExplorer.title')}</span>
             <Button variant="ghost" size="sm">
               <Plus className="h-4 w-4" />
             </Button>
@@ -91,7 +94,7 @@ export function FileExplorer({ deviceId, className }: FileExplorerProps) {
 
         <ScrollArea className="h-[calc(100%-3rem)]">
           {isLoading && (
-            <div className="p-4 text-sm text-muted-foreground">加载中...</div>
+            <div className="p-4 text-sm text-muted-foreground">{tc('actions.loading')}</div>
           )}
           {error && (
             <div className="p-4 text-sm text-destructive">{error}</div>
@@ -117,7 +120,7 @@ export function FileExplorer({ deviceId, className }: FileExplorerProps) {
                 {isEditing && (
                   <Button variant="default" size="sm" onClick={handleSaveFile}>
                     <Save className="h-4 w-4 mr-1" />
-                    保存
+                    {tc('actions.save')}
                   </Button>
                 )}
                 <Button
@@ -146,7 +149,7 @@ export function FileExplorer({ deviceId, className }: FileExplorerProps) {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            选择一个文件以查看内容
+            {t('fileExplorer.selectFile')}
           </div>
         )}
       </div>
