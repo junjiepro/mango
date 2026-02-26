@@ -80,6 +80,8 @@ function ConversationDetailContent() {
   // 资源预览状态
   const [previewResource, setPreviewResource] = useState<DetectedResource | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  // 待在工作区中打开的资源
+  const [pendingResource, setPendingResource] = useState<DetectedResource | null>(null);
 
   // 工作区状态持久化
   const { getInitialState, saveState } = useWorkspaceState(currentConversation?.id);
@@ -297,28 +299,31 @@ function ConversationDetailContent() {
         setShowPreviewDialog(true);
       } else {
         // 工作区已激活，在工作区中预览
-        // TODO: 在工作区中打开资源
-        console.log('在工作区中预览资源:', resource);
+        setPendingResource(resource);
       }
     } else {
       // 不可弹窗预览类型，激活工作区并在其中预览
       setShowWorkspace(true);
-      // TODO: 在工作区中打开资源
-      console.log('激活工作区并预览资源:', resource);
+      setPendingResource(resource);
     }
   };
 
   // 处理图片点击
   const handleImageClick = (url: string, filename?: string) => {
-    // 创建临时资源对象用于预览
+    // 优先从已嗅探资源中匹配，保证与资源快速访问栏使用同一资源对象
+    const existing = resources.find(
+      (r) => r.type === 'image' && (r.metadata?.url === url || r.metadata?.src === url)
+    );
+    if (existing) {
+      handleResourceClick(existing);
+      return;
+    }
+    // 未匹配到时构造临时资源对象
     const imageResource: DetectedResource = {
-      id: `temp-${Date.now()}`,
+      id: `image-${url}`,
       type: 'image',
       content: filename || 'Image',
-      metadata: {
-        url,
-        filename,
-      },
+      metadata: { url, filename },
       position: { start: 0, end: 0 },
     };
     handleResourceClick(imageResource);
@@ -590,6 +595,8 @@ function ConversationDetailContent() {
           onWorkingDirectoryChange={handleWorkingDirectoryChange}
           workspacePanelSize={workspacePanelSize}
           onWorkspacePanelSizeChange={setWorkspacePanelSize}
+          pendingResource={pendingResource}
+          onPendingResourceHandled={() => setPendingResource(null)}
         >
           {/* 同时渲染所有会话，使用 CSS 控制显示/隐藏，保持后台会话运行 */}
 

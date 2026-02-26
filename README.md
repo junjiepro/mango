@@ -288,6 +288,23 @@ Agent 识别用户意图
 - [MiniApp 开发指南](./specs/001-agent-chat-platform/spec.md#user-story-2)
 - [API 参考文档](./specs/001-agent-chat-platform/contracts/)
 
+## 安全特性
+
+- **RLS 策略**: 所有数据表启用行级安全策略
+- **CSRF 防护**: API 路由 Origin 头校验
+- **XSS 防护**: HTML 内容自动清理（sanitize）
+- **安全头**: HSTS、X-Frame-Options、X-Content-Type-Options 等
+- **速率限制**: API/Auth/Chat 分级限流
+- **沙箱隔离**: iframe sandbox 属性限制
+
+## 性能优化
+
+- **数据库索引**: 针对高频查询路径优化
+- **代码分割**: Monaco Editor、Terminal 等重组件 next/dynamic 懒加载
+- **React.memo**: 高频渲染组件（MessageItem、MiniAppCard 等）缓存
+- **Realtime 防抖**: 订阅更新 300-500ms 批量处理
+- **响应压缩**: Next.js compress 启用
+
 ## 贡献指南
 
 1. Fork 本仓库

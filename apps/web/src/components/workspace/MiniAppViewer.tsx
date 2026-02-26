@@ -15,7 +15,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { MonacoEditor } from './MonacoEditor';
+import dynamic from 'next/dynamic';
+
+const MonacoEditor = dynamic(
+  () => import('./MonacoEditor').then(mod => mod.MonacoEditor),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full text-muted-foreground">Loading editor...</div> }
+);
 import { MCPDebugPanel } from './MCPDebugPanel';
 import { InteractPanel } from './InteractPanel';
 import { MINIAPP_TEMPLATES } from '@/lib/miniapp/templates';

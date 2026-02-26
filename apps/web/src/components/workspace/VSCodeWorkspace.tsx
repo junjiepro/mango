@@ -18,7 +18,12 @@ import { DeviceTab } from './tabs/DeviceTab';
 import { FileExplorerTab } from './tabs/FileExplorerTab';
 import { GitTab } from './tabs/GitTab';
 import { MiniAppTab } from './tabs/MiniAppTab';
-import { Terminal } from './Terminal';
+import dynamic from 'next/dynamic';
+
+const Terminal = dynamic(
+  () => import('./Terminal').then(mod => mod.Terminal),
+  { ssr: false }
+);
 import { EditorTabs } from './EditorTabs';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
 import { DeviceBinding } from '@/services/DeviceService';
@@ -33,6 +38,8 @@ interface VSCodeWorkspaceProps {
   className?: string;
   currentWorkingDirectory?: string;
   onWorkingDirectoryChange?: (path: string) => void;
+  pendingResource?: DetectedResource | null;
+  onPendingResourceHandled?: () => void;
 }
 
 export function VSCodeWorkspace({
@@ -42,6 +49,8 @@ export function VSCodeWorkspace({
   className = '',
   currentWorkingDirectory,
   onWorkingDirectoryChange,
+  pendingResource,
+  onPendingResourceHandled,
 }: VSCodeWorkspaceProps) {
   const t = useTranslations('workspace');
   const [selectedDevice, setSelectedDevice] = useState<DeviceBinding | undefined>(undefined);
@@ -100,6 +109,14 @@ export function VSCodeWorkspace({
   useEffect(() => {
     isInitializedRef.current = true;
   }, []);
+
+  // 消费外部传入的待打开资源
+  useEffect(() => {
+    if (pendingResource) {
+      openResourceTab(pendingResource);
+      onPendingResourceHandled?.();
+    }
+  }, [pendingResource, openResourceTab, onPendingResourceHandled]);
 
   // 当 conversationId 变化时，恢复工作区状态
   const prevConversationIdRef = useRef<string | undefined>(undefined);
@@ -223,14 +240,17 @@ export function VSCodeWorkspace({
   const prevExternalWorkingDirectoryRef = React.useRef(currentWorkingDirectory);
   React.useEffect(() => {
     if (currentWorkingDirectory !== prevExternalWorkingDirectoryRef.current) {
+      const wasEmpty = !prevExternalWorkingDirectoryRef.current;
       prevExternalWorkingDirectoryRef.current = currentWorkingDirectory;
-      // 清空文件浏览器展开状态
-      setFileExplorerExpandedPaths([]);
-      if (isInitializedRef.current) {
-        saveState({ fileExplorerExpandedPaths: [] });
+
+      // 初始加载（旧值为空）不清理；用户主动切换（旧值非空）才清理
+      if (!wasEmpty) {
+        setFileExplorerExpandedPaths([]);
+        if (isInitializedRef.current) {
+          saveState({ fileExplorerExpandedPaths: [] });
+        }
+        closeAllFileTabs();
       }
-      // 关闭所有从文件浏览器打开的文件标签页
-      closeAllFileTabs();
     }
   }, [currentWorkingDirectory, saveState, closeAllFileTabs]);
 

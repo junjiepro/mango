@@ -11,7 +11,12 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Terminal } from './Terminal';
+import dynamic from 'next/dynamic';
+
+const Terminal = dynamic(
+  () => import('./Terminal').then(mod => mod.Terminal),
+  { ssr: false }
+);
 import { DeviceBinding } from '@/services/DeviceService';
 
 export interface TerminalSession {

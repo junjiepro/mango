@@ -8,7 +8,12 @@
 
 import React from 'react';
 import { TerminalIcon } from 'lucide-react';
-import { Terminal } from '@/components/workspace/Terminal';
+import dynamic from 'next/dynamic';
+
+const Terminal = dynamic(
+  () => import('@/components/workspace/Terminal').then(mod => mod.Terminal),
+  { ssr: false }
+);
 import { DeviceBinding } from '@/services/DeviceService';
 
 interface TerminalTabProps {

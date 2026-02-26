@@ -53,9 +53,11 @@ export const MiniAppContainer = React.forwardRef<MiniAppContainerRef, MiniAppCon
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const bridgeRef = useRef<AppBridge | null>(null);
     const t = useTranslations('miniapps');
-    // 用 ref 持有回调 prop，避免回调变化触发 useEffect 重建 iframe
+    // 用 ref 持有回调 prop 和 hostContext，避免变化触发 useEffect 重建 iframe
     const callbacksRef = useRef({ onError, onInitialized, onSizeChange, onOpenLink, onSendMessage, onConsole });
     callbacksRef.current = { onError, onInitialized, onSizeChange, onOpenLink, onSendMessage, onConsole };
+    const hostContextRef = useRef(hostContext);
+    hostContextRef.current = hostContext;
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [iframeSize, setIframeSize] = useState<{ width?: number; height?: number }>({});
@@ -112,7 +114,7 @@ export const MiniAppContainer = React.forwardRef<MiniAppContainerRef, MiniAppCon
           mcpClient ?? null,
           { name: 'mango-host', version: '1.0.0' },
           {
-            hostContext: hostContext ?? { theme: 'light' },
+            hostContext: hostContextRef.current ?? { theme: 'light' },
             targetOrigin: sandboxOrigin,
           },
         );
@@ -176,7 +178,7 @@ export const MiniAppContainer = React.forwardRef<MiniAppContainerRef, MiniAppCon
         setIsLoading(false);
         callbacksRef.current.onError?.(err as Error);
       }
-    }, [mcpClient, createSandboxHTML, hostContext, sandboxOrigin]);
+    }, [mcpClient, createSandboxHTML, sandboxOrigin]);
 
     // 暴露 API 给父组件
     React.useImperativeHandle(ref, () => ({

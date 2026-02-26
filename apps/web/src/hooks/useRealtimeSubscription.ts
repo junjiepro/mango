@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { logger } from '@mango/shared/utils'
@@ -22,6 +22,8 @@ interface SubscriptionConfig<T = any> {
   onUpdate?: (payload: RealtimePostgresChangesPayload<T>) => void
   onDelete?: (payload: RealtimePostgresChangesPayload<T>) => void
   onChange?: (payload: RealtimePostgresChangesPayload<T>) => void
+  /** 防抖延迟(ms)，批量处理高频事件。0 表示不防抖 */
+  debounceMs?: number
 }
 
 /**
@@ -42,6 +44,31 @@ export function useRealtimeSubscription<T = any>(
   const [status, setStatus] = useState<SubscriptionStatus>('disconnected')
   const [error, setError] = useState<Error | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingPayloadsRef = useRef<RealtimePostgresChangesPayload<T>[]>([])
+
+  // 用 ref 保存最新回调，避免 effect 因回调变化而重新订阅
+  const callbacksRef = useRef(config)
+  useEffect(() => {
+    callbacksRef.current = config
+  })
+
+  const flushPayloads = useCallback(() => {
+    const payloads = pendingPayloadsRef.current
+    pendingPayloadsRef.current = []
+    for (const payload of payloads) {
+      if (payload.eventType === 'INSERT' && callbacksRef.current.onInsert) {
+        callbacksRef.current.onInsert(payload)
+      } else if (payload.eventType === 'UPDATE' && callbacksRef.current.onUpdate) {
+        callbacksRef.current.onUpdate(payload)
+      } else if (payload.eventType === 'DELETE' && callbacksRef.current.onDelete) {
+        callbacksRef.current.onDelete(payload)
+      }
+      if (callbacksRef.current.onChange) {
+        callbacksRef.current.onChange(payload)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!enabled) {
@@ -53,6 +80,8 @@ export function useRealtimeSubscription<T = any>(
       }
       return
     }
+
+    const debounceMs = config.debounceMs ?? 0
 
     // 创建频道
     setStatus('connecting')
@@ -77,18 +106,25 @@ export function useRealtimeSubscription<T = any>(
           table: config.table,
         })
 
-        // 调用相应的回调
-        if (payload.eventType === 'INSERT' && config.onInsert) {
-          config.onInsert(payload)
-        } else if (payload.eventType === 'UPDATE' && config.onUpdate) {
-          config.onUpdate(payload)
-        } else if (payload.eventType === 'DELETE' && config.onDelete) {
-          config.onDelete(payload)
-        }
-
-        // 调用通用回调
-        if (config.onChange) {
-          config.onChange(payload)
+        if (debounceMs <= 0) {
+          // 无防抖，通过 ref 调用最新回调
+          if (payload.eventType === 'INSERT' && callbacksRef.current.onInsert) {
+            callbacksRef.current.onInsert(payload)
+          } else if (payload.eventType === 'UPDATE' && callbacksRef.current.onUpdate) {
+            callbacksRef.current.onUpdate(payload)
+          } else if (payload.eventType === 'DELETE' && callbacksRef.current.onDelete) {
+            callbacksRef.current.onDelete(payload)
+          }
+          if (callbacksRef.current.onChange) {
+            callbacksRef.current.onChange(payload)
+          }
+        } else {
+          // 防抖：缓冲事件，延迟批量处理
+          pendingPayloadsRef.current.push(payload)
+          if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current)
+          }
+          debounceTimerRef.current = setTimeout(flushPayloads, debounceMs)
         }
       }
     )
@@ -119,6 +155,11 @@ export function useRealtimeSubscription<T = any>(
 
     // 清理函数
     return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = null
+      }
+      pendingPayloadsRef.current = []
       if (channelRef.current) {
         logger.debug('Cleaning up realtime subscription', {
           channel: channelName,
@@ -127,7 +168,7 @@ export function useRealtimeSubscription<T = any>(
         channelRef.current = null
       }
     }
-  }, [channelName, config.table, config.filter, enabled])
+  }, [channelName, config.table, config.filter, config.debounceMs, enabled, supabase, flushPayloads])
 
   return {
     status,

@@ -281,9 +281,8 @@ export function useStreamingMessage(conversationId: string | null) {
     // 订阅消息错误事件
     channel.on('broadcast', { event: 'message_error' }, (payload) => {
       const data = payload.payload as MessageErrorPayload;
-      logger.error('Message streaming error', {
+      logger.error('Message streaming error', new Error(data.error || 'Unknown streaming error'), {
         messageId: data.messageId,
-        error: data.error,
       });
 
       // 更新流式消息为错误内容

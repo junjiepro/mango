@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { MessageItem } from './MessageItem';
 import {
@@ -18,7 +18,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import type { Database } from '@/types/database.types';
 import { useStreamingMessage } from '@/hooks/useStreamingMessage';
-import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { cn } from '@/lib/utils';
 
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -40,11 +39,12 @@ interface MessageListProps {
 
 /**
  * MessageList 组件
- * 显示消息列表,支持虚拟滚动、加载更多、流式消息和实时更新
+ * 显示消息列表,支持加载更多、流式消息
+ * 消息状态由 ConversationContext 统一管理（含 realtime 订阅）
  */
 export function MessageList({
   conversationId,
-  messages: initialMessages,
+  messages,
   installations,
   isLoading = false,
   hasMore = false,
@@ -55,51 +55,11 @@ export function MessageList({
 }: MessageListProps) {
   const t = useTranslations('conversations');
   const tc = useTranslations('common');
-  const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const prevMessagesLengthRef = useRef(initialMessages.length);
-
-  // 本地消息状态（包含初始消息和实时更新）
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const prevMessagesLengthRef = useRef(messages.length);
 
   // 订阅流式消息
-  const { streamingMessages, getStreamingMessage } = useStreamingMessage(conversationId);
-
-  // 处理消息插入
-  const handleMessageInsert = useCallback((newMessage: Message) => {
-    setMessages((prev) => {
-      // 检查消息是否已存在
-      if (prev.some((msg) => msg.id === newMessage.id)) {
-        return prev;
-      }
-      // 按序列号排序插入
-      const updated = [...prev, newMessage].sort((a, b) => a.sequence_number - b.sequence_number);
-      return updated;
-    });
-  }, []);
-
-  // 处理消息更新
-  const handleMessageUpdate = useCallback((updatedMessage: Message) => {
-    setMessages((prev) => prev.map((msg) => (msg.id === updatedMessage.id ? updatedMessage : msg)));
-  }, []);
-
-  // 处理消息删除
-  const handleMessageDelete = useCallback((messageId: string) => {
-    setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
-  }, []);
-
-  // 订阅数据库消息变化
-  useRealtimeMessages({
-    conversationId,
-    onInsert: handleMessageInsert,
-    onUpdate: handleMessageUpdate,
-    onDelete: handleMessageDelete,
-  });
-
-  // 同步初始消息到本地状态
-  useEffect(() => {
-    setMessages(initialMessages);
-  }, [initialMessages]);
+  const { getStreamingMessage } = useStreamingMessage(conversationId);
 
   // 自动滚动到底部 (仅当有新消息时)
   useEffect(() => {

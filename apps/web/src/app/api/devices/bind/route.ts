@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
           headers: {
             'Content-Type': 'application/json',
           },
-          signal: AbortSignal.timeout(5000), // 5秒超时
+          signal: AbortSignal.timeout(5000),
         });
 
         if (healthResponse.ok) {

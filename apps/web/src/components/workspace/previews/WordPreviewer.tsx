@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { PreviewContainer, PreviewLoading, PreviewError } from './PreviewContainer';
+import { sanitizeHtml } from '@/lib/sanitize';
 import type { PreviewerProps } from './types';
 import { buildFileUrl } from './types';
 
@@ -175,7 +176,7 @@ export function WordPreviewer({ file, deviceClient, className = '' }: PreviewerP
       <div className="flex-1 overflow-auto p-8 bg-white dark:bg-zinc-900">
         <article
           className="max-w-4xl mx-auto word-preview"
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlContent) }}
         />
         <style jsx global>{`
           .word-preview {

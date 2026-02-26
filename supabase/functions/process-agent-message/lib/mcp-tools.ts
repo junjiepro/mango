@@ -130,28 +130,34 @@ async function loadToolsFromDevice(
     return;
   }
 
-  const url =
-    binding.device_url.cloudflare_url ||
-    binding.device_url.hostname_url ||
-    binding.device_url.localhost_url ||
-    '';
+  // 按优先级构建候选 URL 列表（包含 tailscale_url）
+  const urlsToTry = [
+    binding.device_url.cloudflare_url,
+    binding.device_url.tailscale_url,
+    binding.device_url.hostname_url,
+    binding.device_url.localhost_url,
+  ].filter(Boolean) as string[];
 
-  if (!url) {
+  if (!urlsToTry.length) {
     console.log(`Skipping binding ${binding.id}: no valid URL`);
     return;
   }
 
-  try {
-    // 健康检查
-    const healthOk = await checkDeviceHealth(url, binding, channel, messageId);
-    if (!healthOk) return;
+  // 逐个尝试健康检查，找到第一个可达的 URL
+  let reachableUrl: string | null = null;
+  for (const candidateUrl of urlsToTry) {
+    const ok = await checkDeviceHealth(candidateUrl, binding, channel, messageId);
+    if (ok) { reachableUrl = candidateUrl; break; }
+  }
+  if (!reachableUrl) return;
 
+  try {
     // 连接 MCP 并加载工具
     const { experimental_createMCPClient } = await import('https://esm.sh/@ai-sdk/mcp');
     const mcpClient = await experimental_createMCPClient({
       transport: {
         type: 'http',
-        url: `${url}/mcp`,
+        url: `${reachableUrl}/mcp`,
         headers: { Authorization: `Bearer ${binding.binding_code}` },
       },
     });

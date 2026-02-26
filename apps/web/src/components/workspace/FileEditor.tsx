@@ -8,7 +8,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { MonacoEditor } from './MonacoEditor';
+import dynamic from 'next/dynamic';
+
+const MonacoEditor = dynamic(
+  () => import('./MonacoEditor').then(mod => mod.MonacoEditor),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full text-muted-foreground">Loading editor...</div> }
+);
 import { Button } from '@/components/ui/button';
 import { Save, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';

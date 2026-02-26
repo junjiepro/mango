@@ -28,7 +28,7 @@ interface ResourceItemProps {
   onClick?: (resource: DetectedResource) => void;
 }
 
-export function ResourceItem({ resource, onClick }: ResourceItemProps) {
+export const ResourceItem = React.memo(function ResourceItem({ resource, onClick }: ResourceItemProps) {
   const isMiniApp = resource.type === 'miniapp';
   const isImage = resource.type === 'image';
   const isFile = resource.type === 'file';
@@ -170,7 +170,7 @@ export function ResourceItem({ resource, onClick }: ResourceItemProps) {
       </TooltipProvider>
     </div>
   );
-}
+});
 
 function getResourceIcon(type: ResourceType) {
   const icons = {

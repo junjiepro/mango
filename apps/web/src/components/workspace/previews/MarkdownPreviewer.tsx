@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { PreviewContainer, PreviewLoading, PreviewError } from './PreviewContainer';
+import { sanitizeHtml } from '@/lib/sanitize';
 import type { PreviewerProps } from './types';
 
 type ViewMode = 'preview' | 'source' | 'split';
@@ -289,7 +290,7 @@ export function MarkdownPreviewer({ file, deviceClient, className = '' }: Previe
                 prose-table:border-collapse prose-th:border prose-th:p-2 prose-th:bg-muted prose-td:border prose-td:p-2
                 prose-hr:my-8
                 prose-img:rounded-lg prose-img:max-w-full"
-              dangerouslySetInnerHTML={{ __html: htmlContent }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlContent) }}
             />
           </div>
         )}

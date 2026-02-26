@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import type { Database } from '@/types/database.types';
 import {
@@ -76,11 +76,31 @@ interface MessageItemProps {
   onImageClick?: (url: string, filename?: string) => void;
 }
 
+// 稳定的空数组引用，避免默认参数每次创建新引用导致 React.memo 失效
+const EMPTY_FILES: AttachmentWithPath[] = [];
+const EMPTY_TOOL_CALLS: ToolCall[] = [];
+
+// 非标准 HTML 标签转义用的正则（模块级别，避免每次渲染重建）
+const STANDARD_HTML_TAGS =
+  /^(?:a|abbr|b|blockquote|br|code|dd|del|details|dfn|div|dl|dt|em|h[1-6]|hr|i|img|ins|kbd|li|mark|ol|p|pre|q|rp|rt|ruby|s|samp|small|span|strong|sub|summary|sup|table|tbody|td|tfoot|th|thead|tr|u|ul|var|wbr)$/i;
+
+const TIME_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+};
+
+function formatTime(dateString: string): string {
+  return new Date(dateString).toLocaleTimeString('zh-CN', TIME_FORMAT_OPTIONS);
+}
+
 /**
  * MessageItem 组件
  * 使用 ai-elements 的 Message 组件展示不同类型的消息内容
  */
-export function MessageItem({
+export const MessageItem = React.memo(function MessageItem({
   message,
   installations,
   showSender = true,
@@ -90,8 +110,8 @@ export function MessageItem({
   className = '',
   streamingContent,
   isStreaming = false,
-  streamingFiles = [],
-  toolCalls = [],
+  streamingFiles = EMPTY_FILES,
+  toolCalls = EMPTY_TOOL_CALLS,
   miniAppInvocation,
   onOpenMiniApp,
   onImageClick,
@@ -123,7 +143,7 @@ export function MessageItem({
   // 使用 ref 跟踪是否已刷新，避免重复执行
   const hasRefreshedRef = useRef(false);
   const lastMessageIdRef = useRef<string>('');
-  const lastAttachmentsRef = useRef<string>('');
+  const lastAttachmentCountRef = useRef<number>(0);
 
   const attachmentsTodo = useMemo(
     () =>
@@ -143,11 +163,11 @@ export function MessageItem({
     // 如果消息 ID 变化，重置刷新状态
     if (
       lastMessageIdRef.current !== message.id ||
-      lastAttachmentsRef.current !== JSON.stringify(attachmentsTodo)
+      lastAttachmentCountRef.current !== attachmentsTodo.length
     ) {
       hasRefreshedRef.current = false;
       lastMessageIdRef.current = message.id;
-      lastAttachmentsRef.current = JSON.stringify(attachmentsTodo);
+      lastAttachmentCountRef.current = attachmentsTodo.length;
     }
 
     // 避免重复刷新
@@ -198,33 +218,23 @@ export function MessageItem({
     refreshUrls();
   }, [message.id, attachmentsTodo]);
 
-  const getSenderName = () => {
+  const senderName = useMemo(() => {
     if (isUser) return t('messageItem.you');
     if (isAgent) return t('messageItem.agent');
     if (isSystem) return t('messageItem.system');
     if (isMiniApp && miniAppInvocation) return miniAppInvocation.miniAppName;
     return t('messageItem.unknown');
-  };
+  }, [isUser, isAgent, isSystem, isMiniApp, miniAppInvocation, t]);
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const formattedTime = useMemo(() => formatTime(message.created_at), [message.created_at]);
 
-  // 处理复制操作
-  const handleCopy = () => {
+  const handleCopy = useCallback(() => {
     if (onCopy) {
       onCopy(message.content);
     } else {
       navigator.clipboard.writeText(message.content);
     }
-  };
+  }, [onCopy, message.content]);
 
   // 转换附件格式为 ai-elements 所需的格式
   const attachments: FileUIPart[] = useMemo(() => {
@@ -255,7 +265,21 @@ export function MessageItem({
   }, [refreshedAttachments, message.attachments]);
 
   // 确定要显示的内容：优先使用流式内容，否则使用消息内容
-  const displayContent = streamingContent || message.content;
+  const rawContent = streamingContent || message.content;
+
+  // 将 Agent 消息中的非标准 XML 标签块包裹为 ```xml 代码块
+  const displayContent = useMemo(() => {
+    if (!rawContent || messageRole === 'user') return rawContent;
+    // 匹配已有代码块，或顶层非标准标签的完整块（含嵌套内容）
+    return rawContent.replace(
+      /(```[\s\S]*?```)|(<(\w[\w-]*)(?:\s[^>]*)?>[\s\S]*?<\/\3>)/g,
+      (m, code, xmlBlock, tagName) => {
+        if (code) return m;
+        if (!tagName || STANDARD_HTML_TAGS.test(tagName)) return m;
+        return '\n```xml\n' + xmlBlock.trim() + '\n```\n';
+      }
+    );
+  }, [rawContent, messageRole]);
 
   // 检测内容是否为 HTML 或包含混合内容
   const contentSegments = useMemo(() => parseContentSegments(displayContent), [displayContent]);
@@ -305,7 +329,7 @@ export function MessageItem({
       // 格式化工具名称 (将下划线替换为空格,首字母大写)
       displayName = displayName
         .split('_')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
 
       return displayName;
@@ -344,9 +368,9 @@ export function MessageItem({
               messageRole === 'user' ? 'justify-end' : 'justify-start'
             )}
           >
-            <span className="font-medium">{getSenderName()}</span>
+            <span className="font-medium">{senderName}</span>
             <span>·</span>
-            <span>{formatTime(message.created_at)}</span>
+            <span>{formattedTime}</span>
             {message.edited_at && (
               <>
                 <span>·</span>
@@ -474,9 +498,13 @@ export function MessageItem({
                     {miniAppInvocation.miniAppName}
                   </span>
                   {miniAppInvocation.error ? (
-                    <span className="text-xs text-red-600 dark:text-red-400">{t('messageItem.executionFailed')}</span>
+                    <span className="text-xs text-red-600 dark:text-red-400">
+                      {t('messageItem.executionFailed')}
+                    </span>
                   ) : (
-                    <span className="text-xs text-purple-600 dark:text-purple-400">{t('messageItem.invoked')}</span>
+                    <span className="text-xs text-purple-600 dark:text-purple-400">
+                      {t('messageItem.invoked')}
+                    </span>
                   )}
                 </div>
 
@@ -491,7 +519,9 @@ export function MessageItem({
                 {miniAppInvocation.result && !miniAppInvocation.error && (
                   <div className="mt-2 text-xs text-muted-foreground">
                     <details className="cursor-pointer">
-                      <summary className="hover:text-foreground">{t('messageItem.viewResult')}</summary>
+                      <summary className="hover:text-foreground">
+                        {t('messageItem.viewResult')}
+                      </summary>
                       <pre className="mt-2 p-2 bg-background rounded text-xs overflow-x-auto">
                         {JSON.stringify(miniAppInvocation.result, null, 2)}
                       </pre>
@@ -636,4 +666,4 @@ export function MessageItem({
       )}
     </div>
   );
-}
+});

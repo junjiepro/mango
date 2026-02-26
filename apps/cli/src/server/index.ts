@@ -8,6 +8,7 @@ import { Hono, Context } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { serve } from '@hono/node-server';
+import https from 'https';
 import os from 'os';
 import type { CLIConfig } from '../types/index.js';
 import { mcpConnector } from '../lib/connectors/mcp-connector.js';
@@ -27,6 +28,17 @@ import { fileWatcherManager, type FileChangeEvent } from '../lib/file-watcher.js
 import { convertToModelMessages, streamText } from 'ai';
 import { planEntrySchema } from '@agentclientprotocol/sdk';
 import z from 'zod';
+
+export interface TlsOptions {
+  cert: string;
+  key: string;
+  httpsPort: number;
+}
+
+export interface ServerResult {
+  httpPort: number;
+  httpsPort?: number;
+}
 
 const getBindingCodeAndCheckFromHeader = (
   c: Context
@@ -1090,259 +1102,272 @@ export function createServer(config: CLIConfig) {
 }
 
 /**
- * 启动HTTP服务器
- * @returns 返回实际使用的端口号
+ * 为 HTTP/HTTPS 服务器设置 WebSocket upgrade 处理
+ * 抽取为共享函数，HTTP 和 HTTPS 服务器共用
  */
-export async function startServer(config: CLIConfig): Promise<number> {
-  const app = createServer(config);
+function setupWebSocketHandlers(server: any): void {
+  const terminalWss = new WebSocketServer({ noServer: true });
+  const fileWss = new WebSocketServer({ noServer: true });
 
-  // 查找可用端口
+  // 手动处理 upgrade 请求
+  server.on('upgrade', (request: any, socket: any, head: any) => {
+    const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
+
+    if (pathname === '/terminal') {
+      terminalWss.handleUpgrade(request, socket, head, (ws) => {
+        terminalWss.emit('connection', ws, request);
+      });
+    } else if (pathname === '/ws/files') {
+      fileWss.handleUpgrade(request, socket, head, (ws) => {
+        fileWss.emit('connection', ws, request);
+      });
+    } else {
+      socket.destroy();
+    }
+  });
+
+  // 终端 WebSocket 连接处理
+  terminalWss.on('connection', (ws, req) => {
+    console.log('[Server] Terminal WebSocket connected');
+
+    let ptyProcess: pty.IPty | null = null;
+    let authenticated = false;
+
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        console.log('[Server] Received message:', message.type);
+
+        if (message.type === 'auth') {
+          const bindingConfig = bindingCodeManager.readConfig();
+          if (bindingConfig && bindingConfig[message.token]) {
+            authenticated = true;
+            const config = bindingConfig[message.token];
+            ws.send(JSON.stringify({ type: 'auth', success: true }));
+
+            let workingDir = config.workspaceDir || process.cwd();
+            try {
+              if (!existsSync(workingDir)) {
+                mkdirSync(workingDir, { recursive: true });
+              }
+            } catch (err) {
+              console.error('Failed to create workspace directory:', err);
+              workingDir = process.cwd();
+            }
+
+            try {
+              const shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
+              ptyProcess = pty.spawn(shell, [], {
+                name: 'xterm-256color',
+                cols: 80,
+                rows: 30,
+                cwd: workingDir,
+                env: process.env as { [key: string]: string },
+              });
+
+              console.log('[Server] PTY created:', shell, 'in directory:', workingDir);
+
+              ptyProcess.onData((data) => {
+                try {
+                  ws.send(JSON.stringify({ type: 'output', data }));
+                } catch (sendError) {
+                  console.error('Failed to send PTY output:', sendError);
+                }
+              });
+
+              ptyProcess.onExit(({ exitCode }) => {
+                console.log('[Server] PTY exited with code:', exitCode);
+                try { ws.close(); } catch { /* ignore */ }
+              });
+            } catch (ptyError) {
+              console.error('Failed to create PTY:', ptyError);
+              ws.send(JSON.stringify({ type: 'error', message: 'Failed to create terminal' }));
+              ws.close();
+            }
+          } else {
+            ws.send(JSON.stringify({ type: 'auth', success: false }));
+            ws.close();
+          }
+        } else if (message.type === 'resize') {
+          if (ptyProcess && message.cols && message.rows) {
+            try {
+              ptyProcess.resize(message.cols, message.rows);
+              console.log('[Server] Terminal resized to:', message.cols, 'x', message.rows);
+            } catch (resizeError) {
+              console.error('Failed to resize PTY:', resizeError);
+            }
+          }
+        } else if (message.type === 'input') {
+          if (authenticated && ptyProcess) {
+            try { ptyProcess.write(message.data); } catch (e) { console.error('Failed to write to PTY:', e); }
+          }
+        }
+      } catch (error) {
+        console.error('Terminal message error:', error);
+      }
+    });
+
+    ws.on('close', () => {
+      console.log('[Server] Terminal WebSocket disconnected');
+      if (ptyProcess) { try { ptyProcess.kill(); } catch { /* ignore */ } }
+    });
+
+    ws.on('error', (error) => {
+      console.error('[Server] Terminal WebSocket error:', error);
+      if (ptyProcess) { try { ptyProcess.kill(); } catch { /* ignore */ } }
+    });
+  });
+
+  // 文件监听 WebSocket 连接处理
+  fileWss.on('connection', (ws, req) => {
+    console.log('[Server] Files WebSocket connected');
+
+    let authenticated = false;
+    let bindingCode = '';
+    let watchPath = '';
+    let unsubscribe: (() => void) | null = null;
+
+    const sendMessage = (msg: object) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(msg));
+      }
+    };
+
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+
+        if (message.type === 'auth') {
+          const config = bindingCodeManager.readConfig();
+          if (config && config[message.token]) {
+            authenticated = true;
+            bindingCode = message.token;
+            sendMessage({ type: 'auth', success: true });
+            console.log('[Server] Files WebSocket authenticated');
+          } else {
+            sendMessage({ type: 'auth', success: false });
+            ws.close();
+          }
+        } else if (message.type === 'subscribe' && authenticated) {
+          const config = bindingCodeManager.readConfig();
+          const bindingConfig = config?.[bindingCode];
+          watchPath = message.path || bindingConfig?.workspaceDir || process.cwd();
+
+          if (unsubscribe) { unsubscribe(); }
+
+          unsubscribe = fileWatcherManager.subscribe(watchPath, (event: FileChangeEvent) => {
+            sendMessage({
+              type: 'file_change',
+              event: {
+                changeType: event.type,
+                path: event.path,
+                relativePath: event.relativePath,
+                timestamp: event.timestamp,
+              },
+            });
+          });
+
+          sendMessage({ type: 'subscribed', path: watchPath });
+          console.log(`[Server] Files WebSocket subscribed to: ${watchPath}`);
+        } else if (message.type === 'unsubscribe' && authenticated) {
+          if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+          sendMessage({ type: 'unsubscribed' });
+        }
+      } catch (error) {
+        console.error('[Server] Files WebSocket message error:', error);
+      }
+    });
+
+    ws.on('close', () => {
+      console.log('[Server] Files WebSocket disconnected');
+      if (unsubscribe) { unsubscribe(); }
+    });
+
+    ws.on('error', (error) => {
+      console.error('[Server] Files WebSocket error:', error);
+      if (unsubscribe) { unsubscribe(); }
+    });
+  });
+}
+
+/**
+ * 启动服务器（HTTP + 可选 HTTPS）
+ */
+export async function startServer(
+  config: CLIConfig,
+  tlsOptions?: TlsOptions
+): Promise<ServerResult> {
+  const app = createServer(config);
   const availablePort = await findAvailablePort(config.port);
 
-  return new Promise((resolve, reject) => {
+  const result: ServerResult = { httpPort: availablePort };
+
+  // 启动 HTTP 服务器
+  await new Promise<void>((resolve, reject) => {
     try {
       const server = serve(
-        {
-          fetch: app.fetch,
-          port: availablePort,
-        },
-        (info) => {
-          // 创建终端 WebSocket 服务器 (noServer 模式)
-          const terminalWss = new WebSocketServer({ noServer: true });
-          // 创建文件监听 WebSocket 服务器 (noServer 模式)
-          const fileWss = new WebSocketServer({ noServer: true });
-
-          // 手动处理 upgrade 请求
-          (server as any).on('upgrade', (request: any, socket: any, head: any) => {
-            const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
-
-            if (pathname === '/terminal') {
-              terminalWss.handleUpgrade(request, socket, head, (ws) => {
-                terminalWss.emit('connection', ws, request);
-              });
-            } else if (pathname === '/ws/files') {
-              fileWss.handleUpgrade(request, socket, head, (ws) => {
-                fileWss.emit('connection', ws, request);
-              });
-            } else {
-              socket.destroy();
-            }
-          });
-
-          // 终端 WebSocket 连接处理
-          const wss = terminalWss;
-
-          wss.on('connection', (ws, req) => {
-            console.log('[Server] Terminal WebSocket connected');
-
-            let ptyProcess: pty.IPty | null = null;
-            let authenticated = false;
-
-            ws.on('message', (data) => {
-              try {
-                const message = JSON.parse(data.toString());
-                console.log('[Server] Received message:', message.type);
-
-                if (message.type === 'auth') {
-                  // 验证 binding code
-                  const bindingConfig = bindingCodeManager.readConfig();
-                  if (bindingConfig && bindingConfig[message.token]) {
-                    authenticated = true;
-                    const config = bindingConfig[message.token];
-                    ws.send(JSON.stringify({ type: 'auth', success: true }));
-
-                    // 获取工作目录：优先使用workspaceDir，否则使用当前目录
-                    let workingDir = config.workspaceDir || process.cwd();
-                    // 确保工作空间目录存在
-                    try {
-                      if (!existsSync(workingDir)) {
-                        mkdirSync(workingDir, { recursive: true });
-                      }
-                    } catch (err) {
-                      console.error('Failed to create workspace directory:', err);
-                      workingDir = process.cwd();
-                    }
-
-                    try {
-                      // 使用 node-pty 创建伪终端
-                      const shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
-                      ptyProcess = pty.spawn(shell, [], {
-                        name: 'xterm-256color',
-                        cols: 80,
-                        rows: 30,
-                        cwd: workingDir,
-                        env: process.env as { [key: string]: string },
-                      });
-
-                      console.log('[Server] PTY created:', shell, 'in directory:', workingDir);
-
-                      // 监听 PTY 输出
-                      ptyProcess.onData((data) => {
-                        try {
-                          ws.send(JSON.stringify({ type: 'output', data }));
-                        } catch (sendError) {
-                          console.error('Failed to send PTY output:', sendError);
-                        }
-                      });
-
-                      // 监听 PTY 退出
-                      ptyProcess.onExit(({ exitCode }) => {
-                        console.log('[Server] PTY exited with code:', exitCode);
-                        try {
-                          ws.close();
-                        } catch {
-                          // 忽略关闭错误
-                        }
-                      });
-                    } catch (ptyError) {
-                      console.error('Failed to create PTY:', ptyError);
-                      ws.send(
-                        JSON.stringify({
-                          type: 'error',
-                          message: 'Failed to create terminal',
-                        })
-                      );
-                      ws.close();
-                    }
-                  } else {
-                    ws.send(JSON.stringify({ type: 'auth', success: false }));
-                    ws.close();
-                  }
-                } else if (message.type === 'resize') {
-                  if (ptyProcess && message.cols && message.rows) {
-                    try {
-                      ptyProcess.resize(message.cols, message.rows);
-                      console.log('[Server] Terminal resized to:', message.cols, 'x', message.rows);
-                    } catch (resizeError) {
-                      console.error('Failed to resize PTY:', resizeError);
-                    }
-                  }
-                } else if (message.type === 'input') {
-                  if (authenticated && ptyProcess) {
-                    try {
-                      ptyProcess.write(message.data);
-                    } catch (writeError) {
-                      console.error('Failed to write to PTY:', writeError);
-                    }
-                  }
-                }
-              } catch (error) {
-                console.error('Terminal message error:', error);
-                // 不关闭连接，只记录错误
-              }
-            });
-
-            ws.on('close', () => {
-              console.log('[Server] Terminal WebSocket disconnected');
-              if (ptyProcess) {
-                try {
-                  ptyProcess.kill();
-                } catch (killError) {
-                  console.error('Failed to kill PTY:', killError);
-                }
-              }
-            });
-
-            ws.on('error', (error) => {
-              console.error('[Server] Terminal WebSocket error:', error);
-              if (ptyProcess) {
-                try {
-                  ptyProcess.kill();
-                } catch {
-                  // 忽略
-                }
-              }
-            });
-          });
-
-          // 文件监听 WebSocket 连接处理
-          fileWss.on('connection', (ws, req) => {
-            console.log('[Server] Files WebSocket connected');
-
-            let authenticated = false;
-            let bindingCode = '';
-            let watchPath = '';
-            let unsubscribe: (() => void) | null = null;
-
-            const sendMessage = (msg: object) => {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify(msg));
-              }
-            };
-
-            ws.on('message', (data) => {
-              try {
-                const message = JSON.parse(data.toString());
-
-                if (message.type === 'auth') {
-                  const config = bindingCodeManager.readConfig();
-                  if (config && config[message.token]) {
-                    authenticated = true;
-                    bindingCode = message.token;
-                    sendMessage({ type: 'auth', success: true });
-                    console.log('[Server] Files WebSocket authenticated');
-                  } else {
-                    sendMessage({ type: 'auth', success: false });
-                    ws.close();
-                  }
-                } else if (message.type === 'subscribe' && authenticated) {
-                  // 订阅目录变化
-                  const config = bindingCodeManager.readConfig();
-                  const bindingConfig = config?.[bindingCode];
-                  watchPath = message.path || bindingConfig?.workspaceDir || process.cwd();
-
-                  // 取消之前的订阅
-                  if (unsubscribe) {
-                    unsubscribe();
-                  }
-
-                  // 创建新订阅
-                  unsubscribe = fileWatcherManager.subscribe(watchPath, (event: FileChangeEvent) => {
-                    sendMessage({
-                      type: 'file_change',
-                      event: {
-                        changeType: event.type,
-                        path: event.path,
-                        relativePath: event.relativePath,
-                        timestamp: event.timestamp,
-                      },
-                    });
-                  });
-
-                  sendMessage({ type: 'subscribed', path: watchPath });
-                  console.log(`[Server] Files WebSocket subscribed to: ${watchPath}`);
-                } else if (message.type === 'unsubscribe' && authenticated) {
-                  if (unsubscribe) {
-                    unsubscribe();
-                    unsubscribe = null;
-                  }
-                  sendMessage({ type: 'unsubscribed' });
-                }
-              } catch (error) {
-                console.error('[Server] Files WebSocket message error:', error);
-              }
-            });
-
-            ws.on('close', () => {
-              console.log('[Server] Files WebSocket disconnected');
-              if (unsubscribe) {
-                unsubscribe();
-              }
-            });
-
-            ws.on('error', (error) => {
-              console.error('[Server] Files WebSocket error:', error);
-              if (unsubscribe) {
-                unsubscribe();
-              }
-            });
-          });
-
-          resolve(info.port);
+        { fetch: app.fetch, port: availablePort },
+        () => {
+          setupWebSocketHandlers(server as any);
+          resolve();
         }
       );
     } catch (error) {
       reject(error);
     }
   });
+
+  // 如果提供了 TLS 选项，额外启动 HTTPS 服务器
+  if (tlsOptions) {
+    const httpsPort = await findAvailablePort(tlsOptions.httpsPort);
+    result.httpsPort = httpsPort;
+
+    await new Promise<void>((resolve, reject) => {
+      try {
+        const httpsServer = https.createServer(
+          { cert: tlsOptions.cert, key: tlsOptions.key },
+          async (req, res) => {
+            // 使用 Hono 的 fetch handler 处理 HTTPS 请求
+            const url = `https://${req.headers.host}${req.url}`;
+            const headers = new Headers();
+            for (const [key, value] of Object.entries(req.headers)) {
+              if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+            }
+
+            const body = ['GET', 'HEAD'].includes(req.method || '')
+              ? undefined
+              : await new Promise<Buffer>((res) => {
+                  const chunks: Buffer[] = [];
+                  req.on('data', (chunk) => chunks.push(chunk));
+                  req.on('end', () => res(Buffer.concat(chunks)));
+                });
+
+            const request = new Request(url, {
+              method: req.method,
+              headers,
+              body,
+            });
+
+            const response = await app.fetch(request);
+
+            res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
+            const arrayBuffer = await response.arrayBuffer();
+            res.end(Buffer.from(arrayBuffer));
+          }
+        );
+
+        setupWebSocketHandlers(httpsServer);
+
+        httpsServer.listen(httpsPort, () => {
+          resolve();
+        });
+
+        httpsServer.on('error', reject);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  return result;
 }

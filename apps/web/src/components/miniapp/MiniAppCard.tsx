@@ -30,7 +30,7 @@ interface MiniAppCardProps {
  * MiniAppCard 组件
  * 展示小应用的基本信息和操作按钮
  */
-export function MiniAppCard({
+export const MiniAppCard = React.memo(function MiniAppCard({
   miniApp,
   installed = false,
   className,
@@ -243,4 +243,4 @@ export function MiniAppCard({
       )}
     </div>
   )
-}
+});

@@ -159,7 +159,7 @@ export function FilePreview({ file, deviceClient, className = '' }: FilePreviewP
           </div>
         </div>
         <div className="flex-1 overflow-hidden">
-          <iframe src={pdfUrl} className="w-full h-full border-0" title={file.name} />
+          <iframe src={pdfUrl} className="w-full h-full border-0" title={file.name} sandbox="allow-same-origin" referrerPolicy="no-referrer" />
         </div>
       </div>
     );

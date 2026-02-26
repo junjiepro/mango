@@ -536,60 +536,60 @@ Based on plan.md monorepo structure:
 
 ### Performance Optimization
 
-- [ ] T174 [P] Optimize database queries with proper indexes (review all tables)
-- [ ] T175 [P] Implement connection pooling for Supabase (PgBouncer config)
-- [ ] T176 [P] Add React.memo and useMemo for expensive components
-- [ ] T177 [P] Implement code splitting for large components using next/dynamic
-- [ ] T178 [P] Optimize image loading with next/image
-- [ ] T179 [P] Add debouncing for realtime subscription updates (300-500ms)
-- [ ] T180 Run Lighthouse audit and address performance issues
+- [X] T174 [P] Optimize database queries with proper indexes (review all tables)
+- [X] T175 [P] Implement connection pooling for Supabase (PgBouncer config)
+- [X] T176 [P] Add React.memo and useMemo for expensive components
+- [X] T177 [P] Implement code splitting for large components using next/dynamic
+- [X] T178 [P] Optimize image loading with next/image
+- [X] T179 [P] Add debouncing for realtime subscription updates (300-500ms)
+- [X] T180 Run Lighthouse audit and address performance issues
 
 ### Security Hardening
 
-- [ ] T181 [P] Review and test all RLS policies in Supabase
-- [ ] T182 [P] Implement rate limiting for API routes using upstash/ratelimit
-- [ ] T183 [P] Add CSRF protection in forms
-- [ ] T184 [P] Sanitize user inputs (XSS prevention)
-- [ ] T185 [P] Add security headers in next.config.js
-- [ ] T186 [P] Audit MiniApp sandbox escape vectors
-- [ ] T187 Conduct penetration testing
+- [X] T181 [P] Review and test all RLS policies in Supabase
+- [X] T182 [P] Implement rate limiting for API routes using upstash/ratelimit
+- [X] T183 [P] Add CSRF protection in forms
+- [X] T184 [P] Sanitize user inputs (XSS prevention)
+- [X] T185 [P] Add security headers in next.config.js
+- [X] T186 [P] Audit MiniApp sandbox escape vectors
+- [X] T187 Conduct penetration testing
 
 ### Testing & Quality
 
-- [ ] T188 [P] Write unit tests for core services in `apps/web/tests/unit/services/`
-- [ ] T189 [P] Write unit tests for utility functions in `packages/shared/utils/`
-- [ ] T190 [P] Write integration tests for API routes in `apps/web/tests/integration/api/`
-- [ ] T191 [P] Write E2E tests for critical user flows in `apps/web/tests/e2e/`
-- [ ] T192 Run E2E test suite with Playwright
-- [ ] T193 Achieve 80%+ code coverage on core business logic
-- [ ] T194 Configure coverage reporting in `apps/web/vitest.config.ts` with 80% thresholds
-- [ ] T195 Verify CI pipeline blocks merge when coverage falls below 80%
-- [ ] T196 Run quickstart.md validation steps
+- [X] T188 [P] Write unit tests for core services in `apps/web/tests/unit/services/`
+- [X] T189 [P] Write unit tests for utility functions in `packages/shared/utils/`
+- [X] T190 [P] Write integration tests for API routes in `apps/web/tests/integration/api/`
+- [X] T191 [P] Write E2E tests for critical user flows in `apps/web/tests/e2e/`
+- [X] T192 Run E2E test suite with Playwright
+- [X] T193 Achieve 80%+ code coverage on core business logic
+- [X] T194 Configure coverage reporting in `apps/web/vitest.config.ts` with 80% thresholds
+- [X] T195 Verify CI pipeline blocks merge when coverage falls below 80%
+- [X] T196 Run quickstart.md validation steps
 
 ### Documentation
 
-- [ ] T197 [P] Update README.md with project overview and setup instructions
-- [ ] T198 [P] Create API documentation using Swagger UI for OpenAPI spec
-- [ ] T199 [P] Document MiniApp development guide in `docs/miniapp-development.md`
-- [ ] T200 [P] Document CLI usage guide (update `apps/cli/README.md`)
-- [ ] T201 [P] Create architecture decision records in `docs/adr/`
-- [ ] T202 Document deployment guide in `docs/deployment.md`
+- [X] T197 [P] Update README.md with project overview and setup instructions
+- [X] T198 [P] Create API documentation using Swagger UI for OpenAPI spec
+- [X] T199 [P] Document MiniApp development guide in `docs/miniapp-development.md`
+- [X] T200 [P] Document CLI usage guide (update `apps/cli/README.md`)
+- [X] T201 [P] Create architecture decision records in `docs/adr/`
+- [X] T202 Document deployment guide in `docs/deployment.md`
 
 ### Monitoring & Observability
 
-- [ ] T203 [P] Setup Supabase Analytics dashboards
-- [ ] T204 [P] Implement custom metrics collection (task completion rate, agent response time)
-- [ ] T205 [P] Add error tracking (e.g., Sentry) in `apps/web/src/lib/sentry.ts`
-- [ ] T206 Setup alerts for critical failures
+- [X] T203 [P] Setup Supabase Analytics dashboards
+- [X] T204 [P] Implement custom metrics collection (task completion rate, agent response time)
+- [X] T205 [P] Add error tracking (e.g., Sentry) in `apps/web/src/lib/sentry.ts`
+- [X] T206 Setup alerts for critical failures
 
 ### Deployment Preparation
 
-- [ ] T207 Create production Supabase project
-- [ ] T208 Apply all migrations to production database
-- [ ] T209 Configure environment variables for production
-- [ ] T210 Setup Vercel deployment for `apps/web`
-- [ ] T211 Configure CDN and edge caching
-- [ ] T212 Create deployment checklist based on `quickstart.md` section 8.2
+- [X] T207 Create production Supabase project
+- [X] T208 Apply all migrations to production database
+- [X] T209 Configure environment variables for production
+- [X] T210 Setup Vercel deployment for `apps/web`
+- [X] T211 Configure CDN and edge caching
+- [X] T212 Create deployment checklist based on `quickstart.md` section 8.2
 
 ---
 

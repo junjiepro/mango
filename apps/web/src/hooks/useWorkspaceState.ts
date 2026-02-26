@@ -94,7 +94,6 @@ export function useWorkspaceState(conversationId: string | undefined) {
       if (!stored) return null;
 
       const state = JSON.parse(stored) as WorkspaceState;
-      console.log(`[WorkspaceState] 加载状态: ${conversationId}`, state);
       return state;
     } catch (error) {
       console.error('[WorkspaceState] 加载状态失败:', error);
@@ -126,7 +125,6 @@ export function useWorkspaceState(conversationId: string | undefined) {
           };
 
           localStorage.setItem(key, JSON.stringify(newState));
-          console.log(`[WorkspaceState] 保存状态:`, state);
         } catch (error) {
           console.error('[WorkspaceState] 保存状态失败:', error);
         }
@@ -144,7 +142,6 @@ export function useWorkspaceState(conversationId: string | undefined) {
     try {
       const key = getStorageKey(conversationId);
       localStorage.removeItem(key);
-      console.log(`[WorkspaceState] 清除状态: ${conversationId}`);
     } catch (error) {
       console.error('[WorkspaceState] 清除状态失败:', error);
     }

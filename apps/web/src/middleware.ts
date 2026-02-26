@@ -109,10 +109,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(homeUrl)
   }
 
+  // CSRF protection: 验证 API 请求的 Origin
+  if (pathname.startsWith('/api/')) {
+    const origin = request.headers.get('origin')
+    const host = request.headers.get('host')
+    if (origin && host && !origin.endsWith(host)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  }
+
   // 添加安全头
   response.headers.set('X-Frame-Options', 'DENY')
   response.headers.set('X-Content-Type-Options', 'nosniff')
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  response.headers.set('X-DNS-Prefetch-Control', 'on')
+  response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
   response.headers.set(
     'Permissions-Policy',
     'camera=(), microphone=(), geolocation=()'

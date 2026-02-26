@@ -130,35 +130,39 @@ export function useDeviceBinding(tempCode: string | null) {
       healthCheckStatus: 'checking',
     }));
 
-    try {
-      // 优先尝试 cloudflare_url
-      const urlToCheck = urls.cloudflare_url || urls.localhost_url;
+    // 按优先级遍历所有 URL，找到第一个可达的
+    const urlsToTry = [
+      urls.cloudflare_url,
+      urls.tailscale_url,
+      urls.hostname_url,
+      urls.localhost_url,
+    ].filter(Boolean) as string[];
 
-      const response = await fetch(`${urlToCheck}/health`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000), // 5秒超时
-      });
+    for (const urlToCheck of urlsToTry) {
+      try {
+        const response = await fetch(`${urlToCheck}/health`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000),
+        });
 
-      if (response.ok) {
-        setState((prev) => ({
-          ...prev,
-          healthCheckStatus: 'success',
-        }));
-      } else {
-        setState((prev) => ({
-          ...prev,
-          healthCheckStatus: 'failed',
-          error: `Health check failed: ${response.status}`,
-        }));
+        if (response.ok) {
+          setState((prev) => ({
+            ...prev,
+            healthCheckStatus: 'success',
+          }));
+          return;
+        }
+      } catch {
+        // 继续尝试下一个 URL
       }
-    } catch (error) {
-      console.error('Health check error:', error);
-      setState((prev) => ({
-        ...prev,
-        healthCheckStatus: 'failed',
-        error: error instanceof Error ? error.message : 'Health check failed',
-      }));
     }
+
+    // 所有 URL 均不可达
+    setState((prev) => ({
+      ...prev,
+      healthCheckStatus: 'failed',
+      error: 'All device URLs unreachable',
+    }));
   };
 
   /**

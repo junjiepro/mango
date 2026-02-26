@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FeedbackDialog } from './FeedbackDialog';
@@ -14,7 +14,7 @@ interface FeedbackButtonProps {
   onFeedbackSubmit?: () => void;
 }
 
-export function FeedbackButton({
+export const FeedbackButton = React.memo(function FeedbackButton({
   messageId,
   taskId,
   conversationId,
@@ -62,4 +62,4 @@ export function FeedbackButton({
       />
     </>
   );
-}
+});

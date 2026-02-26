@@ -157,11 +157,18 @@ export function PDFPreviewer({ file, deviceClient, className = '' }: PreviewerPr
             </div>
           )}
           {blobUrl && (
-            <iframe
-              src={blobUrl}
-              className="w-full h-full border-0"
+            <object
+              data={blobUrl}
+              type="application/pdf"
+              className="w-full h-full"
               title={file.name}
-            />
+            >
+              <p className="p-4 text-sm text-muted-foreground">
+                浏览器无法预览 PDF，请
+                <button onClick={handleDownload} className="underline mx-1">下载</button>
+                后查看
+              </p>
+            </object>
           )}
         </div>
       )}

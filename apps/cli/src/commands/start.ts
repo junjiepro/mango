@@ -6,8 +6,9 @@
 
 import { formatter } from '../lib/formatter.js';
 import { configManager } from '../lib/config.js';
-import { startServer } from '../server/index.js';
+import { startServer, type TlsOptions } from '../server/index.js';
 import { tunnelManager } from '../lib/tunnel-manager.js';
+import { obtainCertificate } from '../lib/cert-manager.js';
 import { serviceInitializer } from '../lib/service-initializer.js';
 import { tempBindingManager } from '../lib/temp-binding-manager.js';
 import { bindingCodeManager } from '../lib/binding-code-manager.js';
@@ -20,6 +21,15 @@ import type { StartCommandOptions } from '../types/index.js';
 import { deviceSecretManager } from '../lib/device-secret.js';
 
 export let actualPort: number;
+let actualHttpsPort: number | undefined;
+
+/** 生成 Tailscale URL，HTTPS 可用时使用 https 协议和 HTTPS 端口 */
+function buildTailscaleUrl(addr: string, httpPort: number, httpsPort?: number): string {
+  if (httpsPort) {
+    return `https://${addr}:${httpsPort}`;
+  }
+  return `http://${addr}:${httpPort}`;
+}
 
 /**
  * 启动设备服务
@@ -66,17 +76,53 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
       bindingCodeManager.updateLastUsedAt();
     }
 
-    // 3. 启动 HTTP 服务
+    // 3. 获取 HTTPS 证书（多策略降级：Tailscale → mkcert）
     formatter.newline();
+    const tailscaleAddr = getTailscaleAddress();
+    const localIpForCert = getLocalIpAddress();
+    let tlsOptions: TlsOptions | undefined;
+
+    // 构建需要覆盖的域名列表
+    const certDomains = ['localhost', localIpForCert];
+    if (tailscaleAddr) certDomains.push(tailscaleAddr);
+
+    // Tailscale 域名（非纯 IP 时才传给 Tailscale 策略）
+    const tailscaleDomain =
+      tailscaleAddr && /[a-zA-Z]/.test(tailscaleAddr) ? tailscaleAddr : undefined;
+
+    const certSpinner = formatter.spinner('Obtaining HTTPS certificate...');
+    const certResult = await obtainCertificate(certDomains, tailscaleDomain);
+
+    if (certResult) {
+      tlsOptions = {
+        cert: certResult.cert,
+        key: certResult.key,
+        httpsPort: config.port + 1,
+      };
+      const sourceHints: Record<string, string> = {
+        tailscale: 'Tailscale trusted certificate',
+        mkcert: 'mkcert trusted certificate',
+      };
+      certSpinner.succeed(`HTTPS certificate obtained (${sourceHints[certResult.source]})`);
+    } else {
+      certSpinner.fail('Failed to obtain HTTPS certificate, falling back to HTTP only');
+    }
+
     const serverSpinner = formatter.spinner('Starting HTTP server...');
     try {
-      actualPort = await startServer(config);
+      const serverResult = await startServer(config, tlsOptions);
+      actualPort = serverResult.httpPort;
+      actualHttpsPort = serverResult.httpsPort;
+
       if (actualPort !== config.port) {
         serverSpinner.succeed(
           `Server running on port ${actualPort} (port ${config.port} was in use)`
         );
       } else {
         serverSpinner.succeed(`Server running on port ${actualPort}`);
+      }
+      if (actualHttpsPort) {
+        formatter.success(`HTTPS server running on port ${actualHttpsPort}`);
       }
       // 更新配置中的端口为实际使用的端口
       config.port = actualPort;
@@ -93,8 +139,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     // 4. 创建 Cloudflare Tunnel
     formatter.newline();
     let tunnelUrl: string | null = null;
-    const localIp = getLocalIpAddress();
-    const tailscaleAddr = getTailscaleAddress();
+    const localIp = localIpForCert;
 
     const cloudflaredInstalled = await tunnelManager.checkCloudflared();
     if (!cloudflaredInstalled) {
@@ -125,7 +170,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
               cloudflare_url: newTunnelUrl,
               localhost_url: `http://localhost:${actualPort}`,
               hostname_url: `http://${localIp}:${actualPort}`,
-              ...(tailscaleAddr ? { tailscale_url: `http://${tailscaleAddr}:${actualPort}` } : {}),
+              ...(tailscaleAddr ? { tailscale_url: buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort) } : {}),
             };
 
             const existingConfig = bindingCodeManager.readConfig();
@@ -166,7 +211,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
         cloudflare_url: tunnelUrl,
         localhost_url: `http://localhost:${actualPort}`,
         hostname_url: `http://${localIp}:${actualPort}`,
-        ...(tailscaleAddr ? { tailscale_url: `http://${tailscaleAddr}:${actualPort}` } : {}),
+        ...(tailscaleAddr ? { tailscale_url: buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort) } : {}),
       };
 
       for (const bindingCode of bindingCodes) {
@@ -201,12 +246,11 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
       const channelSpinner = formatter.spinner('Establishing Realtime Channel...');
       try {
         // 准备设备 URL 信息
-        const localIp = getLocalIpAddress();
         const deviceUrls = {
           cloudflare_url: tunnelUrl,
           localhost_url: `http://localhost:${actualPort}`,
           hostname_url: `http://${localIp}:${actualPort}`,
-          ...(tailscaleAddr ? { tailscale_url: `http://${tailscaleAddr}:${actualPort}` } : {}),
+          ...(tailscaleAddr ? { tailscale_url: buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort) } : {}),
         };
 
         // 准备设备信息
@@ -277,7 +321,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     formatter.labeled('Localhost URL', `http://localhost:${actualPort}`);
     formatter.labeled('Hostname URL', `http://${localIp}:${actualPort}`);
     if (tailscaleAddr) {
-      formatter.labeled('Tailscale URL', `http://${tailscaleAddr}:${actualPort}`);
+      formatter.labeled('Tailscale URL', buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort));
     }
 
     // 只在未绑定时显示绑定 URL

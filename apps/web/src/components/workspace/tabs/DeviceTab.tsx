@@ -93,7 +93,42 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
   const [mcpServicesJson, setMcpServicesJson] = useState('{}');
   const [mcpJsonError, setMcpJsonError] = useState<string | null>(null);
   const clientRef = useRef<Client | null>(null);
-  const onlineUrl = device?.online_urls?.[0];
+  const [onlineUrl, setOnlineUrl] = useState<string | undefined>(
+    device?.online_urls?.[0]
+  );
+
+  // 探测浏览器可达的 URL（按 online_urls 优先级顺序）
+  useEffect(() => {
+    const urls = device?.online_urls;
+    if (!urls?.length) {
+      setOnlineUrl(undefined);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      for (const url of urls) {
+        if (cancelled) return;
+        try {
+          const resp = await fetch(`${url}/health`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(3000),
+          });
+          if (!cancelled && resp.ok) {
+            setOnlineUrl(url);
+            return;
+          }
+        } catch {
+          // 不可达，继续下一个
+        }
+      }
+      // 全部不可达，回退到第一个（保持显示用）
+      if (!cancelled) setOnlineUrl(urls[0]);
+    })();
+
+    return () => { cancelled = true; };
+  }, [device?.online_urls]);
 
   // 清理客户端连接
   useEffect(() => {

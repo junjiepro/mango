@@ -59,35 +59,36 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     // 检查设备在线状态
+    // online_urls 供浏览器直连设备，排除 tailscale_url（浏览器通常无法解析 *.ts.net 域名）
     let healthCheckError = null;
     const onlineUrls: string[] = [];
 
     if (binding.status === 'active' && binding.device_url) {
       try {
         const deviceUrls = binding.device_url as DeviceUrls;
-        const healthCheckResults = await Promise.all(
-          Object.values(deviceUrls).map(async (url) => {
-            if (!url) return;
+        const orderedUrls = [
+          deviceUrls.cloudflare_url,
+          deviceUrls.hostname_url,
+          deviceUrls.localhost_url,
+        ].filter(Boolean) as string[];
 
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-            const healthResponse = await fetch(`${url}/health`, {
+        const results = await Promise.allSettled(
+          orderedUrls.map(async (url) => {
+            const resp = await fetch(`${url}/health`, {
               method: 'GET',
-              signal: controller.signal,
+              signal: AbortSignal.timeout(5000),
             });
-
-            clearTimeout(timeoutId);
-            if (healthResponse.ok) {
-              onlineUrls.push(url);
-            }
-
-            if (!healthResponse.ok) {
-              healthCheckError = `Health check failed with status ${healthResponse.status}`;
-            }
+            return { url, ok: resp.ok, status: resp.status };
           })
         );
-        await Promise.allSettled(healthCheckResults);
+
+        for (const r of results) {
+          if (r.status === 'fulfilled' && r.value.ok) {
+            onlineUrls.push(r.value.url);
+          } else if (r.status === 'fulfilled') {
+            healthCheckError = `Health check failed with status ${r.value.status}`;
+          }
+        }
 
         if (onlineUrls.length > 0) {
           healthCheckError = null;

@@ -24,6 +24,8 @@ interface ChatLayoutProps {
   onWorkingDirectoryChange?: (path: string) => void;
   workspacePanelSize?: number;
   onWorkspacePanelSizeChange?: (size: number) => void;
+  pendingResource?: DetectedResource | null;
+  onPendingResourceHandled?: () => void;
 }
 
 export function ChatLayout({
@@ -37,6 +39,8 @@ export function ChatLayout({
   onWorkingDirectoryChange,
   workspacePanelSize = 50,
   onWorkspacePanelSizeChange,
+  pendingResource,
+  onPendingResourceHandled,
 }: ChatLayoutProps) {
   const { config, isFullscreenMode } = useWorkspaceLayout();
 
@@ -98,6 +102,8 @@ export function ChatLayout({
             conversationId={conversationId}
             currentWorkingDirectory={currentWorkingDirectory}
             onWorkingDirectoryChange={onWorkingDirectoryChange}
+            pendingResource={pendingResource}
+            onPendingResourceHandled={onPendingResourceHandled}
           />
         </div>
       </div>
@@ -108,7 +114,7 @@ export function ChatLayout({
   return (
     <ResizablePanelGroup
       direction="horizontal"
-      className="flex-1"
+      className="h-full"
       onLayout={handleLayout}
     >
       {/* 主聊天区域 */}
@@ -139,6 +145,8 @@ export function ChatLayout({
           conversationId={conversationId}
           currentWorkingDirectory={currentWorkingDirectory}
           onWorkingDirectoryChange={onWorkingDirectoryChange}
+          pendingResource={pendingResource}
+          onPendingResourceHandled={onPendingResourceHandled}
         />
       </ResizablePanel>
     </ResizablePanelGroup>

@@ -79,7 +79,7 @@ export function ConversationProvider({ children, conversationId }: ConversationP
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(!!conversationId);
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -126,7 +126,7 @@ export function ConversationProvider({ children, conversationId }: ConversationP
               .select('value')
               .eq('installation_id', installation.id)
               .eq('key', '_trigger_config')
-              .single();
+              .maybeSingle();
 
             if (!triggerData?.value) continue;
 

@@ -8,7 +8,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import { useTranslations } from 'next-intl';
 import { MiniAppContainer } from './MiniAppContainer';
@@ -46,10 +46,10 @@ export function MiniAppWindow({ miniApp, onClose, onSendMessage, className }: Mi
   const { resolvedTheme } = useTheme();
 
   // 构建 Host 上下文（主题、语言等）
-  const hostContext: HostContext = {
+  const hostContext: HostContext = useMemo(() => ({
     theme: (resolvedTheme === 'dark' ? 'dark' : 'light'),
     locale: typeof navigator !== 'undefined' ? navigator.language : 'zh-CN',
-  };
+  }), [resolvedTheme]);
 
   // 主题变化时推送给 View
   useEffect(() => {

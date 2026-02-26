@@ -113,6 +113,54 @@ function convertToLuckySheet(workbook: import('xlsx').WorkBook): LuckySheetData[
   });
 }
 
+// 模块级加载状态（单例，组件重挂载不影响）
+let luckySheetLoadPromise: Promise<void> | null = null;
+
+function loadLuckySheetScripts(): Promise<void> {
+  if (luckySheetLoadPromise) return luckySheetLoadPromise;
+
+  luckySheetLoadPromise = (async () => {
+    if (typeof window === 'undefined') return;
+    if (window.luckysheet) return;
+
+    // 加载 CSS（去重）
+    const cssUrls = [
+      'https://cdn.jsdelivr.net/npm/luckysheet/dist/plugins/css/pluginsCss.css',
+      'https://cdn.jsdelivr.net/npm/luckysheet/dist/plugins/plugins.css',
+      'https://cdn.jsdelivr.net/npm/luckysheet/dist/css/luckysheet.css',
+      'https://cdn.jsdelivr.net/npm/luckysheet/dist/assets/iconfont/iconfont.css',
+    ];
+    for (const href of cssUrls) {
+      if (!document.querySelector(`link[href="${href}"]`)) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        document.head.appendChild(link);
+      }
+    }
+
+    // 加载 JS（顺序加载，DOM 去重）
+    const scriptUrls = [
+      'https://cdn.jsdelivr.net/npm/luckysheet/dist/plugins/js/plugin.js',
+      'https://cdn.jsdelivr.net/npm/luckysheet/dist/luckysheet.umd.js',
+    ];
+    for (const src of scriptUrls) {
+      if (!document.querySelector(`script[src="${src}"]`)) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error(`Failed to load: ${src}`));
+          document.body.appendChild(script);
+        });
+      }
+    }
+  })();
+
+  luckySheetLoadPromise.catch(() => { luckySheetLoadPromise = null; });
+  return luckySheetLoadPromise;
+}
+
 export function ExcelPreviewer({ file, deviceClient, className = '' }: PreviewerProps) {
   const [allSheetsData, setAllSheetsData] = useState<(string | number | boolean | null)[][][]>([]);
   const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
@@ -130,52 +178,15 @@ export function ExcelPreviewer({ file, deviceClient, className = '' }: Previewer
   // 当前工作表数据
   const rawData = allSheetsData[currentSheetIndex] || [];
 
-  // 加载 LuckySheet CSS 和 JS
+  // 加载 LuckySheet CSS 和 JS（委托给模块级单例，避免 StrictMode 双重调用）
   const loadLuckySheet = useCallback(async () => {
-    if (luckyLoaded || typeof window === 'undefined') return;
-
-    // 检查是否已加载
-    if (window.luckysheet) {
+    try {
+      await loadLuckySheetScripts();
       setLuckyLoaded(true);
-      return;
+    } catch (e) {
+      console.error('LuckySheet 加载失败:', e);
     }
-
-    // 加载 CSS
-    const cssLink = document.createElement('link');
-    cssLink.rel = 'stylesheet';
-    cssLink.href = 'https://cdn.jsdelivr.net/npm/luckysheet/dist/plugins/css/pluginsCss.css';
-    document.head.appendChild(cssLink);
-
-    const cssLink2 = document.createElement('link');
-    cssLink2.rel = 'stylesheet';
-    cssLink2.href = 'https://cdn.jsdelivr.net/npm/luckysheet/dist/plugins/plugins.css';
-    document.head.appendChild(cssLink2);
-
-    const cssLink3 = document.createElement('link');
-    cssLink3.rel = 'stylesheet';
-    cssLink3.href = 'https://cdn.jsdelivr.net/npm/luckysheet/dist/css/luckysheet.css';
-    document.head.appendChild(cssLink3);
-
-    const cssLink4 = document.createElement('link');
-    cssLink4.rel = 'stylesheet';
-    cssLink4.href = 'https://cdn.jsdelivr.net/npm/luckysheet/dist/assets/iconfont/iconfont.css';
-    document.head.appendChild(cssLink4);
-
-    // 加载 JS
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/luckysheet/dist/plugins/js/plugin.js';
-    document.body.appendChild(script);
-
-    await new Promise((resolve) => (script.onload = resolve));
-
-    const script2 = document.createElement('script');
-    script2.src = 'https://cdn.jsdelivr.net/npm/luckysheet/dist/luckysheet.umd.js';
-    document.body.appendChild(script2);
-
-    await new Promise((resolve) => (script2.onload = resolve));
-
-    setLuckyLoaded(true);
-  }, [luckyLoaded]);
+  }, []); // 空依赖，函数引用稳定
 
   // 加载并解析 Excel
   const loadDocument = useCallback(async () => {
@@ -224,11 +235,15 @@ export function ExcelPreviewer({ file, deviceClient, className = '' }: Previewer
     }
   }, [fileUrl, deviceClient]);
 
-  // 初始化加载
+  // 初始化加载文档
   useEffect(() => {
     loadDocument();
+  }, [loadDocument]);
+
+  // 初始化加载 LuckySheet（独立 effect，空依赖确保只执行一次）
+  useEffect(() => {
     loadLuckySheet();
-  }, [loadDocument, loadLuckySheet]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 初始化 LuckySheet
   useEffect(() => {
