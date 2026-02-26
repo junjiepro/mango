@@ -5,16 +5,21 @@
 ## 技术栈
 
 - **前端框架**: Next.js 14+ (App Router), React 18+
-- **样式**: TailwindCSS
+- **样式**: TailwindCSS 3.4, shadcn/ui, Radix UI
+- **AI**: Vercel AI SDK 6 (@ai-sdk/react), MCP SDK (@modelcontextprotocol/sdk), ACP SDK
+- **编辑器/终端**: Monaco Editor (@monaco-editor/react), xterm.js 6
 - **后端**: Next.js API Routes, Supabase Edge Functions
-- **数据库**: Supabase (PostgreSQL 15+)
+- **数据库**: Supabase (PostgreSQL 15+, pgvector)
 - **实时通信**: Supabase Realtime
 - **认证**: Supabase Auth
 - **存储**: Supabase Storage
-- **语言**: TypeScript 5.x
-- **包管理**: pnpm (monorepo)
-- **构建工具**: Turbo
-- **测试**: Vitest (单元测试), Playwright (E2E测试)
+- **国际化**: next-intl 4 (中文/英文)
+- **图表**: Recharts 3
+- **语言**: TypeScript 5.3+
+- **包管理**: pnpm 9+ (monorepo)
+- **构建工具**: Turborepo
+- **CLI**: Hono 4, Commander 11, node-pty, Cloudflare Tunnel
+- **测试**: Vitest 4 (单元测试), Playwright 1.57 (E2E测试), Testing Library
 
 ## 项目结构
 
@@ -22,16 +27,17 @@
 mango/
 ├── apps/
 │   ├── web/                    # Next.js Web应用
-│   └── cli/                    # CLI工具
+│   └── cli/                    # CLI 设备服务工具
 ├── packages/
 │   ├── shared/                 # 共享类型和工具
-│   ├── protocols/              # MCP/ACP/A2A协议适配器
-│   └── miniapp-runtime/        # 小应用运行时
+│   └── protocols/              # MCP/ACP协议适配器
 ├── supabase/
 │   ├── migrations/            # 数据库迁移
 │   ├── functions/             # Edge Functions
 │   └── seed.sql              # 测试数据
-└── specs/                     # 设计文档
+├── specs/                     # 设计文档
+├── docs/                      # 项目文档 (ADR, 开发指南, 报告)
+└── scripts/                   # 构建脚本
 ```
 
 ## 快速开始
@@ -140,7 +146,7 @@ pnpm format
 
 ### 用户故事
 
-1. **与Agent进行对话完成任务** (P1 - MVP)
+1. **与Agent进行对话完成任务** (P1 - MVP) ✅ **已完成**
    - 多模态对话(文本、图片、文件)
    - 后台任务执行
    - 实时同步
@@ -152,23 +158,54 @@ pnpm format
    - 权限管理和沙箱隔离
    - 数据持久化存储
 
-3. **通过CLI工具接入本地MCP/ACP服务** (P3)
-   - CLI工具配置
-   - 本地服务注册
-   - 安全代理
+3. **通过CLI工具接入本地MCP/ACP服务** (P3) ✅ **已完成**
+   - CLI 设备服务 (Hono HTTP Server)
+   - Cloudflare Tunnel 公网暴露
+   - 临时绑定码设备绑定
+   - 本地 MCP/ACP 服务代理
 
-4. **Agent持续学习与改进** (P4)
-   - 反馈收集
-   - 规则提取
-   - 个性化优化
+4. **Agent持续学习与改进** (P4) ✅ **已完成**
+   - 反馈收集与规则提取
+   - 统一 Skill 架构 v3 (语义搜索)
+   - 上下文工程优化
 
-5. **多模态内容的适应性展示** (P5)
-   - 智能布局选择
-   - 内容过滤搜索
+5. **富交互界面与工作区** (P5) ⚠️ **大部分完成**
+   - A2UI 富交互组件 ✅
+   - 资源自动嗅探收集 ✅
+   - Monaco Editor 文件浏览器 ✅
+   - 终端集成 (xterm.js) ✅
+   - Git 集成 ❌ 未完成
 
-6. **多语言国际化支持** (P6)
-   - 中文/英文界面
+6. **多语言国际化支持** (P6) ✅ **已完成**
+   - 中文/英文界面 (next-intl)
    - 多语言Agent理解
+
+## CLI 设备服务
+
+CLI 工具允许技术用户将本地 MCP/ACP 服务接入 Mango 平台：
+
+1. 安装并启动 CLI 设备服务
+2. 通过 Cloudflare Tunnel 暴露到公网
+3. 在 Web 端输入临时绑定码完成设备绑定
+4. 配置本地 MCP/ACP 服务
+5. Agent 可远程调用设备上的工具和服务
+
+```bash
+cd apps/cli
+pnpm build
+pnpm start    # 启动设备服务，生成临时绑定码
+```
+
+详细文档: [CLI README](./apps/cli/README.md)
+
+## 工作区
+
+工作区提供类 VSCode 的开发体验，集成在对话界面右侧：
+
+- **文件浏览器**: 通过 Monaco Editor 浏览和编辑设备文件
+- **终端**: xterm.js 远程终端，连接绑定设备
+- **资源面板**: 自动嗅探对话中的资源（文件、链接、代码片段）
+- **设备管理**: 查看绑定设备状态和服务列表
 
 ## MiniApp 功能
 
@@ -254,10 +291,7 @@ params  // 操作参数对象
 
 查看完整示例:
 
-- [待办事项管理器](./docs/miniapp-examples.md#待办事项管理器)
-- [笔记本](./docs/miniapp-examples.md#笔记本)
-- [倒计时提醒](./docs/miniapp-examples.md#倒计时提醒)
-- [简单计算器](./docs/miniapp-examples.md#简单计算器)
+- [MiniApp 开发指南](./docs/miniapp-development.md)
 
 ### 工作原理
 
@@ -284,8 +318,8 @@ Agent 识别用户意图
 
 ### 更多资源
 
-- [MiniApp 示例代码](./docs/miniapp-examples.md)
-- [MiniApp 开发指南](./specs/001-agent-chat-platform/spec.md#user-story-2)
+- [MiniApp 开发指南](./docs/miniapp-development.md)
+- [MiniApp 功能规格](./specs/001-agent-chat-platform/spec.md#user-story-2)
 - [API 参考文档](./specs/001-agent-chat-platform/contracts/)
 
 ## 安全特性
