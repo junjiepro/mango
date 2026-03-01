@@ -26,8 +26,7 @@ export class TunnelManager {
         'localhost:0', // 禁用 metrics 端口
       ]);
 
-      // 解析输出获取公网 URL
-      this.process.stdout?.on('data', (data) => {
+      const parser = (data: Buffer) => {
         const output = data.toString();
         formatter.debug(`Tunnel output: ${output}`);
 
@@ -51,12 +50,12 @@ export class TunnelManager {
             resolve(url);
           }
         }
-      });
+      };
 
-      this.process.stderr?.on('data', (data) => {
-        const output = data.toString();
-        formatter.debug(`Tunnel error: ${output}`);
-      });
+      // 解析输出获取公网 URL
+      this.process.stdout?.on('data', parser);
+
+      this.process.stderr?.on('data', parser);
 
       this.process.on('error', (error) => {
         reject(new Error(`Failed to start tunnel: ${error.message}`));

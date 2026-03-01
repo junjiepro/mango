@@ -1,6 +1,6 @@
 -- Attachments Table
 CREATE TABLE attachments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
 
   -- 文件信息

@@ -5,7 +5,7 @@
 
 -- 创建小应用分享链接表
 CREATE TABLE IF NOT EXISTS mini_app_share_links (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   mini_app_id UUID NOT NULL REFERENCES mini_apps(id) ON DELETE CASCADE,
   share_token VARCHAR(32) NOT NULL UNIQUE,
   created_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,

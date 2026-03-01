@@ -1,10 +1,17 @@
 {
   "name": "@mango/cli",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
+  "description": "Mango CLI - 智能 Agent 对话平台设备服务",
   "bin": {
     "mango-cli": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -13,7 +20,8 @@
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
     "clean": "rm -rf dist",
-    "package": "pnpm build:standalone && node scripts/package.js"
+    "package": "pnpm build:standalone && node scripts/package.js",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.13.0",

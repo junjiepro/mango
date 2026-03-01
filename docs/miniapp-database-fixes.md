@@ -115,7 +115,7 @@ await supabase.rpc('increment_miniapp_invocations', { miniapp_id: miniAppId });
 **表结构**:
 ```sql
 CREATE TABLE audit_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   action VARCHAR(100) NOT NULL,
   actor_id UUID,                    -- ✅ 正确的字段名
   actor_type VARCHAR(20),

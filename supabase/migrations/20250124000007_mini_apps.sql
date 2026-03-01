@@ -1,6 +1,6 @@
 -- Mini Apps and Installations Tables
 CREATE TABLE mini_apps (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   creator_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
 
   -- 基本信息
@@ -66,7 +66,7 @@ CREATE TABLE mini_apps (
 
 -- Mini App Installations Table
 CREATE TABLE mini_app_installations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   mini_app_id UUID NOT NULL REFERENCES mini_apps(id) ON DELETE CASCADE,
 

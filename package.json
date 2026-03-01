@@ -10,7 +10,11 @@
     "test:e2e": "turbo run test:e2e",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "deploy:all": "bash scripts/deploy.sh --all",
+    "deploy:db": "bash scripts/deploy.sh --db",
+    "deploy:functions": "bash scripts/deploy.sh --functions",
+    "deploy:cli": "bash scripts/deploy.sh --cli"
   },
   "devDependencies": {
     "prettier": "^3.1.1",
