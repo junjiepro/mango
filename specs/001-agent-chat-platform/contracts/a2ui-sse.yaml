@@ -1,0 +1,181 @@
+openapi: 3.1.0
+info:
+  title: A2UI Server-Sent Events API
+  version: 0.8.0
+  description: |
+    A2UI (Agent to UI) 协议的 SSE 流式接口定义。
+    基于 A2UI v0.8 官方规范实现。
+
+    ## 核心特性
+    - JSONL 格式的流式消息传输
+    - 通过 Server-Sent Events (SSE) 实现单向推送
+    - 支持多个独立的 Surface（UI 区域）
+    - 组件树和数据模型分离
+    - 渐进式渲染，提升感知性能
+
+    ## 消息类型
+    1. surfaceUpdate - 定义或更新 UI 组件
+    2. dataModelUpdate - 更新数据模型
+    3. beginRendering - 触发首次渲染
+    4. deleteSurface - 删除 Surface
+
+    ## 参考规范
+    - [A2UI v0.8 Specification](https://github.com/google/A2UI/blob/main/specification/0.8/docs/a2ui_protocol.md)
+
+servers:
+  - url: https://api.mango.ai/v1
+    description: Production API
+  - url: http://localhost:3000/api
+    description: Local Development
+
+paths:
+  /a2ui/stream:
+    get:
+      summary: 建立 A2UI SSE 流连接
+      description: |
+        建立 Server-Sent Events 连接，接收 A2UI 消息流。
+        每条消息为一行 JSON 对象（JSONL 格式）。
+      operationId: streamA2UI
+      tags:
+        - A2UI Stream
+      parameters:
+        - name: conversationId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 对话 ID
+        - name: catalogId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            指定使用的 Catalog ID。
+            默认使用标准 Catalog: https://github.com/google/A2UI/blob/main/specification/0.8/json/standard_catalog_definition.json
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: SSE 流连接成功建立
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: JSONL 格式的消息流
+              examples:
+                surfaceUpdate:
+                  value: |
+                    {"surfaceUpdate":{"surfaceId":"main","components":[{"id":"root","component":{"Column":{"children":{"explicitList":["card1"]}}}}]}}
+                    {"surfaceUpdate":{"surfaceId":"main","components":[{"id":"card1","component":{"Card":{"child":"text1"}}}]}}
+                    {"surfaceUpdate":{"surfaceId":"main","components":[{"id":"text1","component":{"Text":{"text":{"literalString":"Hello World"}}}}]}}
+                    {"dataModelUpdate":{"surfaceId":"main","contents":{}}}
+                    {"beginRendering":{"surfaceId":"main","root":"root"}}
+        '401':
+          description: 未授权 - 缺少或无效的认证令牌
+        '404':
+          description: 对话不存在
+        '500':
+          description: 服务器内部错误
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT 令牌
+
+  schemas:
+    # 服务端到客户端消息类型
+    SurfaceUpdateMessage:
+      type: object
+      required:
+        - surfaceUpdate
+      properties:
+        surfaceUpdate:
+          type: object
+          required:
+            - components
+          properties:
+            surfaceId:
+              type: string
+              description: Surface ID，默认为 "default"
+              default: "default"
+            components:
+              type: array
+              description: 组件定义列表（扁平化）
+              items:
+                $ref: '#/components/schemas/ComponentDefinition'
+
+    ComponentDefinition:
+      type: object
+      required:
+        - id
+        - component
+      properties:
+        id:
+          type: string
+          description: 组件唯一标识符
+        component:
+          type: object
+          description: |
+            组件类型和属性。
+            键为组件类型名称（如 "Button", "Text"），
+            值为该组件的属性对象。
+          additionalProperties: true
+
+    DataModelUpdateMessage:
+      type: object
+      required:
+        - dataModelUpdate
+      properties:
+        dataModelUpdate:
+          type: object
+          required:
+            - contents
+          properties:
+            surfaceId:
+              type: string
+              description: Surface ID，默认为 "default"
+              default: "default"
+            contents:
+              type: object
+              description: 数据模型内容（JSON 对象）
+              additionalProperties: true
+
+    BeginRenderingMessage:
+      type: object
+      required:
+        - beginRendering
+      properties:
+        beginRendering:
+          type: object
+          required:
+            - root
+          properties:
+            surfaceId:
+              type: string
+              description: Surface ID，默认为 "default"
+              default: "default"
+            root:
+              type: string
+              description: 根组件的 ID
+            catalogId:
+              type: string
+              description: 使用的 Catalog ID
+
+    DeleteSurfaceMessage:
+      type: object
+      required:
+        - deleteSurface
+      properties:
+        deleteSurface:
+          type: object
+          required:
+            - surfaceId
+          properties:
+            surfaceId:
+              type: string
+              description: 要删除的 Surface ID

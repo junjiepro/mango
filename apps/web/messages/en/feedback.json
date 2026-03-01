@@ -1,0 +1,28 @@
+{
+  "dialog": {
+    "thankYou": "Thanks for the positive feedback!",
+    "thankYouFeedback": "Thanks for your feedback",
+    "tellUsGood": "Tell us what we did well...",
+    "tellUsImprove": "Tell us how we can improve...",
+    "cancel": "Cancel",
+    "submitting": "Submitting...",
+    "submit": "Submit"
+  },
+  "learning": {
+    "title": "Learning Rules",
+    "noRules": "No learning rules yet",
+    "category": "Category:",
+    "preference": "Preference:",
+    "positive": "Positive",
+    "negative": "Negative",
+    "pattern": "Pattern:",
+    "extensionSkill": "Extension Skill",
+    "noExtensionSkills": "No extension skills yet. Help Agent learn through feedback.",
+    "loading": "Loading...",
+    "refresh": "Refresh",
+    "export": "Export",
+    "confidence": "Confidence:",
+    "noRulesPage": "No learning rules yet. Help Agent learn your preferences through feedback.",
+    "preferencePrefix": "Preference: "
+  }
+}

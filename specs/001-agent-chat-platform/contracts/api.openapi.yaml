@@ -1,0 +1,1461 @@
+openapi: 3.1.0
+info:
+  title: Mango Agent Platform API
+  description: |
+    智能Agent对话平台的RESTful API规范。
+
+    核心功能：
+    - 用户认证与管理
+    - 对话与消息管理
+    - 任务执行与追踪
+    - 小应用生态
+    - 反馈与学习系统
+
+  version: 1.0.0
+  contact:
+    name: Mango Team
+    email: support@mango.example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.mango.example.com/v1
+    description: Production
+  - url: https://api-staging.mango.example.com/v1
+    description: Staging
+  - url: http://localhost:3000/api/v1
+    description: Local Development
+
+tags:
+  - name: auth
+    description: 用户认证与授权
+  - name: users
+    description: 用户管理
+  - name: conversations
+    description: 对话管理
+  - name: messages
+    description: 消息管理
+  - name: tasks
+    description: 任务管理
+  - name: tools
+    description: 工具管理
+  - name: miniapps
+    description: 小应用生态
+  - name: feedback
+    description: 反馈与学习
+  - name: notifications
+    description: 通知系统
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ==================== 认证 ====================
+  /auth/signup:
+    post:
+      tags: [auth]
+      summary: 用户注册
+      description: 使用邮箱密码注册新用户
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                displayName:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+      responses:
+        '201':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: 邮箱已存在
+
+  /auth/signin:
+    post:
+      tags: [auth]
+      summary: 用户登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: 认证失败
+
+  /auth/signout:
+    post:
+      tags: [auth]
+      summary: 用户登出
+      responses:
+        '200':
+          description: 登出成功
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==================== 用户 ====================
+  /users/me:
+    get:
+      tags: [users]
+      summary: 获取当前用户信息
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags: [users]
+      summary: 更新用户信息
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                bio:
+                  type: string
+                preferences:
+                  $ref: '#/components/schemas/UserPreferences'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+
+  # ==================== 对话 ====================
+  /conversations:
+    get:
+      tags: [conversations]
+      summary: 获取对话列表
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, archived, deleted]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: search
+          in: query
+          description: 搜索关键词
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Conversation'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: [conversations]
+      summary: 创建新对话
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 200
+                description:
+                  type: string
+                context:
+                  $ref: '#/components/schemas/ConversationContext'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+
+  /conversations/{conversationId}:
+    parameters:
+      - $ref: '#/components/parameters/ConversationId'
+
+    get:
+      tags: [conversations]
+      summary: 获取对话详情
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [conversations]
+      summary: 更新对话
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, archived]
+                context:
+                  $ref: '#/components/schemas/ConversationContext'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+
+    delete:
+      tags: [conversations]
+      summary: 删除对话
+      responses:
+        '204':
+          description: 删除成功
+
+  # ==================== 消息 ====================
+  /conversations/{conversationId}/messages:
+    parameters:
+      - $ref: '#/components/parameters/ConversationId'
+
+    get:
+      tags: [messages]
+      summary: 获取消息列表
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: before
+          in: query
+          description: 获取此消息ID之前的消息
+          schema:
+            type: string
+            format: uuid
+        - name: after
+          in: query
+          description: 获取此消息ID之后的消息
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+                  pagination:
+                    type: object
+                    properties:
+                      hasMore:
+                        type: boolean
+                      nextCursor:
+                        type: string
+
+    post:
+      tags: [messages]
+      summary: 发送消息
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                contentType:
+                  type: string
+                  default: text/markdown
+                attachments:
+                  type: array
+                  items:
+                    type: object
+                    required: [fileId]
+                    properties:
+                      fileId:
+                        type: string
+                        format: uuid
+                replyTo:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: 消息发送成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+
+  /messages/{messageId}:
+    parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [messages]
+      summary: 获取消息详情
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+
+    patch:
+      tags: [messages]
+      summary: 编辑消息
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+
+  # ==================== 任务 ====================
+  /tasks:
+    get:
+      tags: [tasks]
+      summary: 获取任务列表
+      parameters:
+        - name: conversationId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, queued, running, completed, failed, cancelled]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /tasks/{taskId}:
+    parameters:
+      - name: taskId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [tasks]
+      summary: 获取任务详情
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+    patch:
+      tags: [tasks]
+      summary: 更新任务（如取消）
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [cancelled]
+      responses:
+        '200':
+          description: 更新成功
+
+  # ==================== 工具 ====================
+  /tools:
+    get:
+      tags: [tools]
+      summary: 获取工具列表
+      parameters:
+        - name: protocol
+          in: query
+          schema:
+            type: string
+            enum: [mcp, acp, a2a, native]
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Tool'
+
+    post:
+      tags: [tools]
+      summary: 注册新工具
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolCreate'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tool'
+
+  /tools/{toolId}:
+    parameters:
+      - name: toolId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [tools]
+      summary: 获取工具详情
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tool'
+
+    delete:
+      tags: [tools]
+      summary: 删除工具
+      responses:
+        '204':
+          description: 删除成功
+
+  # ==================== 小应用 ====================
+  /miniapps:
+    get:
+      tags: [miniapps]
+      summary: 获取小应用列表
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, active, suspended, archived]
+        - name: isPublic
+          in: query
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: tags
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MiniApp'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: [miniapps]
+      summary: 创建小应用
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MiniAppCreate'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MiniApp'
+
+  /miniapps/{miniappId}:
+    parameters:
+      - name: miniappId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [miniapps]
+      summary: 获取小应用详情
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MiniApp'
+
+    patch:
+      tags: [miniapps]
+      summary: 更新小应用
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MiniAppUpdate'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MiniApp'
+
+  /miniapps/{miniappId}/install:
+    post:
+      tags: [miniapps]
+      summary: 安装小应用
+      parameters:
+        - name: miniappId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                grantedPermissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: 安装成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MiniAppInstallation'
+
+  /miniapps/installations:
+    get:
+      tags: [miniapps]
+      summary: 获取已安装的小应用列表
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MiniAppInstallation'
+
+  /miniapps/installations/{installationId}:
+    parameters:
+      - name: installationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    delete:
+      tags: [miniapps]
+      summary: 卸载小应用
+      responses:
+        '204':
+          description: 卸载成功
+
+  # ==================== 反馈 ====================
+  /feedback:
+    post:
+      tags: [feedback]
+      summary: 提交反馈
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [feedbackType]
+              properties:
+                conversationId:
+                  type: string
+                  format: uuid
+                messageId:
+                  type: string
+                  format: uuid
+                taskId:
+                  type: string
+                  format: uuid
+                feedbackType:
+                  type: string
+                  enum: [satisfaction, accuracy, usefulness, safety]
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                tags:
+                  type: array
+                  items:
+                    type: string
+                reason:
+                  type: string
+      responses:
+        '201':
+          description: 反馈提交成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Feedback'
+
+  /learning/summary:
+    get:
+      tags: [feedback]
+      summary: 获取学习数据总览
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningSummary'
+
+  /learning/rules:
+    get:
+      tags: [feedback]
+      summary: 获取学习规则列表
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [format, accuracy, safety, efficiency, preference]
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [confidence, created_at]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LearningRecord'
+
+  /learning/rules/{ruleId}:
+    parameters:
+      - name: ruleId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    delete:
+      tags: [feedback]
+      summary: 删除学习规则
+      parameters:
+        - name: soft
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '204':
+          description: 删除成功
+
+  /learning/cleanup:
+    post:
+      tags: [feedback]
+      summary: 批量清理学习数据
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scope:
+                  type: string
+                  enum: [feedback, rules, all]
+                filters:
+                  type: object
+                  properties:
+                    type:
+                      type: array
+                      items:
+                        type: string
+                    before:
+                      type: string
+                      format: date
+                    conversationId:
+                      type: string
+                      format: uuid
+      responses:
+        '200':
+          description: 清理成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: object
+                    properties:
+                      feedback:
+                        type: integer
+                      rules:
+                        type: integer
+                  auditLog:
+                    type: string
+
+  # ==================== 通知 ====================
+  /notifications:
+    get:
+      tags: [notifications]
+      summary: 获取通知列表
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [unread, read, archived]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Notification'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /notifications/{notificationId}/read:
+    post:
+      tags: [notifications]
+      summary: 标记通知为已读
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 标记成功
+
+# ==================== Components ====================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase Auth JWT Token
+
+  parameters:
+    ConversationId:
+      name: conversationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: 未授权
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    # ==================== 基础类型 ====================
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        hasMore:
+          type: boolean
+
+    # ==================== 认证 ====================
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserProfile'
+        session:
+          type: object
+          properties:
+            accessToken:
+              type: string
+            refreshToken:
+              type: string
+            expiresAt:
+              type: string
+              format: date-time
+
+    # ==================== 用户 ====================
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        bio:
+          type: string
+        preferences:
+          $ref: '#/components/schemas/UserPreferences'
+        quota:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        lastActiveAt:
+          type: string
+          format: date-time
+
+    UserPreferences:
+      type: object
+      properties:
+        language:
+          type: string
+          default: zh-CN
+        theme:
+          type: string
+          enum: [light, dark, system]
+        notificationsEnabled:
+          type: boolean
+        agentBehavior:
+          type: object
+          properties:
+            responseStyle:
+              type: string
+              enum: [concise, balanced, detailed]
+            detailLevel:
+              type: string
+              enum: [low, medium, high]
+            autoExecute:
+              type: boolean
+
+    # ==================== 对话 ====================
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, archived, deleted]
+        context:
+          $ref: '#/components/schemas/ConversationContext'
+        stats:
+          type: object
+          properties:
+            messageCount:
+              type: integer
+            taskCount:
+              type: integer
+            totalTokens:
+              type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastMessageAt:
+          type: string
+          format: date-time
+
+    ConversationContext:
+      type: object
+      properties:
+        model:
+          type: string
+          default: claude-3-5-sonnet
+        temperature:
+          type: number
+          default: 0.7
+        maxTokens:
+          type: integer
+          default: 4096
+        systemPrompt:
+          type: string
+
+    # ==================== 消息 ====================
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversationId:
+          type: string
+          format: uuid
+        senderType:
+          type: string
+          enum: [user, agent, system, miniapp]
+        senderId:
+          type: string
+          format: uuid
+        content:
+          type: string
+        contentType:
+          type: string
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
+        agentMetadata:
+          type: object
+          properties:
+            model:
+              type: string
+            tokens:
+              type: integer
+            thinkingTimeMs:
+              type: integer
+            toolCalls:
+              type: array
+        status:
+          type: string
+        sequenceNumber:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        fileName:
+          type: string
+        fileType:
+          type: string
+        fileSize:
+          type: integer
+        storagePath:
+          type: string
+        metadata:
+          type: object
+
+    # ==================== 任务 ====================
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        taskType:
+          type: string
+        status:
+          type: string
+          enum: [pending, queued, running, completed, failed, cancelled]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        result:
+          type: object
+        errorMessage:
+          type: string
+        toolCalls:
+          type: array
+          items:
+            type: object
+        metrics:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+
+    # ==================== 工具 ====================
+    Tool:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        protocol:
+          type: string
+          enum: [mcp, acp, a2a, native]
+        config:
+          type: object
+        requiredPermissions:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        isPublic:
+          type: boolean
+        stats:
+          type: object
+
+    ToolCreate:
+      type: object
+      required: [name, displayName, description, protocol, config]
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        protocol:
+          type: string
+          enum: [mcp, acp, a2a, native]
+        config:
+          type: object
+        requiredPermissions:
+          type: array
+          items:
+            type: string
+
+    # ==================== 小应用 ====================
+    MiniApp:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        creatorId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        iconUrl:
+          type: string
+        manifest:
+          type: object
+        status:
+          type: string
+          enum: [draft, active, suspended, archived]
+        isPublic:
+          type: boolean
+        stats:
+          type: object
+        tags:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+
+    MiniAppCreate:
+      type: object
+      required: [name, displayName, description, code, manifest]
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        iconUrl:
+          type: string
+        code:
+          type: string
+        manifest:
+          type: object
+        tags:
+          type: array
+          items:
+            type: string
+
+    MiniAppUpdate:
+      type: object
+      properties:
+        displayName:
+          type: string
+        description:
+          type: string
+        iconUrl:
+          type: string
+        code:
+          type: string
+        status:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    MiniAppInstallation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        miniAppId:
+          type: string
+          format: uuid
+        installedVersion:
+          type: string
+        customName:
+          type: string
+        grantedPermissions:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        stats:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+
+    # ==================== 反馈 ====================
+    Feedback:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        conversationId:
+          type: string
+          format: uuid
+        messageId:
+          type: string
+          format: uuid
+        taskId:
+          type: string
+          format: uuid
+        feedbackType:
+          type: string
+        rating:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        reason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    LearningSummary:
+      type: object
+      properties:
+        totalRecords:
+          type: integer
+        recordsByType:
+          type: object
+        activeRules:
+          type: integer
+        coverage:
+          type: object
+        confidence:
+          type: object
+
+    LearningRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        recordType:
+          type: string
+        ruleContent:
+          type: object
+        confidence:
+          type: number
+        isActive:
+          type: boolean
+        applicationCount:
+          type: integer
+        successCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    # ==================== 通知 ====================
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        sourceType:
+          type: string
+          enum: [system, agent, miniapp, user]
+        sourceId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        body:
+          type: string
+        actionUrl:
+          type: string
+        category:
+          type: string
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        status:
+          type: string
+          enum: [unread, read, archived]
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time

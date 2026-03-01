@@ -1,0 +1,146 @@
+asyncapi: 2.6.0
+info:
+  title: Terminal WebSocket API
+  version: 1.0.0
+  description: |
+    终端 WebSocket 协议定义。
+    用于在 Web 前端和设备终端之间建立实时双向通信。
+
+    ## 核心特性
+    - 基于 WebSocket 的双向通信
+    - 支持多终端会话管理
+    - 实时输入输出传输
+    - 终端窗口大小调整
+    - 会话状态管理
+
+servers:
+  production:
+    url: wss://api.mango.ai/v1/terminal
+    protocol: wss
+    description: Production WebSocket Server
+  development:
+    url: ws://localhost:3000/api/terminal
+    protocol: ws
+    description: Local Development Server
+
+channels:
+  terminal/{sessionId}:
+    description: 终端会话通道
+    parameters:
+      sessionId:
+        description: 终端会话 ID
+        schema:
+          type: string
+          format: uuid
+    subscribe:
+      summary: 接收终端输出
+      message:
+        oneOf:
+          - $ref: '#/components/messages/TerminalOutput'
+          - $ref: '#/components/messages/TerminalResize'
+          - $ref: '#/components/messages/TerminalStatus'
+    publish:
+      summary: 发送终端输入
+      message:
+        oneOf:
+          - $ref: '#/components/messages/TerminalInput'
+          - $ref: '#/components/messages/TerminalResize'
+          - $ref: '#/components/messages/TerminalControl'
+
+components:
+  messages:
+    TerminalOutput:
+      name: terminalOutput
+      title: 终端输出
+      summary: 从终端接收的输出数据
+      payload:
+        type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: output
+          data:
+            type: string
+            description: 终端输出内容（可能包含 ANSI 转义序列）
+
+    TerminalInput:
+      name: terminalInput
+      title: 终端输入
+      summary: 发送到终端的输入数据
+      payload:
+        type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: input
+          data:
+            type: string
+            description: 用户输入内容
+
+    TerminalResize:
+      name: terminalResize
+      title: 终端窗口大小调整
+      summary: 调整终端窗口大小
+      payload:
+        type: object
+        required:
+          - type
+          - cols
+          - rows
+        properties:
+          type:
+            type: string
+            const: resize
+          cols:
+            type: integer
+            description: 列数
+            minimum: 1
+          rows:
+            type: integer
+            description: 行数
+            minimum: 1
+
+    TerminalControl:
+      name: terminalControl
+      title: 终端控制命令
+      summary: 控制终端会话（如关闭、暂停等）
+      payload:
+        type: object
+        required:
+          - type
+          - action
+        properties:
+          type:
+            type: string
+            const: control
+          action:
+            type: string
+            enum: [close, pause, resume]
+            description: 控制动作
+
+    TerminalStatus:
+      name: terminalStatus
+      title: 终端状态更新
+      summary: 终端会话状态变更通知
+      payload:
+        type: object
+        required:
+          - type
+          - status
+        properties:
+          type:
+            type: string
+            const: status
+          status:
+            type: string
+            enum: [connected, disconnected, error]
+            description: 终端状态
+          message:
+            type: string
+            description: 状态消息（可选）

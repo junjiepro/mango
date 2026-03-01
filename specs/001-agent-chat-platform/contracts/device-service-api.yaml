@@ -1,0 +1,650 @@
+openapi: 3.0.3
+info:
+  title: Mango Device Service API
+  description: |
+    设备服务 API 规范 - User Story 3
+
+    本 API 由运行在用户本地设备上的 CLI 工具提供，通过 Cloudflare Tunnel 暴露到公网。
+    主要功能包括：
+    - 设备绑定管理
+    - MCP 服务代理
+    - ACP 服务代理（预留）
+    - 配置管理
+
+  version: 1.0.0
+  contact:
+    name: Mango Team
+    email: support@mango.ai
+
+servers:
+  - url: https://{tunnel-id}.trycloudflare.com
+    description: Cloudflare Tunnel 动态 URL
+    variables:
+      tunnel-id:
+        default: random-tunnel-id
+        description: Cloudflare 自动生成的 tunnel ID
+
+tags:
+  - name: Health
+    description: 健康检查端点
+  - name: Binding
+    description: 设备绑定管理
+  - name: MCP
+    description: MCP 协议代理
+  - name: ACP
+    description: ACP 协议代理（预留）
+  - name: Settings
+    description: 配置管理
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: 健康检查
+      description: 检查设备服务是否正常运行
+      operationId: healthCheck
+      responses:
+        '200':
+          description: 服务正常
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                    example: ok
+                  timestamp:
+                    type: integer
+                    format: int64
+                    description: Unix 时间戳（毫秒）
+                    example: 1705392000000
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  uptime:
+                    type: integer
+                    description: 服务运行时间（秒）
+                    example: 3600
+
+  /bind:
+    post:
+      tags:
+        - Binding
+      summary: 创建设备绑定
+      description: |
+        用户通过 Mango Web 访问此端点，输入 device_secret 完成设备绑定。
+        绑定成功后返回 binding_token 用于后续 API 认证。
+      operationId: createBinding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - device_secret
+                - user_id
+              properties:
+                device_secret:
+                  type: string
+                  description: 设备密钥（由 CLI 工具生成）
+                  example: "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+                user_id:
+                  type: string
+                  format: uuid
+                  description: 用户 ID
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+                binding_name:
+                  type: string
+                  description: 用户自定义绑定名称
+                  example: "工作电脑"
+                  maxLength: 100
+      responses:
+        '200':
+          description: 绑定成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  binding_id:
+                    type: string
+                    format: uuid
+                    example: "660e8400-e29b-41d4-a716-446655440001"
+                  binding_token:
+                    type: string
+                    description: 用于 API 认证的 token
+                    example: "xyz789abc123def456ghi789jkl012mno345pqr678"
+                  tunnel_url:
+                    type: string
+                    format: uri
+                    example: "https://random-tunnel-id.trycloudflare.com"
+                  device_id:
+                    type: string
+                    example: "device-12345"
+        '401':
+          description: device_secret 无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /mcp/services:
+    get:
+      tags:
+        - MCP
+      summary: 列出所有 MCP 服务
+      description: 获取当前设备上配置的所有 MCP 服务列表
+      operationId: listMCPServices
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功返回服务列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MCPService'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /mcp/{service}/tools:
+    get:
+      tags:
+        - MCP
+      summary: 列出服务的工具
+      description: 获取指定 MCP 服务提供的所有工具
+      operationId: listMCPTools
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: service
+          in: path
+          required: true
+          description: MCP 服务名称
+          schema:
+            type: string
+            example: "filesystem"
+      responses:
+        '200':
+          description: 成功返回工具列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tools:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MCPTool'
+        '404':
+          description: 服务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /mcp/{service}/tools/{tool}:
+    post:
+      tags:
+        - MCP
+      summary: 调用 MCP 工具
+      description: 执行指定 MCP 服务的工具
+      operationId: callMCPTool
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: service
+          in: path
+          required: true
+          description: MCP 服务名称
+          schema:
+            type: string
+            example: "filesystem"
+        - name: tool
+          in: path
+          required: true
+          description: 工具名称
+          schema:
+            type: string
+            example: "read_file"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 工具参数（根据工具的 schema 定义）
+              example:
+                path: "/Users/username/Documents/file.txt"
+      responses:
+        '200':
+          description: 工具执行成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [text, image, resource]
+                        text:
+                          type: string
+                        data:
+                          type: string
+                        mimeType:
+                          type: string
+                  isError:
+                    type: boolean
+                    default: false
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 服务或工具不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 工具执行失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /mcp/{service}/resources:
+    get:
+      tags:
+        - MCP
+      summary: 列出服务的资源
+      description: 获取指定 MCP 服务提供的所有资源
+      operationId: listMCPResources
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: service
+          in: path
+          required: true
+          description: MCP 服务名称
+          schema:
+            type: string
+            example: "filesystem"
+      responses:
+        '200':
+          description: 成功返回资源列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resources:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MCPResource'
+        '404':
+          description: 服务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /mcp/{service}/resources/{resourcePath}:
+    get:
+      tags:
+        - MCP
+      summary: 读取资源
+      description: 读取指定 MCP 资源的内容
+      operationId: readMCPResource
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: service
+          in: path
+          required: true
+          description: MCP 服务名称
+          schema:
+            type: string
+            example: "filesystem"
+        - name: resourcePath
+          in: path
+          required: true
+          description: 资源路径（URI 编码）
+          schema:
+            type: string
+            example: "file:///Users/username/Documents/file.txt"
+      responses:
+        '200':
+          description: 成功返回资源内容
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contents:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        uri:
+                          type: string
+                        mimeType:
+                          type: string
+                        text:
+                          type: string
+        '404':
+          description: 服务或资源不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /acp/{service}/{endpoint}:
+    post:
+      tags:
+        - ACP
+      summary: ACP 协议代理（预留）
+      description: |
+        ACP 协议支持预留接口，Phase 2 实现。
+        当前返回 501 Not Implemented。
+      operationId: acpProxy
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: service
+          in: path
+          required: true
+          description: ACP 服务名称
+          schema:
+            type: string
+        - name: endpoint
+          in: path
+          required: true
+          description: ACP 端点路径
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '501':
+          description: ACP 协议支持即将推出
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "ACP protocol support coming in Phase 2"
+                  message:
+                    type: string
+                    example: "Please use MCP protocol for now"
+
+  /setting:
+    get:
+      tags:
+        - Settings
+      summary: 获取绑定配置
+      description: 获取当前绑定的配置信息，包括 MCP 服务列表
+      operationId: getSettings
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功返回配置
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BindingConfig'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      tags:
+        - Settings
+      summary: 更新绑定配置
+      description: 更新当前绑定的配置，如添加/删除 MCP 服务
+      operationId: updateSettings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindingConfig'
+      responses:
+        '200':
+          description: 配置更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Configuration updated successfully"
+        '400':
+          description: 配置验证失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: binding_token
+      description: |
+        使用设备绑定时生成的 binding_token 进行认证。
+        格式: `Authorization: Bearer {binding_token}`
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: 错误消息
+          example: "Invalid device_secret"
+        code:
+          type: string
+          description: 错误代码
+          example: "INVALID_SECRET"
+        details:
+          type: object
+          description: 额外的错误详情
+
+    MCPService:
+      type: object
+      required:
+        - name
+        - command
+      properties:
+        name:
+          type: string
+          description: 服务名称
+          example: "filesystem"
+        command:
+          type: string
+          description: 启动命令
+          example: "npx"
+        args:
+          type: array
+          items:
+            type: string
+          description: 命令参数
+          example: ["-y", "@modelcontextprotocol/server-filesystem", "/Users/username/Documents"]
+        env:
+          type: object
+          additionalProperties:
+            type: string
+          description: 环境变量
+          example:
+            LOG_LEVEL: "info"
+        status:
+          type: string
+          enum: [active, inactive]
+          description: 服务状态
+          example: "active"
+
+    MCPTool:
+      type: object
+      required:
+        - name
+        - description
+      properties:
+        name:
+          type: string
+          description: 工具名称
+          example: "read_file"
+        description:
+          type: string
+          description: 工具描述
+          example: "Read the contents of a file"
+        inputSchema:
+          type: object
+          description: 工具参数的 JSON Schema
+          example:
+            type: "object"
+            properties:
+              path:
+                type: "string"
+                description: "Path to the file"
+            required: ["path"]
+
+    MCPResource:
+      type: object
+      required:
+        - uri
+        - name
+      properties:
+        uri:
+          type: string
+          description: 资源 URI
+          example: "file:///Users/username/Documents/file.txt"
+        name:
+          type: string
+          description: 资源名称
+          example: "file.txt"
+        description:
+          type: string
+          description: 资源描述
+          example: "A text file"
+        mimeType:
+          type: string
+          description: MIME 类型
+          example: "text/plain"
+
+    BindingConfig:
+      type: object
+      properties:
+        mcp_services:
+          type: array
+          items:
+            $ref: '#/components/schemas/MCPService'
+          description: MCP 服务配置列表
+        acp_services:
+          type: array
+          items:
+            type: object
+          description: ACP 服务配置列表（预留）
+        settings:
+          type: object
+          description: 其他配置项
+          properties:
+            auto_start:
+              type: boolean
+              description: 是否自动启动服务
+              default: true
+            log_level:
+              type: string
+              enum: [debug, info, warn, error]
+              default: info
+
+  responses:
+    UnauthorizedError:
+      description: 认证失败或 token 无效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Invalid or expired token"
+            code: "UNAUTHORIZED"
+
+  examples:
+    MCPToolCallRequest:
+      summary: 读取文件示例
+      value:
+        path: "/Users/username/Documents/report.txt"
+
+    MCPToolCallResponse:
+      summary: 读取文件响应
+      value:
+        content:
+          - type: "text"
+            text: "File contents here..."
+        isError: false
+
+    BindingConfigExample:
+      summary: 绑定配置示例
+      value:
+        mcp_services:
+          - name: "filesystem"
+            command: "npx"
+            args: ["-y", "@modelcontextprotocol/server-filesystem", "/Users/username/Documents"]
+            env:
+              LOG_LEVEL: "info"
+            status: "active"
+          - name: "github"
+            command: "npx"
+            args: ["-y", "@modelcontextprotocol/server-github"]
+            env:
+              GITHUB_TOKEN: "ghp_xxxxxxxxxxxx"
+            status: "active"
+        settings:
+          auto_start: true
+          log_level: "info"

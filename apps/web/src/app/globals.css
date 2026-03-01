@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@source "../node_modules/streamdown/dist/index.js";
+
+
+
+@layer base {
+  :root {
+    /* Primary Colors - HSL Format */
+    --mango-dark: 40 3% 8%;           /* #141413 */
+    --mango-light: 48 31% 97%;        /* #faf9f5 */
+    --mango-mid-gray: 48 4% 68%;      /* #b0aea5 */
+    --mango-light-gray: 48 13% 89%;   /* #e8e6dc */
+    
+    /* Accent Colors - HSL Format */
+    --mango-orange: 15 63% 60%;       /* #d97757 */
+    --mango-blue: 210 45% 60%;        /* #6a9bcc */
+    --mango-green: 85 21% 45%;        /* #788c5d */
+    
+    /* Extended Color Palette - HSL Format */
+    --mango-orange-dark: 15 53% 50%;  /* Darker variant */
+    --mango-orange-light: 15 73% 70%; /* Lighter variant */
+    --mango-blue-dark: 210 55% 50%;   /* Darker variant */
+    --mango-blue-light: 210 55% 70%;  /* Lighter variant */
+    --mango-green-dark: 85 31% 35%;   /* Darker variant */
+    --mango-green-light: 85 31% 55%;  /* Lighter variant */
+    
+    /* Neutral Scale - HSL Format */
+    --mango-gray-50: 48 33% 99%;      /* Near white */
+    --mango-gray-100: 48 25% 96%;     /* Very light gray */
+    --mango-gray-200: 48 13% 89%;     /* Light gray */
+    --mango-gray-300: 48 8% 82%;      /* Medium light gray */
+    --mango-gray-400: 48 4% 68%;      /* Medium gray */
+    --mango-gray-500: 48 3% 55%;      /* Gray */
+    --mango-gray-600: 48 3% 42%;      /* Medium dark gray */
+    --mango-gray-700: 48 4% 32%;      /* Dark gray */
+    --mango-gray-800: 48 6% 22%;      /* Very dark gray */
+    --mango-gray-900: 40 3% 8%;       /* Near black */
+    
+    /* Semantic Colors - HSL Format with CSS Functions */
+    --background: var(--mango-light);
+    --foreground: var(--mango-dark);
+    --card: 0 0% 100%;
+    --card-foreground: var(--mango-dark);
+    --popover: 0 0% 100%;
+    --popover-foreground: var(--mango-dark);
+    --primary: var(--mango-orange);
+    --primary-foreground: 0 0% 100%;
+    --secondary: var(--mango-light-gray);
+    --secondary-foreground: var(--mango-dark);
+    --muted: var(--mango-gray-100);
+    --muted-foreground: var(--mango-gray-600);
+    --accent: var(--mango-gray-100);
+    --accent-foreground: var(--mango-gray-600);
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: var(--mango-gray-200);
+    --input: var(--mango-gray-200);
+    --ring: var(--mango-orange);
+    
+    /* Typography */
+    --font-sans: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-serif: "Lora", Georgia, "Times New Roman", Times, serif;
+    --font-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+    
+    /* Spacing Scale - Based on Anthropic's 8px grid */
+    --spacing-unit: 0.5rem;
+    
+    /* Border Radius */
+    --radius: 0.5rem;
+    --radius-sm: 0.25rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    --radius-3xl: 1.5rem;
+  }
+
+  /* Dark Mode Variables - HSL Format */
+  .dark {
+    --background: var(--mango-dark);
+    --foreground: var(--mango-light);
+    --card: var(--mango-gray-800);
+    --card-foreground: var(--mango-light);
+    --popover: var(--mango-gray-800);
+    --popover-foreground: var(--mango-light);
+    --primary: var(--mango-orange);
+    --primary-foreground: 0 0% 100%;
+    --secondary: var(--mango-gray-700);
+    --secondary-foreground: var(--mango-light);
+    --muted: var(--mango-gray-800);
+    --muted-foreground: var(--mango-gray-300);
+    --accent: var(--mango-gray-800);
+    --accent-foreground: var(--mango-gray-300);
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: var(--mango-gray-700);
+    --input: var(--mango-gray-700);
+    --ring: var(--mango-orange);
+  }
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

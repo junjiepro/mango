@@ -1,0 +1,175 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_migrations:
+        description: "Skip database migrations"
+        required: false
+        default: "false"
+        type: boolean
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  check-ci:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    outputs:
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+    steps:
+      - name: Verify CI status
+        id: check
+        run: |
+          echo "CI passed or manual trigger, proceeding with deployment"
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+
+      - name: Abort if CI failed
+        if: >
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion != 'success'
+        run: |
+          echo "CI workflow failed, aborting deployment"
+          exit 1
+
+  deploy-supabase-migrations:
+    runs-on: ubuntu-latest
+    needs: check-ci
+    if: >
+      needs.check-ci.outputs.should_deploy == 'true' &&
+      (github.event_name != 'workflow_dispatch' || github.event.inputs.skip_migrations != 'true')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link Supabase project
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Run database migrations
+        run: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+  deploy-supabase-functions:
+    runs-on: ubuntu-latest
+    needs: [check-ci, deploy-supabase-migrations]
+    if: always() && needs.check-ci.result == 'success'
+    strategy:
+      matrix:
+        function:
+          - extract-learning-rules
+          - generate-skill-embedding
+          - miniapp-mcp
+          - miniapp-scheduler
+          - process-agent-message
+          - process-task
+          - rag-search
+          - update-device-url
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy function ${{ matrix.function }}
+        run: supabase functions deploy ${{ matrix.function }} --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+  deploy-web:
+    runs-on: ubuntu-latest
+    needs: [check-ci, deploy-supabase-migrations]
+    if: always() && needs.check-ci.result == 'success'
+    steps:
+      - name: Wait for Vercel deployment
+        uses: patrickedqvist/wait-for-vercel-preview@v1.3.2
+        id: vercel
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: Production
+          max_timeout: 600
+
+      - name: Health check
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.vercel.outputs.url }}/api/health" || echo "000")
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check failed with status: $STATUS"
+            echo "Retrying in 30s..."
+            sleep 30
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.vercel.outputs.url }}/api/health" || echo "000")
+            if [ "$STATUS" != "200" ]; then
+              echo "Health check failed after retry: $STATUS"
+              exit 1
+            fi
+          fi
+          echo "Health check passed"
+
+  publish-cli:
+    runs-on: ubuntu-latest
+    needs: check-ci
+    if: needs.check-ci.outputs.should_deploy == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @mango/shared build
+
+      - name: Build CLI
+        run: pnpm --filter @mango/cli build
+
+      - name: Check if version already published
+        id: version-check
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./apps/cli/package.json').version")
+          PUBLISHED=$(npm view @mango/cli@$PACKAGE_VERSION version 2>/dev/null || echo "not-found")
+          if [ "$PUBLISHED" = "$PACKAGE_VERSION" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Version $PACKAGE_VERSION already published, skipping"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "Publishing version $PACKAGE_VERSION"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish to npm
+        if: steps.version-check.outputs.skip != 'true'
+        run: npm publish --access public
+        working-directory: apps/cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

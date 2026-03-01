@@ -1,0 +1,31 @@
+{
+  "title": "Profile",
+  "stats": {
+    "conversations": "Conversations",
+    "messages": "Messages",
+    "tasks": "Tasks"
+  },
+  "form": {
+    "displayName": "Display Name",
+    "displayNamePlaceholder": "Your name",
+    "bio": "Bio",
+    "bioPlaceholder": "Tell us about yourself...",
+    "saveChanges": "Save Changes",
+    "saving": "Saving...",
+    "cancel": "Cancel"
+  },
+  "account": {
+    "title": "Account",
+    "logout": "Log out"
+  },
+  "toast": {
+    "loadFailed": "Load failed",
+    "loadFailedDesc": "Unable to load user profile",
+    "saveSuccess": "Saved",
+    "saveSuccessDesc": "Your profile has been updated",
+    "saveFailed": "Save failed",
+    "saveFailedDesc": "Unable to save profile. Please try again later",
+    "logoutFailed": "Logout failed",
+    "logoutFailedDesc": "Please try again later"
+  }
+}

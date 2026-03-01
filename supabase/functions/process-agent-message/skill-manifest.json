@@ -1,0 +1,159 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-02-05T12:12:56.719Z",
+  "skills": [
+    {
+      "skill_id": "edge:a2ui",
+      "name": "A2UI 组件生成",
+      "description": "生成富交互界面组件。当用户需要展示列表、表单、图表时使用。",
+      "category": "edge",
+      "keywords": [
+        "a2ui",
+        "组件",
+        "表单",
+        "图表",
+        "列表",
+        "卡片",
+        "按钮",
+        "交互"
+      ],
+      "triggers": [
+        "生成表单",
+        "创建图表",
+        "展示列表",
+        "显示数据"
+      ],
+      "tags": [
+        "ui",
+        "交互"
+      ],
+      "priority": 8,
+      "content": "---\nname: A2UI 组件生成\ndescription: 生成富交互界面组件。当用户需要展示列表、表单、图表时使用。\nkeywords: [a2ui, 组件, 表单, 图表, 列表, 卡片, 按钮, 交互]\ntriggers: [生成表单, 创建图表, 展示列表, 显示数据]\ntags: [ui, 交互]\npriority: 8\n---\n\n# A2UI 组件生成\n\n生成富交互界面组件。\n\n## When to Use\n\n- 用户需要展示列表数据时\n- 用户需要填写表单时\n- 用户需要查看图表统计时\n- 用户需要交互式操作按钮时\n\n## Tools\n\n### generate_a2ui\n\n生成 A2UI 组件。\n\n**Parameters:**\n- `components` (array, required): 组件定义数组\n\n**Returns:** 渲染的 UI 组件\n\n## Component Types\n\n### 展示组件\n\n| 类型 | 用途 |\n|------|------|\n| `list` | 列表展示 |\n| `card` | 卡片详情 |\n| `table` | 表格数据 |\n| `chart` | 数据图表 |\n\n### 交互组件\n\n| 类型 | 用途 |\n|------|------|\n| `button` | 操作按钮 |\n| `form` | 表单容器 |\n| `input` | 输入框 |\n| `select` | 下拉选择 |\n\n## Examples\n\n用户: \"展示我的待办事项列表\"\n\n调用:\n```json\ngenerate_a2ui({\n  \"components\": [{\n    \"type\": \"list\",\n    \"props\": {\n      \"title\": \"待办事项\",\n      \"items\": [\n        { \"id\": \"1\", \"text\": \"完成报告\" },\n        { \"id\": \"2\", \"text\": \"开会\" }\n      ]\n    }\n  }]\n})\n```\n\n## Best Practices\n\n1. **优先使用 A2UI**: 展示数据时优先使用组件而非纯文本\n2. **合理选择组件**: 根据数据类型选择最合适的组件\n3. **保持简洁**: 避免过度嵌套\n",
+      "content_hash": "ffd38ca78dac730ac88dee4f27d4c9e3d611584c405f65957e3f3afc45cf0c65"
+    },
+    {
+      "skill_id": "edge:generating-image",
+      "name": "图片/视频生成",
+      "description": "使用 AI 生成图片或视频。当用户需要创建、绘制图片或生成视频时使用。",
+      "category": "edge",
+      "keywords": [
+        "图片",
+        "视频",
+        "生成",
+        "绘制",
+        "画",
+        "图像",
+        "AI绘图",
+        "动画"
+      ],
+      "triggers": [
+        "生成图片",
+        "画一张",
+        "创建图片",
+        "绘制",
+        "生成视频",
+        "做个视频"
+      ],
+      "tags": [
+        "image",
+        "video",
+        "ai"
+      ],
+      "priority": 7,
+      "content": "---\nname: 图片/视频生成\ndescription: 使用 AI 生成图片或视频。当用户需要创建、绘制图片或生成视频时使用。\nkeywords: [图片, 视频, 生成, 绘制, 画, 图像, AI绘图, 动画]\ntriggers: [生成图片, 画一张, 创建图片, 绘制, 生成视频, 做个视频]\ntags: [image, video, ai]\npriority: 7\n---\n\n# 图片/视频生成\n\n使用 AI 模型生成图片或视频。\n\n## When to Use\n\n- 用户说\"生成一张xxx图片\"、\"画一张xxx\"\n- 用户说\"帮我创建一个xxx图像\"\n- 用户描述想要的图片内容\n- 用户说\"生成一个xxx视频\"、\"做个xxx动画\"\n\n## Tools\n\n### generating_image\n\n生成 AI 图片或视频。\n\n**Parameters:**\n- `prompt` (string, required): 图片/视频描述\n- `model` (string, optional): AI 模型\n  - **图片模型**: flux (默认,高质量), zimage, turbo (快速), gptimage, kontext, seedream, seedream-pro, nanobanana, nanobanana-pro\n  - **视频模型**: veo (文生视频), seedance/seedance-pro (文生视频+图生视频)\n- `width` (number, optional): 图片宽度，默认 1024\n- `height` (number, optional): 图片高度，默认 1024\n- `seed` (number, optional): 随机种子，-1 为随机\n- `enhance` (boolean, optional): AI 优化提示词\n- `negative_prompt` (string, optional): 负面提示词，避免生成的内容\n- `safe` (boolean, optional): 启用安全过滤\n- `quality` (string, optional): 图片质量 (仅 gptimage): low/medium/high/hd\n- `transparent` (boolean, optional): 透明背景 (仅 gptimage)\n- `image` (string, optional): 参考图片 URL，多个用逗号分隔\n- `duration` (number, optional): 视频时长秒数 (veo: 4/6/8, seedance: 2-10)\n- `aspectRatio` (string, optional): 视频宽高比: 16:9 或 9:16\n- `audio` (boolean, optional): 生成音频 (仅 veo)\n\n**Returns:** 图片/视频 URL\n\n## Model Selection Guide\n\n| 需求 | 推荐模型 |\n|------|---------|\n| 高质量图片 | flux |\n| 快速生成 | turbo, zimage |\n| GPT 风格 | gptimage |\n| 透明背景 | gptimage (transparent=true) |\n| 图片编辑/参考 | kontext |\n| 高质量视频 | veo |\n| 图生视频 | seedance |\n\n## Examples\n\n用户: \"生成一张日落海滩的图片\"\n调用: `generating_image({ prompt: '日落海滩，金色阳光，海浪' })`\n\n用户: \"用 turbo 模型快速画一只猫\"\n调用: `generating_image({ prompt: '可爱的猫咪', model: 'turbo' })`\n\n用户: \"生成一个 8 秒的海浪视频\"\n调用: `generating_image({ prompt: '海浪拍打沙滩', model: 'veo', duration: 8 })`\n\n用户: \"把这张图片变成视频\"\n调用: `generating_image({ prompt: '动态效果', model: 'seedance', image: 'https://...', duration: 5 })`\n",
+      "content_hash": "8c65573fa55aa83037af9d3277c982f5108f8b9c5422355a5083bdb471fb3c74"
+    },
+    {
+      "skill_id": "edge:miniapp-create",
+      "name": "创建/更新小应用",
+      "description": "创建或更新 MiniApp。当用户需要开发新功能时使用。",
+      "category": "edge",
+      "keywords": [
+        "创建",
+        "开发",
+        "新建",
+        "更新",
+        "修改",
+        "小应用",
+        "miniapp"
+      ],
+      "triggers": [
+        "创建小应用",
+        "新建应用",
+        "开发功能",
+        "更新小应用"
+      ],
+      "tags": [
+        "miniapp",
+        "开发"
+      ],
+      "priority": 8,
+      "content": "---\nname: 创建/更新小应用\ndescription: 创建或更新 MiniApp。当用户需要开发新功能时使用。\nkeywords: [创建, 开发, 新建, 更新, 修改, 小应用, miniapp]\ntriggers: [创建小应用, 新建应用, 开发功能, 更新小应用]\ntags: [miniapp, 开发]\npriority: 8\n---\n\n# 创建/更新小应用\n\nMiniApp = Skill + MCP Server，运行在安全沙箱中。\n\n## When to Use\n\n- 用户说\"创建一个xxx小应用\"\n- 用户说\"帮我做一个xxx功能\"\n- 用户说\"更新/修改xxx小应用\"\n\n## Tools\n\n### create_miniapp\n\n创建新的小应用。\n\n**Parameters:**\n- `name` (string, required): 唯一标识名\n- `display_name` (string, required): 显示名称\n- `description` (string, required): 功能描述\n- `code` (string, required): MCP Server 代码\n- `skill` (string, required): Skill 使用指南\n\n### update_miniapp\n\n更新已有小应用。更新时会自动创建版本记录。\n\n**Parameters:**\n- `miniAppId` (string, required): 小应用 ID\n- `updates` (object, required): 更新内容 {code?, skill?, description?}\n- `changeSummary` (string, optional): 变更摘要\n\n### get_miniapp\n\n读取小应用详情，包括代码、Skill 和版本信息。**更新前先调用此工具了解当前状态**。\n\n**Parameters:**\n- `miniAppId` (string, required): 小应用 ID\n- `includeCode` (boolean, optional): 是否包含完整代码，默认 true\n\n### get_miniapp_versions\n\n获取小应用的版本历史记录，支持查看特定版本的代码。\n\n**Parameters:**\n- `miniAppId` (string, required): 小应用 ID\n- `version` (string, optional): 指定版本号，获取该版本的完整代码\n- `limit` (number, optional): 返回版本数量限制，默认 10\n\n### rollback_miniapp\n\n将小应用回滚到指定版本。\n\n**Parameters:**\n- `miniAppId` (string, required): 小应用 ID\n- `version` (string, required): 要回滚到的版本号\n\n## 沙箱 API\n\n```javascript\n// MCP Server 工具注册\nmcpServer.tool({ name, description, parameters, execute })\n\n// 存储 API\nstorage.get(key)\nstorage.set(key, value)\n\n// UI 资源\ncreateUIResource({ content })\n\n// 用户信息\nuser.id\nuser.email\n\n// HTTP 请求\nhttp.get(url, options)\nhttp.post(url, body, options)\nhttp.put(url, body, options)\nhttp.delete(url, options)\n```\n\n## 网络请求示例\n\n```javascript\n// GET 请求\nconst res = await http.get('https://api.example.com/data');\nconsole.log(res.data);\n\n// POST 请求\nconst res = await http.post('https://api.example.com/items', {\n  name: 'New Item'\n});\n\n// 带选项的请求\nconst res = await http.get('https://api.example.com/data', {\n  headers: { 'Authorization': 'Bearer token' },\n  timeout: 5000\n});\n```\n\n## 代码示例\n\n### 待办小应用 code\n\n```javascript\n// 添加待办\nmcpServer.tool({\n  name: 'add_todo',\n  description: '添加待办事项',\n  parameters: z.object({\n    title: z.string().describe('待办标题'),\n    priority: z.enum(['high', 'medium', 'low']).optional()\n  }),\n  execute: async ({ title, priority = 'medium' }) => {\n    const todos = await storage.get('todos') || [];\n    const newTodo = {\n      id: Date.now().toString(),\n      title,\n      priority,\n      done: false,\n      createdAt: new Date().toISOString()\n    };\n    todos.push(newTodo);\n    await storage.set('todos', todos);\n    return { success: true, todo: newTodo };\n  }\n});\n\n// 列出待办\nmcpServer.tool({\n  name: 'list_todos',\n  description: '列出所有待办事项',\n  parameters: z.object({\n    filter: z.enum(['all', 'done', 'pending']).optional()\n  }),\n  execute: async ({ filter = 'all' }) => {\n    const todos = await storage.get('todos') || [];\n    if (filter === 'done') return todos.filter(t => t.done);\n    if (filter === 'pending') return todos.filter(t => !t.done);\n    return todos;\n  }\n});\n```\n\n### 待办小应用 skill\n\n```markdown\n---\nname: \"待办事项管理\"\ndescription: \"管理用户的待办事项列表\"\nkeywords: [待办, 任务, todo]\ntriggers: [添加待办, 查看待办]\ntags: [miniapp, 效率]\npriority: 5\n---\n\n# 待办事项管理\n\n## When to Use\n- 用户说\"添加待办\"、\"新建任务\"\n- 用户说\"查看待办\"、\"我的任务\"\n\n## Tools\n\n### add_todo\n添加新的待办事项。\n- `title` (string): 待办标题\n- `priority` (enum): 优先级\n\n### list_todos\n列出待办事项。\n- `filter` (enum): 筛选条件\n```\n\n## UI 资源示例\n\n```javascript\nmcpServer.tool({\n  name: 'show_add_form',\n  description: '显示添加待办的表单',\n  parameters: z.object({}),\n  execute: async () => {\n    mcpServer.resource(createUIResource({\n      content: {\n        type: 'card',\n        props: { title: '添加待办' },\n        children: [\n          {\n            type: 'form',\n            id: 'add-form',\n            events: [{\n              event: 'onSubmit',\n              action: 'call_tool',\n              payload: { tool: 'add_todo', args: { title: '{{form.title}}' } }\n            }],\n            children: [\n              { type: 'input', id: 'title', props: { placeholder: '输入标题' } },\n              { type: 'button', props: { label: '添加' } }\n            ]\n          }\n        ]\n      }\n    }));\n    return { ui: 'ui://mango/main' };\n  }\n});\n```\n\n## Best Practices\n\n1. **同时提供 code 和 skill**: 创建时必须两者都有\n2. **Skill 要清晰**: 明确说明何时使用、有哪些工具\n3. **使用 v2-mcp 架构**: 使用 `mcpServer.tool()` 注册工具\n4. **更新前先读取**: 使用 `get_miniapp` 了解当前代码状态\n5. **提供变更摘要**: 更新时填写 `changeSummary` 便于追踪\n6. **版本回滚**: 出问题时使用 `rollback_miniapp` 恢复\n",
+      "content_hash": "5aeb8f2a351ba8cc9d9e792aafd98294450de855862cdee40a12431d2898d169"
+    },
+    {
+      "skill_id": "edge:miniapp-invoke",
+      "name": "调用小应用",
+      "description": "调用已安装的小应用执行功能。",
+      "category": "edge",
+      "keywords": [
+        "调用",
+        "使用",
+        "执行",
+        "小应用",
+        "miniapp"
+      ],
+      "triggers": [
+        "调用小应用",
+        "使用应用",
+        "执行功能"
+      ],
+      "tags": [
+        "miniapp",
+        "调用"
+      ],
+      "priority": 8,
+      "content": "---\nname: 调用小应用\ndescription: 调用已安装的小应用执行功能。\nkeywords: [调用, 使用, 执行, 小应用, miniapp]\ntriggers: [调用小应用, 使用应用, 执行功能]\ntags: [miniapp, 调用]\npriority: 8\n---\n\n# 调用小应用\n\n调用用户已安装的小应用。\n\n## When to Use\n\n- 用户说\"调用xxx\"、\"使用xxx小应用\"\n- 用户想执行小应用提供的功能\n- 用户在消息中选择了某个小应用\n\n## Tools\n\n### invoke_miniapp\n\n调用已安装的小应用。\n\n**Parameters:**\n- `miniAppId` (string, required): 小应用 ID\n- `toolName` (string, required): 工具名称\n- `args` (object, optional): 工具参数\n\n## Examples\n\n用户: \"添加一个待办：完成报告\"\n```\ninvoke_miniapp('todo-app-id', 'add_todo', { title: '完成报告' })\n```\n\n用户: \"查看我的待办列表\"\n```\ninvoke_miniapp('todo-app-id', 'list_todos', { filter: 'pending' })\n```\n\n## 响应处理\n\n调用小应用后，使用 `generate_a2ui` 工具可视化展示结果：\n- 列表数据使用 `list` 组件\n- 单个项目使用 `card` 组件\n- 同时用简短文字说明操作结果\n",
+      "content_hash": "733c6047e4cf24fba13d0278741eb33516ff557de5d6dd842811f5e18d0ded4e"
+    },
+    {
+      "skill_id": "edge:miniapp-template",
+      "name": "{{display_name}}",
+      "description": "{{description}}",
+      "category": "edge",
+      "keywords": [],
+      "triggers": [],
+      "tags": [
+        "miniapp"
+      ],
+      "priority": 5,
+      "content": "---\nname: \"{{display_name}}\"\ndescription: \"{{description}}\"\nkeywords: []\ntriggers: []\ntags: [miniapp]\npriority: 5\n---\n\n# {{display_name}}\n\n{{description}}\n\n## Architecture\n\n- Version: v2-mcp\n- MiniApp ID: {{id}}\n\n## When to Use\n\n- [描述何时调用此小应用]\n\n## Tools\n\n### {{tool_name}}\n\n{{tool_description}}\n\n**Parameters:**\n- `param1` (type, required): 描述\n\n**Returns:** 返回值描述\n\n## Examples\n\n用户: \"[示例请求]\"\n\n调用: `invoke_miniapp('{{id}}', '{{tool_name}}', { param1: 'value' })`\n\n## Storage\n\n- `storage.get(key)` - 获取值\n- `storage.set(key, value)` - 设置值\n",
+      "content_hash": "7bebebb71ad8510124508ed3a6c7772cf22b66e584e917ab0837f551bf3b59c2"
+    },
+    {
+      "skill_id": "edge:reading-file",
+      "name": "文件读取",
+      "description": "读取用户标记的文件内容。当对话中有 <file /> 标记时使用。",
+      "category": "edge",
+      "keywords": [
+        "文件",
+        "读取",
+        "标记",
+        "file",
+        "内容"
+      ],
+      "triggers": [
+        "读取文件",
+        "查看文件",
+        "文件内容"
+      ],
+      "tags": [
+        "file",
+        "tool"
+      ],
+      "priority": 6,
+      "content": "---\nname: 文件读取\ndescription: 读取用户标记的文件内容。当对话中有 <file /> 标记时使用。\nkeywords: [文件, 读取, 标记, file, 内容]\ntriggers: [读取文件, 查看文件, 文件内容]\ntags: [file, tool]\npriority: 6\n---\n\n# 文件读取\n\n读取对话中标记的文件内容。\n\n## When to Use\n\n- 对话中出现 `<file />` 标记\n- 用户说\"读取这个文件\"、\"查看文件内容\"\n\n## Tools\n\n### reading_taged_file\n\n读取标记文件。\n\n**Parameters:**\n- `file_id` (string, required): 文件标识\n\n**Returns:** 文件内容\n\n## Examples\n\n用户: \"帮我读取这个文件的内容\"（对话中有 `<file id=\"abc123\" />`）\n\n调用: `reading_taged_file({ file_id: 'abc123' })`\n",
+      "content_hash": "1fc0487aa2ea7d905cb7b6cdda99d28105e42a1317859a2eb1ecd2a6131cf817"
+    }
+  ]
+}

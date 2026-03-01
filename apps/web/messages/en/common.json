@@ -1,0 +1,42 @@
+{
+  "nav": {
+    "conversations": "Chats",
+    "miniapps": "Mini Apps",
+    "devices": "Devices",
+    "profile": "Profile",
+    "settings": "Settings",
+    "appManager": "App Manager",
+    "conversationList": "Conversations"
+  },
+  "actions": {
+    "login": "Log in",
+    "signup": "Sign up",
+    "logout": "Log out",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "OK",
+    "continue": "Continue",
+    "retry": "Retry",
+    "delete": "Delete",
+    "rename": "Rename",
+    "download": "Download",
+    "refresh": "Refresh",
+    "close": "Close",
+    "submit": "Submit",
+    "submitting": "Submitting...",
+    "saving": "Saving...",
+    "loading": "Loading..."
+  },
+  "time": {
+    "justNow": "Just now",
+    "minutesAgo": "{count}m ago",
+    "hoursAgo": "{count}h ago",
+    "daysAgo": "{count}d ago"
+  },
+  "status": {
+    "online": "Online",
+    "offline": "Offline",
+    "connected": "Connected",
+    "disconnected": "Disconnected"
+  }
+}

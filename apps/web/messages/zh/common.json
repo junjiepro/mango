@@ -1,0 +1,42 @@
+{
+  "nav": {
+    "conversations": "对话",
+    "miniapps": "小应用",
+    "devices": "设备管理",
+    "profile": "个人信息",
+    "settings": "设置",
+    "appManager": "应用管理",
+    "conversationList": "对话列表"
+  },
+  "actions": {
+    "login": "登录",
+    "signup": "注册",
+    "logout": "登出",
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确定",
+    "continue": "继续",
+    "retry": "重试",
+    "delete": "删除",
+    "rename": "重命名",
+    "download": "下载",
+    "refresh": "刷新",
+    "close": "关闭",
+    "submit": "提交",
+    "submitting": "提交中...",
+    "saving": "保存中...",
+    "loading": "加载中..."
+  },
+  "time": {
+    "justNow": "刚刚",
+    "minutesAgo": "{count}分钟前",
+    "hoursAgo": "{count}小时前",
+    "daysAgo": "{count}天前"
+  },
+  "status": {
+    "online": "在线",
+    "offline": "离线",
+    "connected": "已连接",
+    "disconnected": "未连接"
+  }
+}
