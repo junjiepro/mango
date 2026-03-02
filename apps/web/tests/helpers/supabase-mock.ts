@@ -13,9 +13,12 @@ export interface MockSupabaseClient {
 }
 
 export function createMockSupabaseClient(): MockSupabaseClient {
-  // 创建一个可链式调用的 query builder
-  // 使用共享的 builder 实例以便在测试中配置返回值
   const builder: any = {}
+
+  // Default resolved value when builder is directly awaited
+  let defaultResolve: any = { data: null, error: null, count: 0 }
+  builder.then = (resolve: any) => Promise.resolve(defaultResolve).then(resolve)
+  builder.setDefault = (val: any) => { defaultResolve = val }
 
   builder.select = vi.fn().mockReturnValue(builder)
   builder.insert = vi.fn().mockReturnValue(builder)
