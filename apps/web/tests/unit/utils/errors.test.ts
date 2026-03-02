@@ -10,7 +10,7 @@ import {
   NotFoundError,
   ErrorType,
   normalizeError,
-} from '../../../packages/shared/utils/errors'
+} from '@shared/utils/errors'
 
 describe('AppError', () => {
   it('应该创建带默认值的错误', () => {
