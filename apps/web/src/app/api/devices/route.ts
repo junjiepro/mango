@@ -69,9 +69,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 排序和分页
-    query = query
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
 
     const { data: bindings, error: bindingsError, count } = await query;
 
@@ -90,7 +88,7 @@ export async function GET(request: NextRequest) {
       devicesWithStatus = await Promise.all(
         (bindings || []).map(async (binding) => {
           let isOnline = false;
-          let lastCheckAt = new Date().toISOString();
+          const lastCheckAt = new Date().toISOString();
 
           // 尝试检查设备是否在线
           if (binding.status === 'active' && binding.device_url) {
@@ -130,10 +128,7 @@ export async function GET(request: NextRequest) {
     const appError = normalizeError(error);
     logger.error('GET /api/devices failed', appError);
 
-    return NextResponse.json(
-      { error: appError.message },
-      { status: appError.statusCode }
-    );
+    return NextResponse.json({ error: appError.message }, { status: appError.statusCode });
   }
 }
 
@@ -160,10 +155,7 @@ export async function DELETE(request: NextRequest) {
     const bindingId = searchParams.get('id');
 
     if (!bindingId) {
-      return NextResponse.json(
-        { error: 'Binding ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Binding ID is required' }, { status: 400 });
     }
 
     // 验证绑定是否属于当前用户
@@ -174,19 +166,11 @@ export async function DELETE(request: NextRequest) {
       .single();
 
     if (fetchError || !binding) {
-      throw new AppError(
-        'Binding not found',
-        ErrorType.NOT_FOUND,
-        404
-      );
+      throw new AppError('Binding not found', ErrorType.NOT_FOUND, 404);
     }
 
     if (binding.user_id !== user.id) {
-      throw new AppError(
-        'Forbidden: You do not own this binding',
-        ErrorType.FORBIDDEN,
-        403
-      );
+      throw new AppError('Forbidden: You do not own this binding', ErrorType.FORBIDDEN, 403);
     }
 
     // 删除绑定 (级联删除相关的 MCP 服务配置)
@@ -215,9 +199,6 @@ export async function DELETE(request: NextRequest) {
     const appError = normalizeError(error);
     logger.error('DELETE /api/devices failed', appError);
 
-    return NextResponse.json(
-      { error: appError.message },
-      { status: appError.statusCode }
-    );
+    return NextResponse.json({ error: appError.message }, { status: appError.statusCode });
   }
 }

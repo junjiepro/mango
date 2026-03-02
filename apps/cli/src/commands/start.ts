@@ -13,10 +13,9 @@ import { serviceInitializer } from '../lib/service-initializer.js';
 import { tempBindingManager } from '../lib/temp-binding-manager.js';
 import { bindingCodeManager } from '../lib/binding-code-manager.js';
 import { urlUpdateManager } from '../lib/url-update-manager.js';
-import { generateDeviceId, getDeviceInfoSummary, getLocalIpAddress, getTailscaleAddress } from '../lib/device-id.js';
+import { getDeviceInfoSummary, getLocalIpAddress, getTailscaleAddress } from '../lib/device-id.js';
 import { acpConnector } from '../lib/connectors/acp-connector.js';
 import open from 'open';
-import os from 'os';
 import type { StartCommandOptions } from '../types/index.js';
 import { deviceSecretManager } from '../lib/device-secret.js';
 
@@ -170,7 +169,9 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
               cloudflare_url: newTunnelUrl,
               localhost_url: `http://localhost:${actualPort}`,
               hostname_url: `http://${localIp}:${actualPort}`,
-              ...(tailscaleAddr ? { tailscale_url: buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort) } : {}),
+              ...(tailscaleAddr
+                ? { tailscale_url: buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort) }
+                : {}),
             };
 
             const existingConfig = bindingCodeManager.readConfig();
@@ -211,7 +212,9 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
         cloudflare_url: tunnelUrl,
         localhost_url: `http://localhost:${actualPort}`,
         hostname_url: `http://${localIp}:${actualPort}`,
-        ...(tailscaleAddr ? { tailscale_url: buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort) } : {}),
+        ...(tailscaleAddr
+          ? { tailscale_url: buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort) }
+          : {}),
       };
 
       for (const bindingCode of bindingCodes) {
@@ -250,7 +253,9 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
           cloudflare_url: tunnelUrl,
           localhost_url: `http://localhost:${actualPort}`,
           hostname_url: `http://${localIp}:${actualPort}`,
-          ...(tailscaleAddr ? { tailscale_url: buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort) } : {}),
+          ...(tailscaleAddr
+            ? { tailscale_url: buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort) }
+            : {}),
         };
 
         // 准备设备信息
@@ -321,7 +326,10 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     formatter.labeled('Localhost URL', `http://localhost:${actualPort}`);
     formatter.labeled('Hostname URL', `http://${localIp}:${actualPort}`);
     if (tailscaleAddr) {
-      formatter.labeled('Tailscale URL', buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort));
+      formatter.labeled(
+        'Tailscale URL',
+        buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort)
+      );
     }
 
     // 只在未绑定时显示绑定 URL

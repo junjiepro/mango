@@ -27,16 +27,28 @@ import enWorkspace from '../../messages/en/workspace.json';
 import enFeedback from '../../messages/en/feedback.json';
 import enErrors from '../../messages/en/errors.json';
 
-const allMessages: Record<Locale, Record<string, any>> = {
+const allMessages: Record<Locale, Record<string, unknown>> = {
   zh: {
-    common: zhCommon, auth: zhAuth, conversations: zhConversations,
-    miniapps: zhMiniapps, profile: zhProfile, devices: zhDevices,
-    workspace: zhWorkspace, feedback: zhFeedback, errors: zhErrors,
+    common: zhCommon,
+    auth: zhAuth,
+    conversations: zhConversations,
+    miniapps: zhMiniapps,
+    profile: zhProfile,
+    devices: zhDevices,
+    workspace: zhWorkspace,
+    feedback: zhFeedback,
+    errors: zhErrors,
   },
   en: {
-    common: enCommon, auth: enAuth, conversations: enConversations,
-    miniapps: enMiniapps, profile: enProfile, devices: enDevices,
-    workspace: enWorkspace, feedback: enFeedback, errors: enErrors,
+    common: enCommon,
+    auth: enAuth,
+    conversations: enConversations,
+    miniapps: enMiniapps,
+    profile: enProfile,
+    devices: enDevices,
+    workspace: enWorkspace,
+    feedback: enFeedback,
+    errors: enErrors,
   },
 };
 

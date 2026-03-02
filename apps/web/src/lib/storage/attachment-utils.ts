@@ -16,7 +16,7 @@ export interface AttachmentWithPath {
   name?: string;
   type?: string;
   size?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**

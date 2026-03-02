@@ -6,8 +6,8 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import type { Breakpoint, LayoutDirection } from '@mango/shared/types/workspace.types';
+import { useState, useEffect, useCallback } from 'react';
+import type { LayoutDirection } from '@mango/shared/types/workspace.types';
 
 // 断点定义（像素）
 const BREAKPOINTS = {

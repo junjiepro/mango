@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, lazy, Suspense } from 'react';
 import { Code, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -78,9 +78,7 @@ export function UnifiedFileViewer({
   const hasPreview = hasPreviewSupport(file.name);
 
   // 二进制文件默认预览模式，其他默认编辑器模式
-  const [viewMode, setViewMode] = useState<ViewMode>(
-    isBinary ? 'preview' : 'editor'
-  );
+  const [viewMode, setViewMode] = useState<ViewMode>(isBinary ? 'preview' : 'editor');
 
   const PreviewerComponent = getPreviewerComponent(file.name);
 
@@ -130,17 +128,21 @@ export function UnifiedFileViewer({
   // 渲染编辑器
   const renderEditor = () => {
     // 动态导入 FileEditor 避免循环依赖
-    const FileEditor = require('./FileEditor.optimized').FileEditor;
+    const FileEditor = lazy(() =>
+      import('./FileEditor.optimized').then((module) => ({ default: module.FileEditor }))
+    );
     return (
-      <FileEditor
-        key={file.path}
-        file={file}
-        device={device}
-        tabId={tabId}
-        isActive={isActive}
-        onMarkDirty={onMarkDirty}
-        externalChangeTimestamp={externalChangeTimestamp}
-      />
+      <Suspense fallback={<div>Loading editor...</div>}>
+        <FileEditor
+          key={file.path}
+          file={file}
+          device={device}
+          tabId={tabId}
+          isActive={isActive}
+          onMarkDirty={onMarkDirty}
+          externalChangeTimestamp={externalChangeTimestamp}
+        />
+      </Suspense>
     );
   };
 
@@ -153,21 +155,12 @@ export function UnifiedFileViewer({
         </div>
       );
     }
-    return (
-      <PreviewerComponent
-        file={file}
-        deviceClient={deviceClient}
-      />
-    );
+    return <PreviewerComponent file={file} deviceClient={deviceClient} />;
   };
 
   // 二进制文件只显示预览
   if (isBinary) {
-    return (
-      <div className="flex flex-col h-full">
-        {renderPreviewer()}
-      </div>
-    );
+    return <div className="flex flex-col h-full">{renderPreviewer()}</div>;
   }
 
   // 非二进制文件显示模式切换

@@ -3,23 +3,23 @@
  * 缓存签名 URL，避免重复生成
  */
 
-import { logger } from '@mango/shared/utils'
+import { logger } from '@mango/shared/utils';
 
 /**
  * 缓存项接口
  */
 interface CacheEntry {
-  url: string
-  expiresAt: number  // Unix 时间戳（秒）
-  createdAt: number  // Unix 时间戳（秒）
+  url: string;
+  expiresAt: number; // Unix 时间戳（秒）
+  createdAt: number; // Unix 时间戳（秒）
 }
 
 /**
  * URL 缓存管理器
  */
 class UrlCacheManager {
-  private cache: Map<string, CacheEntry> = new Map()
-  private readonly CACHE_KEY_PREFIX = 'url_cache_'
+  private cache: Map<string, CacheEntry> = new Map();
+  private readonly CACHE_KEY_PREFIX = 'url_cache_';
 
   /**
    * 生成缓存键
@@ -27,7 +27,7 @@ class UrlCacheManager {
    * @param bucket Bucket 名称
    */
   private getCacheKey(path: string, bucket: string): string {
-    return `${this.CACHE_KEY_PREFIX}${bucket}:${path}`
+    return `${this.CACHE_KEY_PREFIX}${bucket}:${path}`;
   }
 
   /**
@@ -37,16 +37,16 @@ class UrlCacheManager {
    */
   private extractExpiryFromUrl(url: string): number | null {
     try {
-      const urlObj = new URL(url)
-      const expiresParam = urlObj.searchParams.get('Expires') || urlObj.searchParams.get('expires')
+      const urlObj = new URL(url);
+      const expiresParam = urlObj.searchParams.get('Expires') || urlObj.searchParams.get('expires');
 
       if (expiresParam) {
-        return parseInt(expiresParam, 10)
+        return parseInt(expiresParam, 10);
       }
 
-      return null
+      return null;
     } catch (error) {
-      return null
+      return null;
     }
   }
 
@@ -57,9 +57,9 @@ class UrlCacheManager {
    * @returns 是否有效
    */
   private isEntryValid(entry: CacheEntry, bufferSeconds: number = 3600): boolean {
-    const currentTimestamp = Math.floor(Date.now() / 1000)
+    const currentTimestamp = Math.floor(Date.now() / 1000);
     // 如果距离过期时间还有超过 bufferSeconds，则认为有效
-    return entry.expiresAt - currentTimestamp > bufferSeconds
+    return entry.expiresAt - currentTimestamp > bufferSeconds;
   }
 
   /**
@@ -70,25 +70,25 @@ class UrlCacheManager {
    * @returns 缓存的 URL，如果不存在或已过期则返回 null
    */
   get(path: string, bucket: string = 'attachments', bufferSeconds: number = 3600): string | null {
-    const key = this.getCacheKey(path, bucket)
-    const entry = this.cache.get(key)
+    const key = this.getCacheKey(path, bucket);
+    const entry = this.cache.get(key);
 
     if (!entry) {
-      logger.debug('URL cache miss', { path, bucket, cacheSize: this.cache.size })
-      return null
+      logger.debug('URL cache miss', { path, bucket, cacheSize: this.cache.size });
+      return null;
     }
 
     // 检查是否有效
     if (!this.isEntryValid(entry, bufferSeconds)) {
       // 已过期，删除缓存
-      this.cache.delete(key)
-      logger.debug('URL cache expired', { path, bucket, expiredAt: entry.expiresAt })
-      return null
+      this.cache.delete(key);
+      logger.debug('URL cache expired', { path, bucket, expiredAt: entry.expiresAt });
+      return null;
     }
 
-    const remainingTime = entry.expiresAt - Math.floor(Date.now() / 1000)
-    logger.info('URL cache hit', { path: path.substring(0, 50), bucket, remainingTime })
-    return entry.url
+    const remainingTime = entry.expiresAt - Math.floor(Date.now() / 1000);
+    logger.info('URL cache hit', { path: path.substring(0, 50), bucket, remainingTime });
+    return entry.url;
   }
 
   /**
@@ -99,20 +99,20 @@ class UrlCacheManager {
    * @param expiresIn 过期时间（秒），如果不提供则从 URL 中提取
    */
   set(path: string, url: string, bucket: string = 'attachments', expiresIn?: number): void {
-    const key = this.getCacheKey(path, bucket)
-    const currentTimestamp = Math.floor(Date.now() / 1000)
+    const key = this.getCacheKey(path, bucket);
+    const currentTimestamp = Math.floor(Date.now() / 1000);
 
     // 尝试从 URL 中提取过期时间
-    let expiresAt: number
+    let expiresAt: number;
     if (expiresIn) {
-      expiresAt = currentTimestamp + expiresIn
+      expiresAt = currentTimestamp + expiresIn;
     } else {
-      const extractedExpiry = this.extractExpiryFromUrl(url)
+      const extractedExpiry = this.extractExpiryFromUrl(url);
       if (extractedExpiry) {
-        expiresAt = extractedExpiry
+        expiresAt = extractedExpiry;
       } else {
         // 如果无法提取，默认 24 小时
-        expiresAt = currentTimestamp + 86400
+        expiresAt = currentTimestamp + 86400;
       }
     }
 
@@ -120,10 +120,10 @@ class UrlCacheManager {
       url,
       expiresAt,
       createdAt: currentTimestamp,
-    }
+    };
 
-    this.cache.set(key, entry)
-    logger.debug('URL cached', { path, bucket, expiresAt, ttl: expiresAt - currentTimestamp })
+    this.cache.set(key, entry);
+    logger.debug('URL cached', { path, bucket, expiresAt, ttl: expiresAt - currentTimestamp });
   }
 
   /**
@@ -132,18 +132,18 @@ class UrlCacheManager {
    * @param bucket Bucket 名称
    */
   delete(path: string, bucket: string = 'attachments'): void {
-    const key = this.getCacheKey(path, bucket)
-    this.cache.delete(key)
-    logger.debug('URL cache deleted', { path, bucket })
+    const key = this.getCacheKey(path, bucket);
+    this.cache.delete(key);
+    logger.debug('URL cache deleted', { path, bucket });
   }
 
   /**
    * 清空所有缓存
    */
   clear(): void {
-    const size = this.cache.size
-    this.cache.clear()
-    logger.info('URL cache cleared', { count: size })
+    const size = this.cache.size;
+    this.cache.clear();
+    logger.info('URL cache cleared', { count: size });
   }
 
   /**
@@ -152,36 +152,35 @@ class UrlCacheManager {
    * @returns 清理的数量
    */
   cleanup(bufferSeconds: number = 3600): number {
-    let count = 0
-    const currentTimestamp = Math.floor(Date.now() / 1000)
+    let count = 0;
+    const currentTimestamp = Math.floor(Date.now() / 1000);
 
     for (const [key, entry] of this.cache.entries()) {
       if (entry.expiresAt - currentTimestamp <= bufferSeconds) {
-        this.cache.delete(key)
-        count++
+        this.cache.delete(key);
+        count++;
       }
     }
 
     if (count > 0) {
-      logger.info('URL cache cleanup completed', { cleaned: count, remaining: this.cache.size })
+      logger.info('URL cache cleanup completed', { cleaned: count, remaining: this.cache.size });
     }
 
-    return count
+    return count;
   }
 
   /**
    * 获取缓存统计信息
    */
   getStats(): { total: number; valid: number; expired: number } {
-    const currentTimestamp = Math.floor(Date.now() / 1000)
-    let valid = 0
-    let expired = 0
+    let valid = 0;
+    let expired = 0;
 
     for (const entry of this.cache.values()) {
       if (this.isEntryValid(entry)) {
-        valid++
+        valid++;
       } else {
-        expired++
+        expired++;
       }
     }
 
@@ -189,16 +188,19 @@ class UrlCacheManager {
       total: this.cache.size,
       valid,
       expired,
-    }
+    };
   }
 }
 
 // 导出单例实例
-export const urlCache = new UrlCacheManager()
+export const urlCache = new UrlCacheManager();
 
 // 定期清理过期缓存（每 10 分钟）
 if (typeof window !== 'undefined') {
-  setInterval(() => {
-    urlCache.cleanup()
-  }, 10 * 60 * 1000)
+  setInterval(
+    () => {
+      urlCache.cleanup();
+    },
+    10 * 60 * 1000
+  );
 }

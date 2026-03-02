@@ -318,7 +318,7 @@ export default function DeviceBindPage() {
                   <li>Copy the temporary binding code from the CLI output</li>
                   <li>Paste it into the form above</li>
                   <li>Wait for the device to be detected (automatic)</li>
-                  <li>Enter a device name and click "Bind Device"</li>
+                  <li>Enter a device name and click &quot;Bind Device&quot;</li>
                 </ol>
               </div>
             </>

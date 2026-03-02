@@ -6,14 +6,9 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { X, EyeIcon, CodeIcon, CopyIcon, CheckIcon, ExternalLinkIcon } from 'lucide-react';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
@@ -60,6 +55,22 @@ export function ResourcePreviewDialog({
   const [copied, setCopied] = useState(false);
   const t = useTranslations('conversations');
 
+  // HTML preview URL memoization
+  const htmlPreviewUrl = useMemo(() => {
+    if (!resource || resource.type !== 'html' || viewMode !== 'preview') return '';
+    const blob = new Blob([resource.content], { type: 'text/html' });
+    return URL.createObjectURL(blob);
+  }, [resource, viewMode]);
+
+  // 清理 blob URL
+  useEffect(() => {
+    return () => {
+      if (htmlPreviewUrl) {
+        URL.revokeObjectURL(htmlPreviewUrl);
+      }
+    };
+  }, [htmlPreviewUrl]);
+
   if (!resource) return null;
 
   // 获取资源标题
@@ -101,11 +112,7 @@ export function ResourcePreviewDialog({
       const miniApp = resource.metadata.miniApp as Parameters<typeof MiniAppWindow>[0]['miniApp'];
       return (
         <div className="flex-1 overflow-hidden">
-          <MiniAppWindow
-            miniApp={miniApp}
-            onClose={() => onOpenChange(false)}
-            className="h-full"
-          />
+          <MiniAppWindow miniApp={miniApp} onClose={() => onOpenChange(false)} className="h-full" />
         </div>
       );
     }
@@ -126,20 +133,6 @@ export function ResourcePreviewDialog({
     // HTML 预览
     if (resource.type === 'html') {
       const htmlContent = resource.content;
-      const previewUrl = useMemo(() => {
-        if (viewMode !== 'preview') return '';
-        const blob = new Blob([htmlContent], { type: 'text/html' });
-        return URL.createObjectURL(blob);
-      }, [htmlContent, viewMode]);
-
-      // 清理 blob URL
-      React.useEffect(() => {
-        return () => {
-          if (previewUrl) {
-            URL.revokeObjectURL(previewUrl);
-          }
-        };
-      }, [previewUrl]);
 
       return (
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -169,10 +162,10 @@ export function ResourcePreviewDialog({
           {viewMode === 'preview' ? (
             <div className="flex-1 overflow-hidden">
               <iframe
-                src={previewUrl}
-                className="w-full h-full border-0"
-                sandbox="allow-scripts allow-same-origin allow-forms"
-                title={t('resourcePreview.htmlPreview')}
+                src={htmlPreviewUrl}
+                className="flex-1 border-0"
+                title="HTML Preview"
+                sandbox="allow-scripts"
               />
             </div>
           ) : (
@@ -249,7 +242,9 @@ export function ResourcePreviewDialog({
             <div className="flex-1 overflow-auto p-6">
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('resourcePreview.linkUrl')}</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                    {t('resourcePreview.linkUrl')}
+                  </h3>
                   <a
                     href={resource.metadata.url}
                     target="_blank"
@@ -261,13 +256,17 @@ export function ResourcePreviewDialog({
                 </div>
                 {resource.metadata.domain && (
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('resourcePreview.domain')}</h3>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                      {t('resourcePreview.domain')}
+                    </h3>
                     <p className="text-sm">{resource.metadata.domain}</p>
                   </div>
                 )}
                 {resource.metadata.description && (
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('resourcePreview.description')}</h3>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                      {t('resourcePreview.description')}
+                    </h3>
                     <p className="text-sm">{resource.metadata.description}</p>
                   </div>
                 )}

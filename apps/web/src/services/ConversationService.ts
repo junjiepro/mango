@@ -3,34 +3,36 @@
  * T042: Create Conversation service
  */
 
-import { createClient } from '@/lib/supabase/client'
-import { AppError, ErrorType } from '@mango/shared/utils'
-import type { Database } from '@/types/database.types'
+import { createClient } from '@/lib/supabase/client';
+import { AppError, ErrorType } from '@mango/shared/utils';
+import type { Database } from '@/types/database.types';
 
-type Conversation = Database['public']['Tables']['conversations']['Row']
-type ConversationInsert = Database['public']['Tables']['conversations']['Insert']
-type ConversationUpdate = Database['public']['Tables']['conversations']['Update']
+type Conversation = Database['public']['Tables']['conversations']['Row'];
+type ConversationInsert = Database['public']['Tables']['conversations']['Insert'];
+type ConversationUpdate = Database['public']['Tables']['conversations']['Update'];
 
 /**
  * ConversationService 类
  * 处理对话的 CRUD 操作
  */
 export class ConversationService {
-  private supabase = createClient()
+  private supabase = createClient();
 
   /**
    * 创建新对话
    */
   async createConversation(data: {
-    title: string
-    description?: string
-    context?: Record<string, any>
-    device_id?: string
+    title: string;
+    description?: string;
+    context?: Record<string, unknown>;
+    device_id?: string;
   }): Promise<Conversation> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
     const conversationData: ConversationInsert = {
@@ -45,13 +47,13 @@ export class ConversationService {
       },
       status: 'active',
       device_id: data.device_id || null,
-    }
+    };
 
     const { data: conversation, error } = await this.supabase
       .from('conversations')
       .insert(conversationData)
       .select()
-      .single()
+      .single();
 
     if (error) {
       throw new AppError(
@@ -60,43 +62,45 @@ export class ConversationService {
         500,
         true,
         { originalError: error }
-      )
+      );
     }
 
-    return conversation
+    return conversation;
   }
 
   /**
    * 获取对话列表
    */
   async getConversations(options?: {
-    limit?: number
-    offset?: number
-    status?: 'active' | 'archived' | 'deleted'
+    limit?: number;
+    offset?: number;
+    status?: 'active' | 'archived' | 'deleted';
   }): Promise<{ conversations: Conversation[]; total: number }> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
-    const limit = options?.limit || 20
-    const offset = options?.offset || 0
-    const status = options?.status || 'active'
+    const limit = options?.limit || 20;
+    const offset = options?.offset || 0;
+    const status = options?.status || 'active';
 
     // 获取总数
     const { count, error: countError } = await this.supabase
       .from('conversations')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .eq('status', status)
+      .eq('status', status);
 
     if (countError) {
       throw new AppError(
         `Failed to count conversations: ${countError.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
 
     // 获取对话列表
@@ -106,30 +110,32 @@ export class ConversationService {
       .eq('user_id', user.id)
       .eq('status', status)
       .order('updated_at', { ascending: false })
-      .range(offset, offset + limit - 1)
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new AppError(
         `Failed to fetch conversations: ${error.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
 
     return {
       conversations: conversations || [],
       total: count || 0,
-    }
+    };
   }
 
   /**
    * 获取单个对话
    */
   async getConversation(conversationId: string): Promise<Conversation> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
     const { data: conversation, error } = await this.supabase
@@ -137,24 +143,20 @@ export class ConversationService {
       .select('*')
       .eq('id', conversationId)
       .eq('user_id', user.id)
-      .single()
+      .single();
 
     if (error) {
       if (error.code === 'PGRST116') {
-        throw new AppError(
-          'Conversation not found',
-          ErrorType.RESOURCE_NOT_FOUND,
-          404
-        )
+        throw new AppError('Conversation not found', ErrorType.RESOURCE_NOT_FOUND, 404);
       }
       throw new AppError(
         `Failed to fetch conversation: ${error.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
 
-    return conversation
+    return conversation;
   }
 
   /**
@@ -164,10 +166,12 @@ export class ConversationService {
     conversationId: string,
     updates: ConversationUpdate
   ): Promise<Conversation> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
     const { data: conversation, error } = await this.supabase
@@ -176,41 +180,43 @@ export class ConversationService {
       .eq('id', conversationId)
       .eq('user_id', user.id)
       .select()
-      .single()
+      .single();
 
     if (error) {
       throw new AppError(
         `Failed to update conversation: ${error.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
 
-    return conversation
+    return conversation;
   }
 
   /**
    * 删除对话 (软删除)
    */
   async deleteConversation(conversationId: string): Promise<void> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
     const { error } = await this.supabase
       .from('conversations')
       .update({ status: 'deleted' })
       .eq('id', conversationId)
-      .eq('user_id', user.id)
+      .eq('user_id', user.id);
 
     if (error) {
       throw new AppError(
         `Failed to delete conversation: ${error.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
   }
 
@@ -221,7 +227,7 @@ export class ConversationService {
     return this.updateConversation(conversationId, {
       status: 'archived',
       archived_at: new Date().toISOString(),
-    })
+    });
   }
 
   /**
@@ -231,17 +237,19 @@ export class ConversationService {
     return this.updateConversation(conversationId, {
       status: 'active',
       archived_at: null,
-    })
+    });
   }
 
   /**
    * 搜索对话
    */
   async searchConversations(query: string): Promise<Conversation[]> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
 
     if (!user) {
-      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401)
+      throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
     const { data: conversations, error } = await this.supabase
@@ -254,21 +262,21 @@ export class ConversationService {
         config: 'simple',
       })
       .order('updated_at', { ascending: false })
-      .limit(20)
+      .limit(20);
 
     if (error) {
       throw new AppError(
         `Failed to search conversations: ${error.message}`,
         ErrorType.DATABASE_ERROR,
         500
-      )
+      );
     }
 
-    return conversations || []
+    return conversations || [];
   }
 }
 
 /**
  * 导出单例实例
  */
-export const conversationService = new ConversationService()
+export const conversationService = new ConversationService();

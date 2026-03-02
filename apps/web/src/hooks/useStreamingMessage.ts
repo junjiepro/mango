@@ -22,8 +22,8 @@ interface ToolCall {
   tool: string;
   toolCallId?: string;
   status: 'pending' | 'running' | 'success' | 'error';
-  args?: any;
-  result?: any;
+  args?: unknown;
+  result?: unknown;
   error?: string;
   isMcpTool?: boolean;
   deviceName?: string;
@@ -53,7 +53,7 @@ interface ToolCallStartPayload {
   messageId: string;
   tool: string;
   toolCallId?: string;
-  args: any;
+  args: unknown;
   isMcpTool?: boolean;
   deviceName?: string;
 }
@@ -63,7 +63,7 @@ interface ToolCallResultPayload {
   tool: string;
   toolCallId?: string;
   status: 'success' | 'error';
-  result?: any;
+  result?: unknown;
   error?: string;
   isMcpTool?: boolean;
   deviceName?: string;
@@ -129,9 +129,7 @@ export function useStreamingMessage(conversationId: string | null) {
         const toolCalls = existing.toolCalls || [];
         // 优先使用 toolCallId 匹配,否则使用 tool 名称匹配
         const existingIndex = toolCalls.findIndex((tc) =>
-          toolCall.toolCallId
-            ? tc.toolCallId === toolCall.toolCallId
-            : tc.tool === toolCall.tool
+          toolCall.toolCallId ? tc.toolCallId === toolCall.toolCallId : tc.tool === toolCall.tool
         );
 
         const updatedToolCalls =
@@ -246,14 +244,17 @@ export function useStreamingMessage(conversationId: string | null) {
       // 如果是图片生成成功，自动添加到文件列表
       if (data.status === 'success' && data.tool === 'generating_image' && data.result) {
         // 从结果中提取文件信息
-        const resultData = typeof data.result === 'string' ? {} : data.result;
+        const resultData =
+          typeof data.result === 'string'
+            ? ({} as Record<string, unknown>)
+            : (data.result as Record<string, unknown>);
         if (resultData.name && resultData.path) {
           addFileToStreamingMessage(data.messageId, {
-            type: resultData.type || 'image/png',
-            url: resultData.url || '',
-            mediaType: resultData.type || 'image/png',
-            name: resultData.name,
-            path: resultData.path,
+            type: (resultData.type as string) || 'image/png',
+            url: (resultData.url as string) || '',
+            mediaType: (resultData.type as string) || 'image/png',
+            name: resultData.name as string,
+            path: resultData.path as string,
           });
         }
       }
@@ -299,7 +300,11 @@ export function useStreamingMessage(conversationId: string | null) {
       if (status === 'SUBSCRIBED') {
         logger.info('Subscribed to streaming channel', { conversationId });
       } else if (status === 'CHANNEL_ERROR') {
-        logger.error('Failed to subscribe to streaming channel', { conversationId });
+        logger.error(
+          'Failed to subscribe to streaming channel',
+          new Error('Channel subscription failed'),
+          { conversationId }
+        );
       }
     });
 

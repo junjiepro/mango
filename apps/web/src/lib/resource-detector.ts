@@ -21,23 +21,11 @@ export class ResourceDetector {
 
   constructor() {
     this.detectors = new Map([
-      ['link', [
-        /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi,
-        /www\.[^\s<>"{}|\\^`\[\]]+/gi,
-      ]],
-      ['file', [
-        /\[([^\]]+)\]\(file:\/\/([^\)]+)\)/gi,
-        /attachment:\/\/([a-zA-Z0-9-_]+)/gi,
-      ]],
-      ['miniapp', [
-        /miniapp:\/\/([a-zA-Z0-9-_]+)/gi,
-      ]],
-      ['image', [
-        /!\[([^\]]*)\]\(([^\)]+)\)/gi,
-      ]],
-      ['code', [
-        /```(\w+)?\n([\s\S]*?)```/gi,
-      ]],
+      ['link', [/https?:\/\/[^\s<>"{}|^`[\]]+/gi, /www\.[^\s<>"{}|^`[\]]+/gi]],
+      ['file', [/\[([^\]]+)\]\(file:\/\/([^)]+)\)/gi, /attachment:\/\/([a-zA-Z0-9-_]+)/gi]],
+      ['miniapp', [/miniapp:\/\/([a-zA-Z0-9-_]+)/gi]],
+      ['image', [/!\[([^\]]*)\]\(([^)]+)\)/gi]],
+      ['code', [/```(\w+)?\n([\s\S]*?)```/gi]],
     ]);
   }
 
@@ -83,7 +71,7 @@ export class ResourceDetector {
   /**
    * 提取资源元数据
    */
-  private extractMetadata(type: ResourceType, match: RegExpMatchArray): any {
+  private extractMetadata(type: ResourceType, match: RegExpMatchArray): Record<string, unknown> {
     switch (type) {
       case 'link':
         try {
@@ -139,8 +127,7 @@ export class ResourceDetector {
     // 如果内容包含 HTML 标签或 DOCTYPE
     if (htmlTagPattern.test(content) || doctypePattern.test(content)) {
       // 匹配完整的 HTML 文档或 HTML 片段
-      const htmlDocPattern =
-        /<!DOCTYPE[^>]*>[\s\S]*?<\/html>|<html[^>]*>[\s\S]*?<\/html>/gi;
+      const htmlDocPattern = /<!DOCTYPE[^>]*>[\s\S]*?<\/html>|<html[^>]*>[\s\S]*?<\/html>/gi;
 
       const matches = content.matchAll(htmlDocPattern);
       for (const match of matches) {
@@ -176,7 +163,7 @@ export class ResourceDetector {
    */
   private deduplicateResources(resources: DetectedResource[]): DetectedResource[] {
     const seen = new Set<string>();
-    return resources.filter(resource => {
+    return resources.filter((resource) => {
       const key = `${resource.type}:${resource.content}`;
       if (seen.has(key)) return false;
       seen.add(key);

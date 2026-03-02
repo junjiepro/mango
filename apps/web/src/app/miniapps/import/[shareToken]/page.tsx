@@ -3,87 +3,87 @@
  * T100: Create MiniApp import from share link
  */
 
-'use client'
+'use client';
 
-import React, { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
-import { PermissionDialog } from '@/components/miniapp/PermissionDialog'
-import type { Database } from '@/types/database.types'
+import React, { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PermissionDialog } from '@/components/miniapp/PermissionDialog';
+import type { Database } from '@/types/database.types';
 
-type MiniApp = Database['public']['Tables']['mini_apps']['Row']
+type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
 
 export default function MiniAppImportPage() {
-  const params = useParams()
-  const router = useRouter()
-  const shareToken = params.shareToken as string
+  const params = useParams();
+  const router = useRouter();
+  const shareToken = params.shareToken as string;
 
-  const [miniApp, setMiniApp] = useState<MiniApp | null>(null)
-  const [shareLink, setShareLink] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showPermissionDialog, setShowPermissionDialog] = useState(false)
-  const [installing, setInstalling] = useState(false)
+  const [miniApp, setMiniApp] = useState<MiniApp | null>(null);
+  const [shareLink, setShareLink] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
-    loadMiniApp()
-  }, [shareToken])
+    loadMiniApp();
+  }, [shareToken]);
 
   const loadMiniApp = async () => {
     try {
-      const response = await fetch(`/api/miniapps/share/${shareToken}`)
-      const result = await response.json()
+      const response = await fetch(`/api/miniapps/share/${shareToken}`);
+      const result = await response.json();
 
       if (result.success) {
-        setMiniApp(result.data.mini_app)
-        setShareLink(result.data.share_link)
+        setMiniApp(result.data.mini_app);
+        setShareLink(result.data.share_link);
       } else {
-        setError(result.error)
+        setError(result.error);
       }
     } catch (error) {
-      console.error('Failed to load mini app:', error)
-      setError('Failed to load mini app')
+      console.error('Failed to load mini app:', error);
+      setError('Failed to load mini app');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleInstallClick = () => {
-    const manifest = miniApp?.manifest as any || {}
-    const requiredPermissions = manifest.required_permissions || []
+    const manifest = (miniApp?.manifest as any) || {};
+    const requiredPermissions = manifest.required_permissions || [];
 
     if (requiredPermissions.length > 0) {
-      setShowPermissionDialog(true)
+      setShowPermissionDialog(true);
     } else {
-      handleInstall([])
+      handleInstall([]);
     }
-  }
+  };
 
   const handleInstall = async (grantedPermissions: string[]) => {
-    setInstalling(true)
+    setInstalling(true);
     try {
       const response = await fetch(`/api/miniapps/share/${shareToken}/install`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ granted_permissions: grantedPermissions }),
-      })
+      });
 
-      const result = await response.json()
+      const result = await response.json();
 
       if (result.success) {
-        alert('Mini app installed successfully!')
-        router.push(`/miniapps/${miniApp?.id}`)
+        alert('Mini app installed successfully!');
+        router.push(`/miniapps/${miniApp?.id}`);
       } else {
-        alert(`Failed to install: ${result.error}`)
+        alert(`Failed to install: ${result.error}`);
       }
     } catch (error) {
-      console.error('Failed to install mini app:', error)
-      alert('Failed to install mini app')
+      console.error('Failed to install mini app:', error);
+      alert('Failed to install mini app');
     } finally {
-      setInstalling(false)
+      setInstalling(false);
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -102,7 +102,7 @@ export default function MiniAppImportPage() {
           <Skeleton className="h-10 w-full" />
         </div>
       </div>
-    )
+    );
   }
 
   if (error || !miniApp) {
@@ -116,11 +116,11 @@ export default function MiniAppImportPage() {
           </Button>
         </div>
       </div>
-    )
+    );
   }
 
-  const stats = miniApp.stats as any || {}
-  const manifest = miniApp.manifest as any || {}
+  const stats = (miniApp.stats as any) || {};
+  const manifest = (miniApp.manifest as any) || {};
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-2xl">
@@ -128,7 +128,7 @@ export default function MiniAppImportPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Install Mini App</h1>
         <p className="text-muted-foreground mt-2">
-          You've been invited to install this mini app
+          You&apos;ve been invited to install this mini app
         </p>
       </div>
 
@@ -144,12 +144,7 @@ export default function MiniAppImportPage() {
             />
           ) : (
             <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <svg
-                className="h-8 w-8"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -183,12 +178,7 @@ export default function MiniAppImportPage() {
         {/* 统计信息 */}
         <div className="flex items-center gap-6 mb-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -200,12 +190,7 @@ export default function MiniAppImportPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -218,10 +203,7 @@ export default function MiniAppImportPage() {
 
           {stats.avg_rating > 0 && (
             <div className="flex items-center gap-2">
-              <svg
-                className="h-5 w-5 fill-yellow-400"
-                viewBox="0 0 24 24"
-              >
+              <svg className="h-5 w-5 fill-yellow-400" viewBox="0 0 24 24">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
               <span>{stats.avg_rating.toFixed(1)}</span>
@@ -236,12 +218,7 @@ export default function MiniAppImportPage() {
             <ul className="space-y-1 text-sm text-muted-foreground">
               {manifest.required_permissions.map((perm: string) => (
                 <li key={perm} className="flex items-center gap-2">
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -260,12 +237,7 @@ export default function MiniAppImportPage() {
         {shareLink && (
           <div className="mb-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-950 text-sm">
             <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -283,12 +255,7 @@ export default function MiniAppImportPage() {
         )}
 
         {/* 安装按钮 */}
-        <Button
-          onClick={handleInstallClick}
-          disabled={installing}
-          className="w-full"
-          size="lg"
-        >
+        <Button onClick={handleInstallClick} disabled={installing} className="w-full" size="lg">
           {installing ? 'Installing...' : 'Install Mini App'}
         </Button>
       </div>
@@ -305,5 +272,5 @@ export default function MiniAppImportPage() {
         />
       )}
     </div>
-  )
+  );
 }

@@ -12,8 +12,8 @@ export interface CreateTaskOptions {
   title: string;
   description?: string;
   taskType: 'analysis' | 'generation' | 'search' | 'tool_call';
-  agentConfig?: Record<string, any>;
-  metadata?: Record<string, any>;
+  agentConfig?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface TaskQueueResult {
@@ -54,10 +54,7 @@ export async function createTask(options: CreateTaskOptions): Promise<TaskQueueR
     await triggerTaskProcessing(task.id, options.userId);
 
     // Update status to queued
-    await supabase
-      .from('tasks')
-      .update({ status: 'queued' })
-      .eq('id', task.id);
+    await supabase.from('tasks').update({ status: 'queued' }).eq('id', task.id);
 
     return {
       taskId: task.id,
@@ -231,10 +228,7 @@ export async function retryTask(taskId: string, userId: string): Promise<TaskQue
   try {
     await triggerTaskProcessing(taskId, userId);
 
-    await supabase
-      .from('tasks')
-      .update({ status: 'queued' })
-      .eq('id', taskId);
+    await supabase.from('tasks').update({ status: 'queued' }).eq('id', taskId);
 
     return {
       taskId,
@@ -253,10 +247,7 @@ export async function retryTask(taskId: string, userId: string): Promise<TaskQue
 /**
  * Clean up old completed tasks
  */
-export async function cleanupOldTasks(
-  userId: string,
-  olderThanDays: number = 30
-): Promise<number> {
+export async function cleanupOldTasks(userId: string, olderThanDays: number = 30): Promise<number> {
   const supabase = await createClient();
 
   const cutoffDate = new Date();

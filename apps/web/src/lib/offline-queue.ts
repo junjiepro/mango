@@ -10,7 +10,7 @@ export interface QueuedMessage {
   conversationId: string;
   content: string;
   contentType: string;
-  attachments?: any[];
+  attachments?: unknown[];
   tempId: string; // Temporary ID for optimistic updates
   timestamp: number;
   retryCount: number;
@@ -60,7 +60,9 @@ export class OfflineQueue {
   /**
    * Add message to queue
    */
-  addMessage(message: Omit<QueuedMessage, 'tempId' | 'timestamp' | 'retryCount' | 'status'>): string {
+  addMessage(
+    message: Omit<QueuedMessage, 'tempId' | 'timestamp' | 'retryCount' | 'status'>
+  ): string {
     const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const queuedMessage: QueuedMessage = {
@@ -162,13 +164,15 @@ export class OfflineQueue {
       const nextSeq = (lastMessage?.sequence_number || 0) + 1;
 
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
 
       // Insert message
-      const { data: newMessage, error } = await supabase
+      const { error } = await supabase
         .from('messages')
         .insert({
           conversation_id: message.conversationId,

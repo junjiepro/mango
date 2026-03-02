@@ -32,7 +32,7 @@ export type A2UIComponentType =
 export interface A2UIComponent {
   id: string;
   type: A2UIComponentType;
-  props: Record<string, any>;
+  props: Record<string, unknown>;
   children?: A2UIComponent[];
   events?: A2UIEvent[];
 }
@@ -43,7 +43,7 @@ export interface A2UIComponent {
 export interface A2UIEvent {
   event: string; // onClick, onChange, onSubmit, etc.
   action: string; // submit, navigate, invoke, etc.
-  payload?: Record<string, any>;
+  payload?: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -106,7 +106,7 @@ export interface ButtonProps {
 export interface ChartProps {
   chartType: 'line' | 'bar' | 'pie' | 'area' | 'scatter';
   title?: string;
-  data: Array<Record<string, any>>;
+  data: Array<Record<string, unknown>>;
   xAxis?: { dataKey: string; label?: string };
   yAxis?: { label?: string };
   series: Array<{
@@ -129,7 +129,7 @@ export interface TableProps {
     width?: number;
     align?: 'left' | 'center' | 'right';
   }>;
-  data: Array<Record<string, any>>;
+  data: Array<Record<string, unknown>>;
   pagination?: boolean;
   pageSize?: number;
 }

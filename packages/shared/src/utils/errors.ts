@@ -47,30 +47,30 @@ export enum ErrorType {
  * 应用错误类
  */
 export class AppError extends Error {
-  public readonly type: ErrorType
-  public readonly statusCode: number
-  public readonly isOperational: boolean
-  public readonly context?: Record<string, any>
-  public readonly timestamp: Date
+  public readonly type: ErrorType;
+  public readonly statusCode: number;
+  public readonly isOperational: boolean;
+  public readonly context?: Record<string, unknown>;
+  public readonly timestamp: Date;
 
   constructor(
     message: string,
     type: ErrorType = ErrorType.UNKNOWN_ERROR,
     statusCode: number = 500,
     isOperational: boolean = true,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
-    super(message)
+    super(message);
 
-    this.name = this.constructor.name
-    this.type = type
-    this.statusCode = statusCode
-    this.isOperational = isOperational
-    this.context = context
-    this.timestamp = new Date()
+    this.name = this.constructor.name;
+    this.type = type;
+    this.statusCode = statusCode;
+    this.isOperational = isOperational;
+    this.context = context;
+    this.timestamp = new Date();
 
     // 维护正确的堆栈跟踪
-    Error.captureStackTrace(this, this.constructor)
+    Error.captureStackTrace(this, this.constructor);
   }
 
   /**
@@ -87,7 +87,7 @@ export class AppError extends Error {
       ...(process.env.NODE_ENV === 'development' && {
         stack: this.stack,
       }),
-    }
+    };
   }
 }
 
@@ -95,8 +95,12 @@ export class AppError extends Error {
  * 认证错误
  */
 export class AuthError extends AppError {
-  constructor(message: string, type: ErrorType = ErrorType.AUTH_UNAUTHORIZED, context?: Record<string, any>) {
-    super(message, type, 401, true, context)
+  constructor(
+    message: string,
+    type: ErrorType = ErrorType.AUTH_UNAUTHORIZED,
+    context?: Record<string, unknown>
+  ) {
+    super(message, type, 401, true, context);
   }
 }
 
@@ -104,8 +108,8 @@ export class AuthError extends AppError {
  * 验证错误
  */
 export class ValidationError extends AppError {
-  constructor(message: string, context?: Record<string, any>) {
-    super(message, ErrorType.VALIDATION_FAILED, 400, true, context)
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, ErrorType.VALIDATION_FAILED, 400, true, context);
   }
 }
 
@@ -113,8 +117,8 @@ export class ValidationError extends AppError {
  * 资源未找到错误
  */
 export class NotFoundError extends AppError {
-  constructor(resource: string, context?: Record<string, any>) {
-    super(`${resource} not found`, ErrorType.RESOURCE_NOT_FOUND, 404, true, context)
+  constructor(resource: string, context?: Record<string, unknown>) {
+    super(`${resource} not found`, ErrorType.RESOURCE_NOT_FOUND, 404, true, context);
   }
 }
 
@@ -122,8 +126,8 @@ export class NotFoundError extends AppError {
  * 资源冲突错误
  */
 export class ConflictError extends AppError {
-  constructor(message: string, context?: Record<string, any>) {
-    super(message, ErrorType.RESOURCE_CONFLICT, 409, true, context)
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, ErrorType.RESOURCE_CONFLICT, 409, true, context);
   }
 }
 
@@ -131,8 +135,8 @@ export class ConflictError extends AppError {
  * 配额超限错误
  */
 export class QuotaExceededError extends AppError {
-  constructor(message: string, context?: Record<string, any>) {
-    super(message, ErrorType.QUOTA_EXCEEDED, 429, true, context)
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, ErrorType.QUOTA_EXCEEDED, 429, true, context);
   }
 }
 
@@ -140,8 +144,8 @@ export class QuotaExceededError extends AppError {
  * 速率限制错误
  */
 export class RateLimitError extends AppError {
-  constructor(message: string = 'Rate limit exceeded', context?: Record<string, any>) {
-    super(message, ErrorType.RATE_LIMIT_EXCEEDED, 429, true, context)
+  constructor(message: string = 'Rate limit exceeded', context?: Record<string, unknown>) {
+    super(message, ErrorType.RATE_LIMIT_EXCEEDED, 429, true, context);
   }
 }
 
@@ -149,14 +153,14 @@ export class RateLimitError extends AppError {
  * 外部服务错误
  */
 export class ExternalServiceError extends AppError {
-  constructor(service: string, message: string, context?: Record<string, any>) {
+  constructor(service: string, message: string, context?: Record<string, unknown>) {
     super(
       `External service error (${service}): ${message}`,
       ErrorType.EXTERNAL_SERVICE_ERROR,
       502,
       true,
       context
-    )
+    );
   }
 }
 
@@ -165,9 +169,9 @@ export class ExternalServiceError extends AppError {
  */
 export function isOperationalError(error: Error): boolean {
   if (error instanceof AppError) {
-    return error.isOperational
+    return error.isOperational;
   }
-  return false
+  return false;
 }
 
 /**
@@ -176,33 +180,25 @@ export function isOperationalError(error: Error): boolean {
 export function normalizeError(error: unknown): AppError {
   // 如果已经是 AppError，直接返回
   if (error instanceof AppError) {
-    return error
+    return error;
   }
 
   // 如果是标准 Error
   if (error instanceof Error) {
-    return new AppError(
-      error.message,
-      ErrorType.UNKNOWN_ERROR,
-      500,
-      false,
-      { originalError: error.name }
-    )
+    return new AppError(error.message, ErrorType.UNKNOWN_ERROR, 500, false, {
+      originalError: error.name,
+    });
   }
 
   // 如果是字符串
   if (typeof error === 'string') {
-    return new AppError(error, ErrorType.UNKNOWN_ERROR, 500, false)
+    return new AppError(error, ErrorType.UNKNOWN_ERROR, 500, false);
   }
 
   // 其他类型
-  return new AppError(
-    'An unknown error occurred',
-    ErrorType.UNKNOWN_ERROR,
-    500,
-    false,
-    { originalError: String(error) }
-  )
+  return new AppError('An unknown error occurred', ErrorType.UNKNOWN_ERROR, 500, false, {
+    originalError: String(error),
+  });
 }
 
 /**
@@ -236,19 +232,19 @@ export const ERROR_MESSAGES: Record<ErrorType, string> = {
   [ErrorType.MINIAPP_ERROR]: '小应用错误',
 
   [ErrorType.UNKNOWN_ERROR]: '未知错误',
-}
+};
 
 /**
  * 获取用户友好的错误消息
  */
 export function getUserFriendlyMessage(error: AppError): string {
-  return ERROR_MESSAGES[error.type] || error.message
+  return ERROR_MESSAGES[error.type] || error.message;
 }
 
 /**
  * 错误日志格式化
  */
-export function formatErrorForLogging(error: AppError): Record<string, any> {
+export function formatErrorForLogging(error: AppError): Record<string, unknown> {
   return {
     type: error.type,
     message: error.message,
@@ -257,5 +253,5 @@ export function formatErrorForLogging(error: AppError): Record<string, any> {
     context: error.context,
     timestamp: error.timestamp.toISOString(),
     stack: error.stack,
-  }
+  };
 }

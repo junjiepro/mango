@@ -22,7 +22,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "lint": "eslint . --ext .ts",
+    "lint": "eslint src --ext .ts",
     "clean": "rm -rf dist"
   },
   "devDependencies": {

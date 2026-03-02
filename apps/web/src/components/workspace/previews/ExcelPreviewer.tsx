@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { PreviewContainer, PreviewLoading, PreviewError } from './PreviewContainer';
 import type { PreviewerProps } from './types';
 import { buildFileUrl } from './types';
+import * as XLSX from 'xlsx';
 
 type ViewMode = 'spreadsheet' | 'raw';
 
@@ -51,17 +52,22 @@ interface LuckySheetData {
 interface LuckySheetCell {
   r: number;
   c: number;
-  v: {
-    v?: string | number | boolean | null;
-    m?: string;
-    ct?: { fa?: string; t?: string };
-    bg?: string;
-    fc?: string;
-    ff?: string;
-    fs?: number;
-    bl?: number;
-    it?: number;
-  } | string | number | boolean | null;
+  v:
+    | {
+        v?: string | number | boolean | null;
+        m?: string;
+        ct?: { fa?: string; t?: string };
+        bg?: string;
+        fc?: string;
+        ff?: string;
+        fs?: number;
+        bl?: number;
+        it?: number;
+      }
+    | string
+    | number
+    | boolean
+    | null;
 }
 
 // 全局 LuckySheet 引用
@@ -76,8 +82,6 @@ declare global {
 
 // 将 SheetJS 数据转换为 LuckySheet 格式
 function convertToLuckySheet(workbook: import('xlsx').WorkBook): LuckySheetData[] {
-  const XLSX = require('xlsx');
-
   return workbook.SheetNames.map((name, index) => {
     const sheet = workbook.Sheets[name];
     const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
@@ -157,7 +161,9 @@ function loadLuckySheetScripts(): Promise<void> {
     }
   })();
 
-  luckySheetLoadPromise.catch(() => { luckySheetLoadPromise = null; });
+  luckySheetLoadPromise.catch(() => {
+    luckySheetLoadPromise = null;
+  });
   return luckySheetLoadPromise;
 }
 
@@ -220,10 +226,10 @@ export function ExcelPreviewer({ file, deviceClient, className = '' }: Previewer
       // 保存所有工作表的原始数据用于简单表格视图
       const allData = workbook.SheetNames.map((sheetName) => {
         const sheet = workbook.Sheets[sheetName];
-        return XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(
-          sheet,
-          { header: 1, defval: null }
-        );
+        return XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(sheet, {
+          header: 1,
+          defval: null,
+        });
       });
       setAllSheetsData(allData);
       setCurrentSheetIndex(0);
@@ -275,7 +281,9 @@ export function ExcelPreviewer({ file, deviceClient, className = '' }: Previewer
       clearTimeout(timer);
       try {
         window.luckysheet?.destroy();
-      } catch {}
+      } catch {
+        // Ignore cleanup errors
+      }
     };
   }, [luckyLoaded, luckyData, viewMode, sheetNames.length]);
 

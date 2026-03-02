@@ -171,9 +171,7 @@ export default function MCPDebugPage() {
                 </div>
               </button>
             ))}
-            {devices.length === 0 && (
-              <p className="text-gray-500 text-center py-4">没有找到设备</p>
-            )}
+            {devices.length === 0 && <p className="text-gray-500 text-center py-4">没有找到设备</p>}
           </div>
         </div>
 
@@ -196,9 +194,7 @@ export default function MCPDebugPage() {
                       {service.is_online ? '在线' : '离线'}
                     </span>
                   </div>
-                  {service.error && (
-                    <p className="text-sm text-red-600 mb-2">{service.error}</p>
-                  )}
+                  {service.error && <p className="text-sm text-red-600 mb-2">{service.error}</p>}
                   <div className="space-y-1">
                     {service.tools.map((tool) => (
                       <button
@@ -304,7 +300,7 @@ export default function MCPDebugPage() {
           <li>1. 从左侧选择一个设备</li>
           <li>2. 从中间选择一个服务和工具</li>
           <li>3. 在右侧输入工具参数（JSON 格式）</li>
-          <li>4. 点击"执行工具"按钮测试工具调用</li>
+          <li>4. 点击&quot;执行工具&quot;按钮测试工具调用</li>
           <li>5. 查看执行结果和参数 Schema</li>
         </ul>
       </div>

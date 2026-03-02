@@ -28,15 +28,19 @@ export function showStatus(): void {
     console.log(t('status.boundCount', { count: bindingCount }) + '\n');
 
     console.log(t('status.bindingDetails'));
-    for (const [code, binding] of Object.entries(config || {})) {
+    for (const [, binding] of Object.entries(config || {})) {
       console.log(`  - ${binding.deviceName || t('status.unnamedDevice')}`);
       console.log(t('status.deviceId', { id: binding.deviceId }));
       console.log(t('status.boundAt', { time: binding.boundAt }));
       console.log(t('status.lastUsed', { time: binding.lastUsedAt }));
 
-      if (binding.mcpServices && binding.mcpServices.length > 0) {
+      if (
+        binding.mcpServices &&
+        Array.isArray(binding.mcpServices) &&
+        binding.mcpServices.length > 0
+      ) {
         console.log(t('status.mcpServices', { count: binding.mcpServices.length }));
-        binding.mcpServices.forEach((service: any) => {
+        binding.mcpServices.forEach((service: { name: string }) => {
           console.log(`      - ${service.name}`);
         });
       }
