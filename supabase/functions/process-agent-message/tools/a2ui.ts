@@ -3,7 +3,7 @@
  * Agent 生成 A2UI 组件的工具
  */
 
-import { tool } from 'https://esm.sh/ai';
+import { tool } from 'https://esm.sh/ai@5.0.110';
 import { z } from 'https://esm.sh/zod@3.23.8';
 
 /**
@@ -24,7 +24,7 @@ const A2UIComponentSchema = z.object({
     'grid',
     'image',
     'video',
-    'audio'
+    'audio',
   ]),
   props: z.record(z.any()),
   children: z.array(z.any()).optional(),
@@ -88,9 +88,7 @@ function cleanComponent(component: any): any {
 
   // 清理 events
   if (component.events && Array.isArray(component.events)) {
-    cleaned.events = component.events.filter(
-      (event: any) => event && event.event && event.action
-    );
+    cleaned.events = component.events.filter((event: any) => event && event.event && event.action);
   }
 
   return cleaned;

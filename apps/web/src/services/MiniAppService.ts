@@ -140,7 +140,7 @@ export class MiniAppService {
     }
 
     if (!miniApp) {
-      throw new AppError('Mini app not found', ErrorType.NOT_FOUND, 404);
+      throw new AppError('Mini app not found', ErrorType.RESOURCE_NOT_FOUND, 404);
     }
 
     return miniApp;

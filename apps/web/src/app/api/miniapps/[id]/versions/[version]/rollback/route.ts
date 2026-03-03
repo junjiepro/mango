@@ -58,7 +58,7 @@ export async function POST(
     }
 
     // 先保存当前版本作为备份
-    const contentHash = hashContent(app.code, app.skill_content, app.html);
+    const contentHash = hashContent(app.code ?? '', typeof app.skill_content === 'string' ? app.skill_content : '', typeof app.html === 'string' ? app.html : undefined);
     const { data: nextVersion } = await supabase
       .rpc('generate_next_mini_app_version', { p_mini_app_id: miniAppId });
 

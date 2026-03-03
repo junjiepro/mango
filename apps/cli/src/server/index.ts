@@ -1177,7 +1177,11 @@ function setupWebSocketHandlers(server: any): void {
 
               ptyProcess.onExit(({ exitCode }) => {
                 console.log('[Server] PTY exited with code:', exitCode);
-                try { ws.close(); } catch { /* ignore */ }
+                try {
+                  ws.close();
+                } catch {
+                  /* ignore */
+                }
               });
             } catch (ptyError) {
               console.error('Failed to create PTY:', ptyError);
@@ -1199,7 +1203,11 @@ function setupWebSocketHandlers(server: any): void {
           }
         } else if (message.type === 'input') {
           if (authenticated && ptyProcess) {
-            try { ptyProcess.write(message.data); } catch (e) { console.error('Failed to write to PTY:', e); }
+            try {
+              ptyProcess.write(message.data);
+            } catch (e) {
+              console.error('Failed to write to PTY:', e);
+            }
           }
         }
       } catch (error) {
@@ -1209,12 +1217,24 @@ function setupWebSocketHandlers(server: any): void {
 
     ws.on('close', () => {
       console.log('[Server] Terminal WebSocket disconnected');
-      if (ptyProcess) { try { ptyProcess.kill(); } catch { /* ignore */ } }
+      if (ptyProcess) {
+        try {
+          ptyProcess.kill();
+        } catch {
+          /* ignore */
+        }
+      }
     });
 
     ws.on('error', (error) => {
       console.error('[Server] Terminal WebSocket error:', error);
-      if (ptyProcess) { try { ptyProcess.kill(); } catch { /* ignore */ } }
+      if (ptyProcess) {
+        try {
+          ptyProcess.kill();
+        } catch {
+          /* ignore */
+        }
+      }
     });
   });
 
@@ -1253,7 +1273,9 @@ function setupWebSocketHandlers(server: any): void {
           const bindingConfig = config?.[bindingCode];
           watchPath = message.path || bindingConfig?.workspaceDir || process.cwd();
 
-          if (unsubscribe) { unsubscribe(); }
+          if (unsubscribe) {
+            unsubscribe();
+          }
 
           unsubscribe = fileWatcherManager.subscribe(watchPath, (event: FileChangeEvent) => {
             sendMessage({
@@ -1270,7 +1292,10 @@ function setupWebSocketHandlers(server: any): void {
           sendMessage({ type: 'subscribed', path: watchPath });
           console.log(`[Server] Files WebSocket subscribed to: ${watchPath}`);
         } else if (message.type === 'unsubscribe' && authenticated) {
-          if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+          if (unsubscribe) {
+            unsubscribe();
+            unsubscribe = null;
+          }
           sendMessage({ type: 'unsubscribed' });
         }
       } catch (error) {
@@ -1280,12 +1305,16 @@ function setupWebSocketHandlers(server: any): void {
 
     ws.on('close', () => {
       console.log('[Server] Files WebSocket disconnected');
-      if (unsubscribe) { unsubscribe(); }
+      if (unsubscribe) {
+        unsubscribe();
+      }
     });
 
     ws.on('error', (error) => {
       console.error('[Server] Files WebSocket error:', error);
-      if (unsubscribe) { unsubscribe(); }
+      if (unsubscribe) {
+        unsubscribe();
+      }
     });
   });
 }
@@ -1305,13 +1334,10 @@ export async function startServer(
   // 启动 HTTP 服务器
   await new Promise<void>((resolve, reject) => {
     try {
-      const server = serve(
-        { fetch: app.fetch, port: availablePort },
-        () => {
-          setupWebSocketHandlers(server as any);
-          resolve();
-        }
-      );
+      const server = serve({ fetch: app.fetch, port: availablePort }, () => {
+        setupWebSocketHandlers(server as any);
+        resolve();
+      });
     } catch (error) {
       reject(error);
     }

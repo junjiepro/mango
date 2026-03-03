@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: 'Internal server error',
-        type: ErrorType.INTERNAL_ERROR,
+        type: ErrorType.INTERNAL_SERVER_ERROR,
       },
       { status: 500 }
     )
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     if (!name || !display_name || !description || !code) {
       throw new AppError(
         'Missing required fields: name, display_name, description, code',
-        ErrorType.VALIDATION_ERROR,
+        ErrorType.VALIDATION_FAILED,
         400
       )
     }
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
       throw new AppError(
         'Invalid name format. Only alphanumeric characters, underscores, and hyphens are allowed',
-        ErrorType.VALIDATION_ERROR,
+        ErrorType.VALIDATION_FAILED,
         400
       )
     }
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: 'Internal server error',
-        type: ErrorType.INTERNAL_ERROR,
+        type: ErrorType.INTERNAL_SERVER_ERROR,
       },
       { status: 500 }
     )

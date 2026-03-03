@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: 'Internal server error',
-        type: ErrorType.INTERNAL_ERROR,
+        type: ErrorType.INTERNAL_SERVER_ERROR,
       },
       { status: 500 }
     );

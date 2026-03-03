@@ -181,7 +181,7 @@ export async function DELETE(request: NextRequest) {
 
     // 从 Storage 删除文件
     const { error: storageError } = await supabase.storage
-      .from(attachment.storage_bucket)
+      .from(attachment.storage_bucket ?? 'attachments')
       .remove([attachment.storage_path])
 
     if (storageError) {

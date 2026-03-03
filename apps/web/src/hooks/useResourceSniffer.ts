@@ -14,9 +14,9 @@ import type { DetectedResource } from '@mango/shared/types/resource.types';
 interface Message {
   id: string;
   content: string;
-  created_at: string;
-  attachments?: any[];
-  metadata?: Record<string, any>;
+  created_at: string | null;
+  attachments?: unknown;
+  metadata?: unknown;
 }
 
 export function useResourceSniffer(messages: Message[]) {

@@ -65,7 +65,7 @@ export async function refreshAttachmentUrls(
         .createSignedUrl(attachment.path, expiresIn);
 
       if (error || !data) {
-        logger.error('Failed to refresh attachment URL', { error, path: attachment.path });
+        logger.error('Failed to refresh attachment URL', undefined, { error, path: attachment.path });
         // 保留原 URL
         refreshedAttachments.push(attachment);
         continue;

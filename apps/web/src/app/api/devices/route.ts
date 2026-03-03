@@ -166,11 +166,11 @@ export async function DELETE(request: NextRequest) {
       .single();
 
     if (fetchError || !binding) {
-      throw new AppError('Binding not found', ErrorType.NOT_FOUND, 404);
+      throw new AppError('Binding not found', ErrorType.RESOURCE_NOT_FOUND, 404);
     }
 
     if (binding.user_id !== user.id) {
-      throw new AppError('Forbidden: You do not own this binding', ErrorType.FORBIDDEN, 403);
+      throw new AppError('Forbidden: You do not own this binding', ErrorType.AUTH_FORBIDDEN, 403);
     }
 
     // 删除绑定 (级联删除相关的 MCP 服务配置)

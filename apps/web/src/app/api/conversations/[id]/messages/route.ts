@@ -184,7 +184,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           locale: (await cookies()).get('NEXT_LOCALE')?.value || 'zh',
         }),
       }).catch((error) => {
-        logger.error('Failed to trigger agent response', { error });
+        logger.error('Failed to trigger agent response', error instanceof Error ? error : undefined);
       });
     } else {
       logger.warn('Edge function URL not configured, agent response not triggered');

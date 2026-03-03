@@ -51,19 +51,19 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (bindingError || !binding) {
-      throw new AppError('Device not found', ErrorType.NOT_FOUND, 404);
+      throw new AppError('Device not found', ErrorType.RESOURCE_NOT_FOUND, 404);
     }
 
     if (binding.user_id !== user.id) {
-      throw new AppError('Forbidden', ErrorType.FORBIDDEN, 403);
+      throw new AppError('Forbidden', ErrorType.AUTH_FORBIDDEN, 403);
     }
 
     if (binding.status !== 'active') {
-      throw new AppError('Device is not active', ErrorType.VALIDATION_ERROR, 400);
+      throw new AppError('Device is not active', ErrorType.VALIDATION_FAILED, 400);
     }
 
     if (!binding.device_url) {
-      throw new AppError('Device URL not available', ErrorType.VALIDATION_ERROR, 400);
+      throw new AppError('Device URL not available', ErrorType.VALIDATION_FAILED, 400);
     }
 
     // 根据action执行不同操作

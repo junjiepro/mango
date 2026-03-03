@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         record_type,
-        content,
+        rule_content: content,
         confidence,
       })
       .select()

@@ -23,7 +23,7 @@
       "@mango/protocols": ["../../packages/protocols/src/index.ts"],
       "@mango/protocols/*": ["../../packages/protocols/src/*"],
       "@mango/shared": ["../../packages/shared/src/index.ts"],
-      "@mango/shared/*": ["../../packages/shared/src/*"]
+      "@mango/shared/*": ["../../packages/shared/src/*/index.ts", "../../packages/shared/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

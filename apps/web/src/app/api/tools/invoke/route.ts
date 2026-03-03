@@ -65,8 +65,8 @@ export async function POST(request: NextRequest) {
       .from('tasks')
       .insert({
         user_id: user.id,
-        conversation_id: conversationId,
-        message_id: messageId,
+        conversation_id: conversationId ?? '',
+        message_id: messageId ?? null,
         title: `Tool: ${toolName}`,
         description: `Invoking tool ${toolName}`,
         task_type: 'tool_call',
@@ -93,12 +93,12 @@ export async function POST(request: NextRequest) {
       .update({
         status: result.success ? 'completed' : 'failed',
         progress: 100,
-        result: result.content,
+        result: result.content as unknown as import('@/types/database.types').Json,
         error_message: result.error,
         metrics: {
           duration_ms: result.duration,
           tool_call_count: 1,
-        },
+        } as unknown as import('@/types/database.types').Json,
         completed_at: new Date().toISOString(),
         tool_calls: [
           {
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
             duration_ms: result.duration,
             success: result.success,
           },
-        ],
+        ] as unknown as import('@/types/database.types').Json,
       })
       .eq('id', task.id);
 

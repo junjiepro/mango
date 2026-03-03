@@ -4,7 +4,7 @@
  * 适配 Edge Function 环境（无文件系统操作）
  */
 
-import { tool } from 'https://esm.sh/ai';
+import { tool } from 'https://esm.sh/ai@5.0.110';
 import { z } from 'https://esm.sh/zod@3.23.8';
 import type { SkillLoader } from '../lib/skill-loader.ts';
 
@@ -49,8 +49,7 @@ export function createLoadSkillTool(loader: SkillLoader) {
 
         // 限制长度
         if (result.length > 6000) {
-          result = result.substring(0, 6000) +
-            '\n\n... (内容已截断，请指定 section 参数)';
+          result = result.substring(0, 6000) + '\n\n... (内容已截断，请指定 section 参数)';
         }
 
         return result;

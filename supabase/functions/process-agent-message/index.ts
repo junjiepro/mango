@@ -5,15 +5,15 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js';
-import { createOpenAICompatible } from 'https://esm.sh/@ai-sdk/openai-compatible';
-import { gateway } from 'https://esm.sh/@ai-sdk/gateway';
+import { createOpenAICompatible } from 'https://esm.sh/@ai-sdk/openai-compatible@1.0.29';
+import { gateway } from 'https://esm.sh/@ai-sdk/gateway@2.0.20';
 import {
   createProviderRegistry,
   tool,
   stepCountIs,
   ModelMessage,
   Experimental_Agent as Agent,
-} from 'https://esm.sh/ai';
+} from 'https://esm.sh/ai@5.0.110';
 import { z } from 'https://esm.sh/zod@3.23.8';
 
 // Import refactored modules
@@ -157,9 +157,10 @@ Deno.serve(async (req) => {
         await supabase
           .from('messages')
           .update({
-            content: locale === 'en'
-              ? 'Sorry, I encountered some issues and was unable to reply to your message.'
-              : '抱歉，我遇到了一些问题，无法回复您的消息。',
+            content:
+              locale === 'en'
+                ? 'Sorry, I encountered some issues and was unable to reply to your message.'
+                : '抱歉，我遇到了一些问题，无法回复您的消息。',
             status: 'failed',
             agent_metadata: {
               error: error instanceof Error ? error.message : 'Unknown error',
@@ -319,15 +320,21 @@ async function streamAgentResponse(
 
     // 初始化 MCP 工具（包括用户设备的工具）
     console.log('Initializing MCP tools...');
-    const mcpTools = await initializeMCPTools(
-      supabase,
-      channel,
-      messageId,
-      userId,
-      deviceId,
-      abortController.signal
-    );
-    console.log(`Loaded ${Object.keys(mcpTools).length} MCP tools`);
+    let mcpTools = {};
+    try {
+      mcpTools = await initializeMCPTools(
+        supabase,
+        channel,
+        messageId,
+        userId,
+        deviceId,
+        abortController.signal
+      );
+      console.log(`✅ Loaded ${Object.keys(mcpTools).length} MCP tools`);
+    } catch (error) {
+      console.error('❌ MCP tools initialization failed:', error);
+      console.log('Continuing without device MCP tools');
+    }
 
     // 注入 Skill 上下文到系统提示词（两阶段加载模式）
     if (skillContext.totalCount > 0) {
@@ -335,9 +342,7 @@ async function streamAgentResponse(
     }
 
     // 检查用户消息是否包含 MiniApp 调用请求
-    const userMessage = conversationHistory
-      .filter((msg: any) => msg.sender_type === 'user')
-      .pop();
+    const userMessage = conversationHistory.filter((msg: any) => msg.sender_type === 'user').pop();
     const miniAppMetadata = userMessage?.metadata?.miniApp;
     let miniAppInfo = null;
 
@@ -577,6 +582,8 @@ ${mcpTools.length > 0 ? `- 可用工具: ${mcpTools.map((t: any) => t.name).join
         },
       }),
     };
+
+    console.log('Tools count', Object.keys(allTools).length);
 
     const mangoAgent = new Agent({
       model: registry.languageModel('pollinations:gemini-fast'),
@@ -946,9 +953,11 @@ ${mcpTools.length > 0 ? `- 可用工具: ${mcpTools.map((t: any) => t.name).join
 
       // 达到最大运行次数，保存当前内容并完成
       console.warn('Max continuation runs reached:', { runCount });
-      const finalContent = fullContent || (locale === 'en'
-        ? 'Sorry, your request took too long to process and has reached the maximum number of retries.'
-        : '抱歉，处理您的请求需要较长时间，已达到最大处理次数。');
+      const finalContent =
+        fullContent ||
+        (locale === 'en'
+          ? 'Sorry, your request took too long to process and has reached the maximum number of retries.'
+          : '抱歉，处理您的请求需要较长时间，已达到最大处理次数。');
 
       await supabase
         .from('messages')
@@ -967,13 +976,14 @@ ${mcpTools.length > 0 ? `- 可用工具: ${mcpTools.map((t: any) => t.name).join
 
       return;
     }
-    const errorContent = locale === 'en'
-      ? `Sorry, I encountered an issue while processing your message. Error: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`
-      : `抱歉，我在处理您的消息时遇到了问题。错误信息：${
-          error instanceof Error ? error.message : '未知错误'
-        }`;
+    const errorContent =
+      locale === 'en'
+        ? `Sorry, I encountered an issue while processing your message. Error: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`
+        : `抱歉，我在处理您的消息时遇到了问题。错误信息：${
+            error instanceof Error ? error.message : '未知错误'
+          }`;
 
     // 通过 Realtime Channel 通知前端错误
     try {

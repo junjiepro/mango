@@ -55,7 +55,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       .maybeSingle();
 
     if (bindingError || !binding) {
-      throw new AppError('Device not found', ErrorType.NOT_FOUND, 404);
+      throw new AppError('Device not found', ErrorType.RESOURCE_NOT_FOUND, 404);
     }
 
     // 检查设备在线状态
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     if (binding.status === 'active' && binding.device_url) {
       try {
-        const deviceUrls = binding.device_url as DeviceUrls;
+        const deviceUrls = binding.device_url as unknown as DeviceUrls;
         const orderedUrls = [
           deviceUrls.cloudflare_url,
           deviceUrls.hostname_url,
@@ -144,11 +144,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       .single();
 
     if (fetchError || !binding) {
-      throw new AppError('Device not found', ErrorType.NOT_FOUND, 404);
+      throw new AppError('Device not found', ErrorType.RESOURCE_NOT_FOUND, 404);
     }
 
     if (binding.user_id !== user.id) {
-      throw new AppError('Forbidden', ErrorType.FORBIDDEN, 403);
+      throw new AppError('Forbidden', ErrorType.AUTH_FORBIDDEN, 403);
     }
 
     // 更新设备信息

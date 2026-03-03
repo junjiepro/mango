@@ -8,8 +8,8 @@ import { createClient } from '@/lib/supabase/client';
 export interface DeviceBinding {
   id: string;
   binding_name: string;
-  device_url: string;
-  status: 'active' | 'inactive' | 'expired';
+  device_url: unknown;
+  status: 'active' | 'inactive' | 'expired' | string | null;
   binding_code: string;
   online_urls?: string[];
 }

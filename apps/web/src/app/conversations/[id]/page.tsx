@@ -312,7 +312,7 @@ function ConversationDetailContent() {
   const handleImageClick = (url: string, filename?: string) => {
     // 优先从已嗅探资源中匹配，保证与资源快速访问栏使用同一资源对象
     const existing = resources.find(
-      (r) => r.type === 'image' && (r.metadata?.url === url || r.metadata?.src === url)
+      (r) => r.type === 'image' && r.metadata?.url === url
     );
     if (existing) {
       handleResourceClick(existing);
@@ -350,7 +350,7 @@ function ConversationDetailContent() {
     attachments?: any[],
     miniAppData?: { miniAppId: string; installationId: string }
   ) => {
-    return sendMessage(content, attachments, miniAppData, selectedDeviceId || undefined);
+    await sendMessage(content, attachments, miniAppData, selectedDeviceId || undefined);
   };
 
   // 处理创建 ACP 会话
@@ -375,7 +375,7 @@ function ConversationDetailContent() {
         envVars,
         sessionConfig: {
           cwd: actualWorkingDir,
-          mcpServers: agent.session?.mcpServers || [],
+          mcpServers: [],
         },
         workingDirectory: actualWorkingDir,
       });
@@ -562,7 +562,7 @@ function ConversationDetailContent() {
       {/* 紧凑型顶部栏 - 合并导航、会话信息和标签页 */}
       <ConversationHeader
         conversationId={currentConversation.id}
-        conversationTitle={currentConversation.title}
+        conversationTitle={currentConversation.title ?? ''}
         conversationDescription={currentConversation.description || undefined}
         onTitleChange={handleTitleChange}
         sessions={sessions}

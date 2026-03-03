@@ -175,10 +175,10 @@ importers:
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@supabase/ssr':
-        specifier: ^0.1.0
-        version: 0.1.0(@supabase/supabase-js@2.85.0)
+        specifier: ^0.8.0
+        version: 0.8.0(@supabase/supabase-js@2.85.0)
       '@supabase/supabase-js':
-        specifier: ^2.39.0
+        specifier: ^2.85.0
         version: 2.85.0
       '@xterm/addon-fit':
         specifier: ^0.11.0
@@ -2023,10 +2023,10 @@ packages:
     resolution: {integrity: sha512-bUQXuZjvZaNN8ySRcXHK+lxbO9VKE2FErT8R2DqhzPwM1cr3NVb3/cr5mke0JsZxpwaIeOOfe4rOsgPNxnPTNA==}
     engines: {node: '>=20.0.0'}
 
-  '@supabase/ssr@0.1.0':
-    resolution: {integrity: sha512-bIVrkqjAK5G3KjkIMKYKtAOlCgRRplEWjrlyRyXSOYtgDieiOhk2ZyNAPsEOa1By9OZVxuX5eAW1fitdnuxayw==}
+  '@supabase/ssr@0.8.0':
+    resolution: {integrity: sha512-/PKk8kNFSs8QvvJ2vOww1mF5/c5W8y42duYtXvkOSe+yZKRgTTZywYG2l41pjhNomqESZCpZtXuWmYjFRMV+dw==}
     peerDependencies:
-      '@supabase/supabase-js': ^2.33.1
+      '@supabase/supabase-js': ^2.76.1
 
   '@supabase/storage-js@2.85.0':
     resolution: {integrity: sha512-n+XtubmOnM2/8wthauMlCJLu8a7YUTDnCkMcKhty5Y8qcVpYtfBOruV9/Akvh1cl6SwPDs2cWjD6nBKTd7lPNQ==}
@@ -2992,10 +2992,6 @@ packages:
   cookie-signature@1.2.2:
     resolution: {integrity: sha512-D76uU73ulSXrD1UXF4KE2TMxVVwhsnCgfAyTg9k8P6KGZjlXKrOLe4dJQKI3Bxi5wjesZoFXJWElNWBjPZMbhg==}
     engines: {node: '>=6.6.0'}
-
-  cookie@0.5.0:
-    resolution: {integrity: sha512-YZ3GUyn/o8gfKJlnlX7g7xq4gyO6OSuhGPKaaGssGB2qgDUS0gPgtTvoyZLTt9Ab6dC4hfc9dV5arkvc/OCmrw==}
-    engines: {node: '>= 0.6'}
 
   cookie@0.7.2:
     resolution: {integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==}
@@ -5197,9 +5193,6 @@ packages:
 
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
-
-  ramda@0.29.1:
-    resolution: {integrity: sha512-OfxIeWzd4xdUNxlWhgFazxsA/nl3mS4/jGZI5n00uWOoSSFRhC1b6gl6xvmzUamgmqELraWp0J/qqVlXYPDPyA==}
 
   range-parser@1.2.1:
     resolution: {integrity: sha512-Hrgsx+orqoygnmhFbKaHE6c296J+HTAQXoxEF6gNupROmmGJRoyzfG3ccAveqCBrwr/2yxQ5BVd/GTl5agOwSg==}
@@ -7948,11 +7941,10 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@supabase/ssr@0.1.0(@supabase/supabase-js@2.85.0)':
+  '@supabase/ssr@0.8.0(@supabase/supabase-js@2.85.0)':
     dependencies:
       '@supabase/supabase-js': 2.85.0
-      cookie: 0.5.0
-      ramda: 0.29.1
+      cookie: 1.1.1
 
   '@supabase/storage-js@2.85.0':
     dependencies:
@@ -8952,8 +8944,6 @@ snapshots:
   convert-source-map@2.0.0: {}
 
   cookie-signature@1.2.2: {}
-
-  cookie@0.5.0: {}
 
   cookie@0.7.2: {}
 
@@ -11704,8 +11694,6 @@ snapshots:
     optional: true
 
   queue-microtask@1.2.3: {}
-
-  ramda@0.29.1: {}
 
   range-parser@1.2.1: {}
 

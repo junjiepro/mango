@@ -3,7 +3,7 @@
  * 基于 MCP 协议的 v2 架构
  */
 
-import { tool } from 'https://esm.sh/ai';
+import { tool } from 'https://esm.sh/ai@5.0.110';
 import { z } from 'https://esm.sh/zod@3.23.8';
 
 /** MiniApp 工具上下文 */
@@ -92,25 +92,22 @@ async function callMiniAppMCP(
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${serviceKey}`,
+    Authorization: `Bearer ${serviceKey}`,
   };
   if (userId) {
     headers['X-User-Id'] = userId;
   }
 
-  const response = await fetch(
-    `${supabaseUrl}/functions/v1/miniapp-mcp/mcp/${miniAppId}`,
-    {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: Date.now(),
-        method,
-        params,
-      }),
-    }
-  );
+  const response = await fetch(`${supabaseUrl}/functions/v1/miniapp-mcp/mcp/${miniAppId}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method,
+      params,
+    }),
+  });
 
   if (!response.ok) {
     throw new Error(`MCP 请求失败: ${response.statusText}`);
@@ -195,11 +192,22 @@ export function createCreateMiniAppTool(ctx: MiniAppToolContext) {
       description: z.string().describe('功能描述'),
       code: z.string().describe('MCP 格式的 JavaScript 代码'),
       skill: z.string().describe('Skill 使用指南（Markdown 格式，告诉 Agent 如何使用此小应用）'),
-      html: z.record(z.string()).optional().describe('UI 资源对象，key 为资源名，value 为 HTML 内容。如 {"main":"<!DOCTYPE html>..."}'),
+      html: z
+        .record(z.string())
+        .optional()
+        .describe(
+          'UI 资源对象，key 为资源名，value 为 HTML 内容。如 {"main":"<!DOCTYPE html>..."}'
+        ),
       tags: z.array(z.string()).optional().describe('标签'),
     }),
     execute: async ({ name, display_name, description, code, skill, html, tags }) => {
-      console.log('create_miniapp called with:', { name, display_name, description: description?.substring(0, 50), hasCode: !!code, hasSkill: !!skill });
+      console.log('create_miniapp called with:', {
+        name,
+        display_name,
+        description: description?.substring(0, 50),
+        hasCode: !!code,
+        hasSkill: !!skill,
+      });
 
       try {
         // 验证必填参数
@@ -270,13 +278,17 @@ ID: ${miniApp.id}
 /**
  * 计算内容哈希
  */
-function calculateContentHash(code: string, skillContent: string, html?: Record<string, string>): string {
+function calculateContentHash(
+  code: string,
+  skillContent: string,
+  html?: Record<string, string>
+): string {
   const content = `${code || ''}|${skillContent || ''}|${JSON.stringify(html || {})}`;
   // 简单哈希实现
   let hash = 0;
   for (let i = 0; i < content.length; i++) {
     const char = content.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash;
   }
   return Math.abs(hash).toString(16);
@@ -308,8 +320,9 @@ async function createVersionRecord(
   }
 
   // 生成新版本号
-  const { data: versionData } = await supabase
-    .rpc('generate_next_mini_app_version', { p_mini_app_id: miniAppId });
+  const { data: versionData } = await supabase.rpc('generate_next_mini_app_version', {
+    p_mini_app_id: miniAppId,
+  });
 
   const newVersion = versionData || '1.0.1';
 
@@ -348,10 +361,19 @@ export function createUpdateMiniAppTool(ctx: MiniAppToolContext) {
         description: z.string().optional(),
         code: z.string().optional(),
         skill: z.string().optional().describe('Skill 使用指南'),
-        html: z.record(z.string()).optional().describe('UI 资源。整体替换时传完整对象；增量操作时传要新增/更新的资源'),
-        html_mode: z.enum(['replace', 'merge', 'delete']).optional()
-          .describe('html 更新模式：replace=整体替换(默认)，merge=合并(新增/更新指定key，保留其他)，delete=删除指定key'),
-        html_delete_keys: z.array(z.string()).optional()
+        html: z
+          .record(z.string())
+          .optional()
+          .describe('UI 资源。整体替换时传完整对象；增量操作时传要新增/更新的资源'),
+        html_mode: z
+          .enum(['replace', 'merge', 'delete'])
+          .optional()
+          .describe(
+            'html 更新模式：replace=整体替换(默认)，merge=合并(新增/更新指定key，保留其他)，delete=删除指定key'
+          ),
+        html_delete_keys: z
+          .array(z.string())
+          .optional()
           .describe('html_mode=delete 时，要删除的资源 key 列表'),
         tags: z.array(z.string()).optional(),
         status: z.enum(['active', 'suspended']).optional(),
@@ -389,7 +411,13 @@ export function createUpdateMiniAppTool(ctx: MiniAppToolContext) {
         }
 
         // 映射字段名：Agent schema 用 skill，数据库字段是 skill_content
-        const { skill: skillValue, html: htmlValue, html_mode: htmlMode, html_delete_keys: htmlDeleteKeys, ...restUpdates } = updates;
+        const {
+          skill: skillValue,
+          html: htmlValue,
+          html_mode: htmlMode,
+          html_delete_keys: htmlDeleteKeys,
+          ...restUpdates
+        } = updates;
         const dbUpdates: Record<string, unknown> = {
           ...restUpdates,
           updated_at: new Date().toISOString(),
@@ -414,10 +442,7 @@ export function createUpdateMiniAppTool(ctx: MiniAppToolContext) {
         }
 
         // 执行更新
-        const { error } = await supabase
-          .from('mini_apps')
-          .update(dbUpdates)
-          .eq('id', miniAppId);
+        const { error } = await supabase.from('mini_apps').update(dbUpdates).eq('id', miniAppId);
 
         if (error) throw new Error(error.message);
 

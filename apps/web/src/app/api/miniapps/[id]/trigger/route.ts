@@ -161,7 +161,7 @@ export async function POST(
       {
         installation_id: installation.id,
         key: '_trigger_config',
-        value: triggerConfig,
+        value: triggerConfig as unknown as import('@/types/database.types').Json,
         value_type: 'json',
         metadata: {
           updated_at: new Date().toISOString(),
@@ -186,7 +186,7 @@ export async function POST(
       details: {
         installation_id: installation.id,
         trigger_config: triggerConfig,
-      },
+      } as unknown as import('@/types/database.types').Json,
     })
 
     logger.info('Trigger config saved', {

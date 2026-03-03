@@ -51,11 +51,11 @@ export class SharingService {
       .single()
 
     if (fetchError || !miniApp) {
-      throw new AppError('Mini app not found', ErrorType.NOT_FOUND, 404)
+      throw new AppError('Mini app not found', ErrorType.RESOURCE_NOT_FOUND, 404)
     }
 
     if (!miniApp.is_shareable) {
-      throw new AppError('This mini app is not shareable', ErrorType.VALIDATION_ERROR, 400)
+      throw new AppError('This mini app is not shareable', ErrorType.VALIDATION_FAILED, 400)
     }
 
     // 验证所有权（只有创建者可以分享）
@@ -114,17 +114,17 @@ export class SharingService {
       .single()
 
     if (linkError || !shareLink) {
-      throw new AppError('Invalid share link', ErrorType.NOT_FOUND, 404)
+      throw new AppError('Invalid share link', ErrorType.RESOURCE_NOT_FOUND, 404)
     }
 
     // 检查是否过期
     if (shareLink.expires_at && new Date(shareLink.expires_at) < new Date()) {
-      throw new AppError('Share link has expired', ErrorType.VALIDATION_ERROR, 400)
+      throw new AppError('Share link has expired', ErrorType.VALIDATION_FAILED, 400)
     }
 
     // 检查使用次数
     if (shareLink.max_uses && shareLink.use_count >= shareLink.max_uses) {
-      throw new AppError('Share link has reached maximum uses', ErrorType.VALIDATION_ERROR, 400)
+      throw new AppError('Share link has reached maximum uses', ErrorType.VALIDATION_FAILED, 400)
     }
 
     // 获取小应用信息
@@ -135,7 +135,7 @@ export class SharingService {
       .single()
 
     if (appError || !miniApp) {
-      throw new AppError('Mini app not found', ErrorType.NOT_FOUND, 404)
+      throw new AppError('Mini app not found', ErrorType.RESOURCE_NOT_FOUND, 404)
     }
 
     return { mini_app: miniApp, share_link: shareLink }
@@ -167,7 +167,7 @@ export class SharingService {
       .single()
 
     if (existing) {
-      throw new AppError('Mini app already installed', ErrorType.VALIDATION_ERROR, 400)
+      throw new AppError('Mini app already installed', ErrorType.VALIDATION_FAILED, 400)
     }
 
     // 验证权限
@@ -180,7 +180,7 @@ export class SharingService {
     if (missingPermissions.length > 0) {
       throw new AppError(
         `Missing required permissions: ${missingPermissions.join(', ')}`,
-        ErrorType.VALIDATION_ERROR,
+        ErrorType.VALIDATION_FAILED,
         400
       )
     }
@@ -283,7 +283,7 @@ export class SharingService {
       .single()
 
     if (fetchError || !shareLink) {
-      throw new AppError('Share link not found', ErrorType.NOT_FOUND, 404)
+      throw new AppError('Share link not found', ErrorType.RESOURCE_NOT_FOUND, 404)
     }
 
     if (shareLink.created_by !== user.id) {

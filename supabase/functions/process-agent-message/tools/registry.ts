@@ -3,7 +3,7 @@
  * 工具注册和管理
  */
 
-import { tool } from 'https://esm.sh/ai';
+import { tool } from 'https://esm.sh/ai@5.0.110';
 import { z } from 'https://esm.sh/zod@3.23.8';
 
 /**

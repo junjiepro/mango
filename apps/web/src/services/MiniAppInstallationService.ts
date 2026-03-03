@@ -59,7 +59,7 @@ export class MiniAppInstallationService {
 
     // 如果已有激活的安装记录,抛出错误
     if (existing && existing.status === 'active') {
-      throw new AppError('Mini app already installed', ErrorType.VALIDATION_ERROR, 400);
+      throw new AppError('Mini app already installed', ErrorType.VALIDATION_FAILED, 400);
     }
 
     // 如果有已卸载的记录,恢复它
@@ -110,7 +110,7 @@ export class MiniAppInstallationService {
     if (missingPermissions.length > 0) {
       throw new AppError(
         `Missing required permissions: ${missingPermissions.join(', ')}`,
-        ErrorType.VALIDATION_ERROR,
+        ErrorType.VALIDATION_FAILED,
         400
       );
     }
@@ -262,7 +262,7 @@ export class MiniAppInstallationService {
       .single();
 
     if (fetchError || !existing) {
-      throw new AppError('Installation not found', ErrorType.NOT_FOUND, 404);
+      throw new AppError('Installation not found', ErrorType.RESOURCE_NOT_FOUND, 404);
     }
 
     if (existing.user_id !== user.id) {
@@ -331,7 +331,7 @@ export class MiniAppInstallationService {
       .single();
 
     if (fetchError || !existing) {
-      throw new AppError('Installation not found', ErrorType.NOT_FOUND, 404);
+      throw new AppError('Installation not found', ErrorType.RESOURCE_NOT_FOUND, 404);
     }
 
     if (existing.user_id !== user.id) {
@@ -402,7 +402,7 @@ export class MiniAppInstallationService {
       .single();
 
     if (fetchError || !installation) {
-      throw new AppError('Installation not found', ErrorType.NOT_FOUND, 404);
+      throw new AppError('Installation not found', ErrorType.RESOURCE_NOT_FOUND, 404);
     }
 
     const stats = (installation.stats as any) || {};

@@ -54,7 +54,7 @@ export async function POST(
       {
         success: false,
         error: 'Internal server error',
-        type: ErrorType.INTERNAL_ERROR,
+        type: ErrorType.INTERNAL_SERVER_ERROR,
       },
       { status: 500 }
     )
@@ -78,7 +78,7 @@ export async function DELETE(
     const installation = await miniAppInstallationService.getInstallation(params.id)
 
     if (!installation) {
-      throw new AppError('Mini app not installed', ErrorType.NOT_FOUND, 404)
+      throw new AppError('Mini app not installed', ErrorType.RESOURCE_NOT_FOUND, 404)
     }
 
     await miniAppInstallationService.uninstallMiniApp(installation.id, { clearData })
@@ -104,7 +104,7 @@ export async function DELETE(
       {
         success: false,
         error: 'Internal server error',
-        type: ErrorType.INTERNAL_ERROR,
+        type: ErrorType.INTERNAL_SERVER_ERROR,
       },
       { status: 500 }
     )
@@ -143,7 +143,7 @@ export async function GET(
       {
         success: false,
         error: 'Internal server error',
-        type: ErrorType.INTERNAL_ERROR,
+        type: ErrorType.INTERNAL_SERVER_ERROR,
       },
       { status: 500 }
     )

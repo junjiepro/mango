@@ -2,9 +2,7 @@
  * MCP Tools - 初始化和管理 MCP 工具
  */
 
-import { experimental_createMCPClient as createMCPClient } from 'https://esm.sh/@ai-sdk/mcp';
-import { tool } from 'https://esm.sh/ai';
-import { z } from 'https://esm.sh/zod@3.23.8';
+import { experimental_createMCPClient as createMCPClient } from 'https://esm.sh/@ai-sdk/mcp@1.0.23';
 
 /**
  * 初始化 MCP 工具
@@ -62,7 +60,7 @@ export async function initializeMCPTools(
   }
 
   try {
-    await loadDeviceMCPTools(
+    deviceMcpClient = await loadDeviceMCPTools(
       supabase,
       channel,
       messageId,
@@ -87,7 +85,7 @@ async function loadDeviceMCPTools(
   userId: string,
   deviceId: string,
   tools: Record<string, any>
-): Promise<void> {
+): Promise<any | null> {
   console.log(`Loading MCP tools from device: ${deviceId}`);
 
   const { data: bindings, error: bindingsError } = await supabase
@@ -109,11 +107,13 @@ async function loadDeviceMCPTools(
 
   console.log(`Found ${bindings.length} active device bindings`);
 
-  for (const binding of bindings) {
-    await loadToolsFromDevice(binding, channel, messageId, tools);
-  }
+  const firstOne = bindings[0];
+
+  const client = await loadToolsFromDevice(firstOne, channel, messageId, tools);
 
   console.log(`Total MCP tools loaded: ${Object.keys(tools).length}`);
+
+  return client;
 }
 
 /**
@@ -124,7 +124,7 @@ async function loadToolsFromDevice(
   channel: any,
   messageId: string,
   tools: Record<string, any>
-): Promise<void> {
+): Promise<any | null> {
   if (!binding.device_url) {
     console.log(`Skipping binding ${binding.id}: no device URL`);
     return;
@@ -147,14 +147,16 @@ async function loadToolsFromDevice(
   let reachableUrl: string | null = null;
   for (const candidateUrl of urlsToTry) {
     const ok = await checkDeviceHealth(candidateUrl, binding, channel, messageId);
-    if (ok) { reachableUrl = candidateUrl; break; }
+    if (ok) {
+      reachableUrl = candidateUrl;
+      break;
+    }
   }
   if (!reachableUrl) return;
 
   try {
     // 连接 MCP 并加载工具
-    const { experimental_createMCPClient } = await import('https://esm.sh/@ai-sdk/mcp');
-    const mcpClient = await experimental_createMCPClient({
+    const mcpClient = await createMCPClient({
       transport: {
         type: 'http',
         url: `${reachableUrl}/mcp`,
@@ -168,8 +170,12 @@ async function loadToolsFromDevice(
     for (const [name, deviceTool] of Object.entries(deviceTools)) {
       tools[`${binding.device_name}_${name}`] = deviceTool;
     }
+
+    return mcpClient;
   } catch (error) {
     await handleDeviceError(error, binding, channel, messageId);
+
+    return null;
   }
 }
 

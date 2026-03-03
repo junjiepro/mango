@@ -38,7 +38,7 @@ export async function GET(
       {
         success: false,
         error: 'Internal server error',
-        type: ErrorType.INTERNAL_ERROR,
+        type: ErrorType.INTERNAL_SERVER_ERROR,
       },
       { status: 500 }
     )
@@ -86,7 +86,7 @@ export async function PATCH(
       {
         success: false,
         error: 'Internal server error',
-        type: ErrorType.INTERNAL_ERROR,
+        type: ErrorType.INTERNAL_SERVER_ERROR,
       },
       { status: 500 }
     )
@@ -124,7 +124,7 @@ export async function DELETE(
       {
         success: false,
         error: 'Internal server error',
-        type: ErrorType.INTERNAL_ERROR,
+        type: ErrorType.INTERNAL_SERVER_ERROR,
       },
       { status: 500 }
     )

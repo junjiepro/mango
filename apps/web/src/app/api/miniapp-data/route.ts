@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const key = searchParams.get('key');
 
     if (!installation_id) {
-      throw new AppError('Missing installation_id parameter', ErrorType.VALIDATION_ERROR, 400);
+      throw new AppError('Missing installation_id parameter', ErrorType.VALIDATION_FAILED, 400);
     }
 
     let query = supabase.from('mini_app_data').select('*').eq('installation_id', installation_id);
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: 'Internal server error',
-        type: ErrorType.INTERNAL_ERROR,
+        type: ErrorType.INTERNAL_SERVER_ERROR,
       },
       { status: 500 }
     );
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     if (!installation_id || !key || value === undefined) {
       throw new AppError(
         'Missing required fields: installation_id, key, value',
-        ErrorType.VALIDATION_ERROR,
+        ErrorType.VALIDATION_FAILED,
         400
       );
     }
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: 'Internal server error',
-        type: ErrorType.INTERNAL_ERROR,
+        type: ErrorType.INTERNAL_SERVER_ERROR,
       },
       { status: 500 }
     );
@@ -221,7 +221,7 @@ export async function DELETE(request: NextRequest) {
     if (!installation_id || !key) {
       throw new AppError(
         'Missing required parameters: installation_id, key',
-        ErrorType.VALIDATION_ERROR,
+        ErrorType.VALIDATION_FAILED,
         400
       );
     }
@@ -272,7 +272,7 @@ export async function DELETE(request: NextRequest) {
       {
         success: false,
         error: 'Internal server error',
-        type: ErrorType.INTERNAL_ERROR,
+        type: ErrorType.INTERNAL_SERVER_ERROR,
       },
       { status: 500 }
     );
