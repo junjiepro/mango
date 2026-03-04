@@ -31,7 +31,7 @@ export function AudioPreviewer({ file, deviceClient, className = '' }: Previewer
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  const audioUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
+  const audioUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path, deviceClient.bindingCode) : '';
 
   // 播放/暂停
   const togglePlay = useCallback(() => {

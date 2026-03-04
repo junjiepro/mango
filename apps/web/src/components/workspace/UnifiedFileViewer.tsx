@@ -25,6 +25,11 @@ import { PPTPreviewer } from './previews/PPTPreviewer';
 import { MarkdownPreviewer } from './previews/MarkdownPreviewer';
 import { HTMLPreviewer } from './previews/HTMLPreviewer';
 
+// 在模块顶层声明 lazy 组件，避免每次渲染都重新创建
+const FileEditor = lazy(() =>
+  import('./FileEditor.optimized').then((module) => ({ default: module.FileEditor }))
+);
+
 type ViewMode = 'editor' | 'preview';
 
 interface UnifiedFileViewerProps {
@@ -127,12 +132,8 @@ export function UnifiedFileViewer({
 
   // 渲染编辑器
   const renderEditor = () => {
-    // 动态导入 FileEditor 避免循环依赖
-    const FileEditor = lazy(() =>
-      import('./FileEditor.optimized').then((module) => ({ default: module.FileEditor }))
-    );
     return (
-      <Suspense fallback={<div>Loading editor...</div>}>
+      <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground">Loading editor...</div>}>
         <FileEditor
           key={file.path}
           file={file}

@@ -218,6 +218,7 @@ export function isBinaryFile(filename: string): boolean {
 /**
  * 构建文件 URL（直接访问 CLI 设备）
  */
-export function buildFileUrl(deviceUrl: string, filePath: string): string {
-  return `${deviceUrl}/files/download?path=${encodeURIComponent(filePath)}`;
+export function buildFileUrl(deviceUrl: string, filePath: string, token?: string): string {
+  const url = `${deviceUrl}/files/download?path=${encodeURIComponent(filePath)}`;
+  return token ? `${url}&token=${encodeURIComponent(token)}` : url;
 }

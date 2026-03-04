@@ -24,7 +24,7 @@ export function PDFPreviewer({ file, deviceClient, className = '' }: PreviewerPr
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
   const blobUrlRef = useRef<string | null>(null);
-  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
+  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path, deviceClient.bindingCode) : '';
 
   // 加载 PDF 文件
   const loadPDF = useCallback(async () => {

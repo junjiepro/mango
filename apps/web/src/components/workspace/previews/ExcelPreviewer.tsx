@@ -179,7 +179,7 @@ export function ExcelPreviewer({ file, deviceClient, className = '' }: Previewer
 
   const containerRef = useRef<HTMLDivElement>(null);
   const luckyContainerId = useRef(`luckysheet-${Date.now()}`);
-  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
+  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path, deviceClient.bindingCode) : '';
 
   // 当前工作表数据
   const rawData = allSheetsData[currentSheetIndex] || [];

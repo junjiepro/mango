@@ -22,7 +22,7 @@ export function WordPreviewer({ file, deviceClient, className = '' }: PreviewerP
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
+  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path, deviceClient.bindingCode) : '';
 
   // 加载并转换文档
   const loadDocument = useCallback(async () => {

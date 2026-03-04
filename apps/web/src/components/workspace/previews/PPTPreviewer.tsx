@@ -26,7 +26,7 @@ export function PPTPreviewer({ file, deviceClient, className = '' }: PreviewerPr
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
+  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path, deviceClient.bindingCode) : '';
   const extension = getFileExtension(file.name);
 
   // 尝试解析 PPT 基本信息

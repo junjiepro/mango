@@ -39,7 +39,7 @@ export function ImagePreviewer({ file, deviceClient, className = '' }: Previewer
   const imageRef = useRef<HTMLImageElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
 
-  const imageUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
+  const imageUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path, deviceClient.bindingCode) : '';
 
   // 重置视图
   const resetView = useCallback(() => {

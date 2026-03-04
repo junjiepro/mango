@@ -33,7 +33,7 @@ export function HTMLPreviewer({ file, deviceClient, className = '' }: PreviewerP
   const [key, setKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
+  const fileUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path, deviceClient.bindingCode) : '';
 
   // 加载文件内容（用于源码视图）
   useEffect(() => {

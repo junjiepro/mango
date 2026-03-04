@@ -43,7 +43,7 @@ export function VideoPreviewer({ file, deviceClient, className = '' }: Previewer
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const videoUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path) : '';
+  const videoUrl = deviceClient ? buildFileUrl(deviceClient.deviceUrl, file.path, deviceClient.bindingCode) : '';
 
   // 播放/暂停
   const togglePlay = useCallback(() => {
