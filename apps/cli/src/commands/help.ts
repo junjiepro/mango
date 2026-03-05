@@ -28,16 +28,16 @@ export function showHelp(): void {
 
   console.log(t('help.examples'));
   console.log(t('help.exDefaultStart'));
-  console.log('  mango-cli start\n');
+  console.log('  mango-ai-cli start\n');
 
   console.log(t('help.exPortStart'));
-  console.log('  mango-cli start --port 3200\n');
+  console.log('  mango-ai-cli start --port 3200\n');
 
   console.log(t('help.exNoBrowser'));
-  console.log('  mango-cli start --ignore-open-bind-url\n');
+  console.log('  mango-ai-cli start --ignore-open-bind-url\n');
 
   console.log(t('help.exStatus'));
-  console.log('  mango-cli status\n');
+  console.log('  mango-ai-cli status\n');
 
   console.log(t('help.moreInfo'));
   console.log(t('help.docs'));

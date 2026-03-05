@@ -29,7 +29,7 @@ Mango 智能Agent对话平台的命令行工具，用于启动设备服务、管
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/your-org/mango.git
+git clone https://github.com/junjiepro/mango.git
 cd mango
 
 # 2. 安装依赖
@@ -47,10 +47,10 @@ pnpm link --global
 
 ```bash
 # 使用 npm
-npm install -g @mango/cli
+npm install -g mango-ai-cli
 
 # 使用 pnpm
-pnpm add -g @mango/cli
+pnpm add -g mango-ai-cli
 ```
 
 ### 安装 Cloudflare Tunnel（推荐）
@@ -77,13 +77,13 @@ cloudflared --version
 
 ```bash
 # 使用默认配置启动
-mango-cli start
+mango-ai-cli start
 
 # 指定端口启动
-mango-cli start --port 3200
+mango-ai-cli start --port 3200
 
 # 不自动打开浏览器
-mango-cli start --ignore-open-bind-url
+mango-ai-cli start --ignore-open-bind-url
 ```
 
 启动后，CLI 会：
@@ -115,7 +115,7 @@ CLI 会自动加载并启动配置的 MCP 服务。
 ### `start` - 启动设备服务
 
 ```bash
-mango-cli start [options]
+mango-ai-cli start [options]
 ```
 
 **选项:**
@@ -131,22 +131,22 @@ mango-cli start [options]
 
 ```bash
 # 基本使用
-mango-cli start
+mango-ai-cli start
 
 # 自定义端口
-mango-cli start --port 3200
+mango-ai-cli start --port 3200
 
 # 指定 Mango 应用 URL
-mango-cli start --app-url https://mango.example.com
+mango-ai-cli start --app-url https://mango.example.com
 
 # 不创建 Tunnel（仅本地访问）
-mango-cli start --no-tunnel
+mango-ai-cli start --no-tunnel
 ```
 
 ### `status` - 查看设备状态
 
 ```bash
-mango-cli status
+mango-ai-cli status
 ```
 
 显示信息：
@@ -158,21 +158,21 @@ mango-cli status
 ### `version` - 显示版本信息
 
 ```bash
-mango-cli version
+mango-ai-cli version
 ```
 
 ### `help` - 显示帮助信息
 
 ```bash
-mango-cli help
+mango-ai-cli help
 ```
 
 ## 配置文件
 
 CLI 会在以下位置存储配置：
 
-- **Windows**: `%USERPROFILE%\.mango-cli\`
-- **macOS/Linux**: `~/.mango-cli/`
+- **Windows**: `%USERPROFILE%\.mango-ai-cli\`
+- **macOS/Linux**: `~/.mango-ai-cli/`
 
 配置文件包括：
 - `device-secret.json` - 设备密钥
@@ -233,7 +233,7 @@ export DEVICE_SECRET=your-device-secret
 
 3. 使用 `--no-tunnel` 选项跳过 Tunnel 创建:
    ```bash
-   mango-cli start --no-tunnel
+   mango-ai-cli start --no-tunnel
    ```
 
 ### 问题: 设备绑定失败
@@ -312,5 +312,5 @@ MIT License - 详见 [LICENSE](../../LICENSE) 文件
 ## 支持
 
 - 📖 文档: https://docs.mango.example.com
-- 💬 讨论: https://github.com/your-org/mango/discussions
-- 🐛 问题反馈: https://github.com/your-org/mango/issues
+- 💬 讨论: https://github.com/junjiepro/mango/discussions
+- 🐛 问题反馈: https://github.com/junjiepro/mango/issues

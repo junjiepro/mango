@@ -150,13 +150,13 @@ jobs:
         run: pnpm --filter @mango/shared build
 
       - name: Build CLI
-        run: pnpm --filter @mango/cli build
+        run: pnpm --filter mango-ai-cli build
 
       - name: Check if version already published
         id: version-check
         run: |
           PACKAGE_VERSION=$(node -p "require('./apps/cli/package.json').version")
-          PUBLISHED=$(npm view @mango/cli@$PACKAGE_VERSION version 2>/dev/null || echo "not-found")
+          PUBLISHED=$(npm view mango-ai-cli@$PACKAGE_VERSION version 2>/dev/null || echo "not-found")
           if [ "$PUBLISHED" = "$PACKAGE_VERSION" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
             echo "Version $PACKAGE_VERSION already published, skipping"

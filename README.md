@@ -353,5 +353,5 @@ Agent 识别用户意图
 
 ## 联系方式
 
-- GitHub: https://github.com/your-org/mango
+- GitHub: https://github.com/junjiepro/mango
 - 文档: [specs/](./specs/)

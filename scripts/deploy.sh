@@ -183,19 +183,19 @@ deploy_cli() {
   cd "$PROJECT_ROOT"
 
   pnpm --filter @mango/shared build
-  pnpm --filter @mango/cli build
+  pnpm --filter mango-ai-cli build
 
   cd "$PROJECT_ROOT/apps/cli"
   local VERSION
   VERSION=$(extract_version "./package.json")
 
   # 检查版本是否已发布
-  if npm view "@mango/cli@$VERSION" version &>/dev/null; then
+  if npm view "mango-ai-cli@$VERSION" version &>/dev/null; then
     log_warn "版本 $VERSION 已发布，跳过"
     return
   fi
 
-  log_info "发布 @mango/cli@$VERSION..."
+  log_info "发布 mango-ai-cli@$VERSION..."
   npm publish --access public
 
   log_ok "CLI v$VERSION 发布成功"

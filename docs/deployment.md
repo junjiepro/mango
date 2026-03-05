@@ -35,7 +35,7 @@ CI 通过后，`.github/workflows/deploy.yml` 自动触发，包含以下 Job：
 | `deploy-supabase-migrations` | check-ci | 数据库迁移 |
 | `deploy-supabase-functions` | migrations | matrix 并行部署 8 个 Edge Functions |
 | `deploy-web` | migrations | 等待 Vercel 部署 + 健康检查 |
-| `publish-cli` | check-ci | npm publish @mango/cli |
+| `publish-cli` | check-ci | npm publish mango-ai-cli |
 
 ### 需要配置的 GitHub Secrets
 
@@ -75,10 +75,10 @@ export SUPABASE_PROJECT_REF="your-project-ref"
 
 ## 3. CLI npm 发布
 
-`@mango/cli` 通过 npm 发布，支持全局安装：
+`mango-ai-cli` 通过 npm 发布，支持全局安装：
 
 ```bash
-npm install -g @mango/cli
+npm install -g mango-ai-cli
 ```
 
 发布前确保：
@@ -111,7 +111,7 @@ Web 应用通过 Vercel GitHub Integration 自动部署：
 | 数据库 | 编写反向迁移 SQL，走正常 PR 流程 |
 | Edge Functions | 手动触发 deploy.yml 或本地 `pnpm deploy:functions` |
 | Vercel | Dashboard 内置 Instant Rollback |
-| CLI | `npm unpublish @mango/cli@x.x.x` 或发布修复版本 |
+| CLI | `npm unpublish mango-ai-cli@x.x.x` 或发布修复版本 |
 
 ---
 
@@ -121,4 +121,4 @@ Web 应用通过 Vercel GitHub Integration 自动部署：
 2. 本地 `pnpm deploy:functions` 测试函数部署
 3. 本地 `pnpm deploy:cli` 测试 npm 发布（可先用 `--dry-run`）
 4. 推送到 main，观察 CI → Deploy 流水线自动触发
-5. `npm info @mango/cli` 确认 CLI 包已发布
+5. `npm info mango-ai-cli` 确认 CLI 包已发布

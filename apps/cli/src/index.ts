@@ -36,7 +36,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const program = new Command();
 
-program.name('mango-cli').description(t('app.description')).version('0.1.0');
+program.name('mango-ai-cli').description(t('app.description')).version('0.1.0');
 
 // Start command
 program
