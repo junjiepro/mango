@@ -86,7 +86,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Build skill manifest
-        run: pnpm --filter @mango/shared exec ts-node ../../scripts/build-skill-manifest.ts
+        run: pnpm --filter @mango/shared exec tsx ../../scripts/build-skill-manifest.ts
 
       - name: Check build artifacts
         run: |
