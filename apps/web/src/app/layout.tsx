@@ -3,6 +3,8 @@ import './globals.css';
 import { Toaster } from '@/components/ui/sonner';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
+import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Analytics } from '@vercel/analytics/react';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('common');
@@ -27,6 +29,8 @@ export default async function RootLayout({
           {children}
           <Toaster />
         </NextIntlClientProvider>
+        <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
