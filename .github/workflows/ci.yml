@@ -81,6 +81,9 @@ jobs:
 
       - name: Build all packages
         run: pnpm build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Build skill manifest
         run: pnpm --filter @mango/shared exec ts-node ../../scripts/build-skill-manifest.ts
