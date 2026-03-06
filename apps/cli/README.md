@@ -77,7 +77,7 @@ cloudflared --version
 
 ```bash
 # 使用默认配置启动
-mango-ai-cli start
+mango-ai-cli start --app-url https://mango.example.com
 
 # 指定端口启动
 mango-ai-cli start --port 3200
@@ -87,6 +87,7 @@ mango-ai-cli start --ignore-open-bind-url
 ```
 
 启动后，CLI 会：
+
 1. 生成临时绑定码（6位数字）
 2. 启动本地 HTTP 服务
 3. 创建 Cloudflare Tunnel（如果已安装 cloudflared）
@@ -95,6 +96,7 @@ mango-ai-cli start --ignore-open-bind-url
 ### 2. 完成设备绑定
 
 在浏览器中：
+
 1. 输入临时绑定码
 2. 为设备命名
 3. 点击"绑定设备"
@@ -104,6 +106,7 @@ mango-ai-cli start --ignore-open-bind-url
 ### 3. 配置 MCP 服务
 
 在 Mango Web 应用的设备管理页面：
+
 1. 进入"设备设置"
 2. 添加 MCP 服务配置
 3. 保存配置
@@ -130,7 +133,7 @@ mango-ai-cli start [options]
 **示例:**
 
 ```bash
-# 基本使用
+# 基本使用，默认连接本地 Mango 应用
 mango-ai-cli start
 
 # 自定义端口
@@ -150,6 +153,7 @@ mango-ai-cli status
 ```
 
 显示信息：
+
 - 系统信息（平台、主机名、架构）
 - 绑定状态（已绑定设备数量）
 - 绑定详情（设备名称、ID、MCP 服务）
@@ -175,6 +179,7 @@ CLI 会在以下位置存储配置：
 - **macOS/Linux**: `~/.mango-ai-cli/`
 
 配置文件包括：
+
 - `device-secret.json` - 设备密钥
 - `binding-codes.json` - 绑定码配置
 - `mcp-services.json` - MCP 服务配置
@@ -225,6 +230,7 @@ export DEVICE_SECRET=your-device-secret
 **解决方案:**
 
 1. 检查 cloudflared 是否已安装:
+
    ```bash
    cloudflared --version
    ```
@@ -232,6 +238,7 @@ export DEVICE_SECRET=your-device-secret
 2. 检查网络连接
 
 3. 使用 `--no-tunnel` 选项跳过 Tunnel 创建:
+
    ```bash
    mango-ai-cli start --no-tunnel
    ```

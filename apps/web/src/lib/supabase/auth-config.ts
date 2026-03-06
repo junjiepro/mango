@@ -19,7 +19,7 @@ export const authConfig = {
 
   // 流程类型 (PKCE for better security)
   flowType: 'pkce' as const,
-}
+};
 
 /**
  * Auth 相关常量
@@ -51,8 +51,9 @@ export const AUTH_CONSTANTS = {
     '/auth/callback',
     '/auth/reset-password',
     '/auth/verify-email',
+    '/api/config',
   ],
-} as const
+} as const;
 
 /**
  * Auth 错误消息映射
@@ -66,27 +67,27 @@ export const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'Signups not allowed for this instance': '当前不允许注册新用户',
   'Email rate limit exceeded': '邮件发送频率过高，请稍后再试',
   'Invalid refresh token': '会话已过期，请重新登录',
-}
+};
 
 /**
  * 获取友好的错误消息
  */
 export function getAuthErrorMessage(error: string): string {
-  return AUTH_ERROR_MESSAGES[error] || '认证失败，请稍后重试'
+  return AUTH_ERROR_MESSAGES[error] || '认证失败，请稍后重试';
 }
 
 /**
  * 检查路径是否需要认证
  */
 export function isProtectedPath(pathname: string): boolean {
-  return !AUTH_CONSTANTS.PUBLIC_PATHS.some(path =>
-    pathname === path || pathname.startsWith(`${path}/`)
-  )
+  return !AUTH_CONSTANTS.PUBLIC_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  );
 }
 
 /**
  * 获取重定向 URL
  */
 export function getRedirectUrl(type: keyof typeof AUTH_CONSTANTS.REDIRECT_PATHS): string {
-  return AUTH_CONSTANTS.REDIRECT_PATHS[type]
+  return AUTH_CONSTANTS.REDIRECT_PATHS[type];
 }

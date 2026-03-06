@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { join } from 'path';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { deviceSecretManager } from './device-secret.js';
+import axios from 'axios';
 import type { CLIConfig, MCPServiceConfig, StartCommandOptions } from '../types/index.js';
 
 // 加载 .env 文件
@@ -36,10 +37,44 @@ export class ConfigManager {
    * 加载配置
    */
   async loadConfig(options: StartCommandOptions): Promise<CLIConfig> {
+    const appUrl = options.appUrl || process.env.MANGO_APP_URL || 'http://localhost:3000';
+    let supabaseUrl = options.supabaseUrl || process.env.SUPABASE_URL;
+    let supabaseAnonKey = options.supabaseAnonKey || process.env.SUPABASE_ANON_KEY;
+
+    // 如果未提供 Supabase 配置或指定了 appUrl，尝试从缓存或 API 获取
+    if (!supabaseUrl || !supabaseAnonKey || options.appUrl) {
+      const cached = this.readConfig();
+      if (!options.appUrl && cached?.supabaseUrl && cached?.supabaseAnonKey) {
+        supabaseUrl = supabaseUrl || cached.supabaseUrl;
+        supabaseAnonKey = supabaseAnonKey || cached.supabaseAnonKey;
+      } else {
+        // 从 API 获取配置
+        try {
+          const response = await axios.get(`${appUrl}/api/config`, { timeout: 5000 });
+          // 指定 appUrl，则需从 APII 获取
+          if (options.appUrl) {
+            supabaseUrl = response.data.supabaseUrl;
+            supabaseAnonKey = response.data.supabaseAnonKey;
+          } else {
+            supabaseUrl = supabaseUrl || response.data.supabaseUrl;
+            supabaseAnonKey = supabaseAnonKey || response.data.supabaseAnonKey;
+          }
+
+          // 缓存配置
+          this.saveConfig({ appUrl, supabaseUrl, supabaseAnonKey });
+        } catch (error) {
+          throw new Error(
+            `Failed to fetch configuration from ${appUrl}/api/config\n` +
+              'Please ensure the web application is running or provide configuration manually.'
+          );
+        }
+      }
+    }
+
     const rawConfig = {
-      appUrl: options.appUrl || process.env.MANGO_APP_URL || 'http://localhost:3000',
-      supabaseUrl: options.supabaseUrl || process.env.SUPABASE_URL,
-      supabaseAnonKey: options.supabaseAnonKey || process.env.SUPABASE_ANON_KEY,
+      appUrl,
+      supabaseUrl,
+      supabaseAnonKey,
       deviceSecret: options.deviceSecret || process.env.DEVICE_SECRET,
       port: parseInt(options.port || process.env.PORT || '3001'),
     };
@@ -52,9 +87,9 @@ export class ConfigManager {
         throw new Error(
           `Configuration validation failed. Missing or invalid fields: ${missingFields}\n\n` +
             'Please provide configuration via:\n' +
-            '  1. Command line options (--supabase-url, --supabase-anon-key)\n' +
-            '  2. Environment variables (SUPABASE_URL, SUPABASE_ANON_KEY)\n' +
-            '  3. .env file in current directory'
+            '  1. Command line option --app-url (auto-fetch from web)\n' +
+            '  2. Command line options (--supabase-url, --supabase-anon-key)\n' +
+            '  3. Environment variables (SUPABASE_URL, SUPABASE_ANON_KEY)'
         );
       }
       throw error;

@@ -45,8 +45,8 @@ program
   .option('--port <port>', t('options.port'), '3000')
   .option('--ignore-open-bind-url', t('options.ignoreOpenBind'))
   .option('--app-url <url>', 'Mango Web URL', process.env.MANGO_APP_URL)
-  .option('--supabase-url <url>', 'Supabase URL', process.env.SUPABASE_URL)
-  .option('--supabase-anon-key <key>', 'Supabase anon key', process.env.SUPABASE_ANON_KEY)
+  .option('--supabase-url <url>', 'Supabase URL (optional, auto-fetch from app-url)', process.env.SUPABASE_URL)
+  .option('--supabase-anon-key <key>', 'Supabase anon key (optional, auto-fetch from app-url)', process.env.SUPABASE_ANON_KEY)
   .option('--device-secret <secret>', t('options.deviceSecret'), process.env.DEVICE_SECRET)
   .action(async (options) => {
     await startDeviceService(options);
