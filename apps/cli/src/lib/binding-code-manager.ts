@@ -287,7 +287,6 @@ export class BindingCodeManager {
 
         next[k] = {
           ...raw[k],
-          workspaceDir: raw[k].workspaceDir || this.getDefaultWorkspaceDir(k),
         };
 
         const workingDir = next[k].workspaceDir;

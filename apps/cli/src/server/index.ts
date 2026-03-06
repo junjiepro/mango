@@ -238,12 +238,30 @@ export function createServer(config: CLIConfig) {
         hostname,
         temp_code,
         mcp_services,
+        mcpServices,
         workspace_dir,
+        workspaceDir,
         binding_data_dir,
+        bindingDataDir,
       } = body;
+      // 规范化字段名为驼峰命名
       const rest = { ...body };
       delete rest.binding_code;
       delete rest.temp_code;
+
+      // 统一使用驼峰命名
+      if (workspaceDir || workspace_dir) {
+        rest.workspaceDir = workspaceDir || workspace_dir;
+        delete rest.workspace_dir;
+      }
+      if (bindingDataDir || binding_data_dir) {
+        rest.bindingDataDir = bindingDataDir || binding_data_dir;
+        delete rest.binding_data_dir;
+      }
+      if (mcpServices || mcp_services) {
+        rest.mcpServices = mcpServices || mcp_services;
+        delete rest.mcp_services;
+      }
 
       // 验证必需字段
       if (!binding_code) {
@@ -252,7 +270,7 @@ export function createServer(config: CLIConfig) {
 
       console.log('Received binding configuration:', rest, binding_code);
 
-      // 保存完整的绑定配置
+      // 保存完整的绑定配置（支持驼峰和下划线命名）
       bindingCodeManager.saveConfig(binding_code, rest, {
         bindingCode: binding_code,
         deviceId: device_id,
@@ -260,14 +278,14 @@ export function createServer(config: CLIConfig) {
         boundAt: new Date().toISOString(),
         lastUsedAt: new Date().toISOString(),
         userId: user_id,
-        workspaceDir: workspace_dir,
-        bindingDataDir: binding_data_dir,
+        workspaceDir: workspaceDir || workspace_dir,
+        bindingDataDir: bindingDataDir || binding_data_dir,
         metadata: {
           platform: platform || process.platform,
           hostname: hostname || os.hostname(),
           arch: os.arch(),
         },
-        mcpServices: mcp_services,
+        mcpServices: mcpServices || mcp_services,
       });
 
       // 如果提供了 temp_code，标记为已使用并清理 Channel
