@@ -4,11 +4,8 @@
  * Supports streaming responses via Realtime Channel
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js';
-import { createOpenAICompatible } from 'https://esm.sh/@ai-sdk/openai-compatible@1.0.29';
-import { gateway } from 'https://esm.sh/@ai-sdk/gateway@2.0.20';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import {
-  createProviderRegistry,
   tool,
   stepCountIs,
   ModelMessage,
@@ -42,30 +39,9 @@ import {
   createGetMiniAppVersionsTool,
   createRollbackMiniAppTool,
 } from './tools/miniapp.ts';
+import { combinedLanguageModel } from './lib/registry.ts';
 
 const corsHeaders = CORS_HEADERS;
-
-const registry = createProviderRegistry({
-  pollinations: createOpenAICompatible({
-    apiKey: Deno.env.get('POLLINATIONS_API_KEY'),
-    baseURL: 'https://gen.pollinations.ai/v1',
-    name: 'pollinations',
-  }),
-
-  openrouter: createOpenAICompatible({
-    apiKey: Deno.env.get('OPENROUTER_API_KEY'),
-    baseURL: 'https://openrouter.ai/api/v1',
-    name: 'openrouter',
-  }),
-
-  openai: createOpenAICompatible({
-    apiKey: Deno.env.get('OPENAI_API_KEY'),
-    baseURL: Deno.env.get('OPENAI_API_BASE') || 'https://api.openai.com/v1',
-    name: 'openai',
-  }),
-
-  gateway,
-});
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -586,7 +562,7 @@ ${mcpTools.length > 0 ? `- 可用工具: ${mcpTools.map((t: any) => t.name).join
     console.log('Tools count', Object.keys(allTools).length);
 
     const mangoAgent = new Agent({
-      model: registry.languageModel('pollinations:gemini-fast'),
+      model: combinedLanguageModel,
       tools: allTools,
       stopWhen: stepCountIs(20),
       prepareStep: () => {

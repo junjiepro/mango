@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { getClient } from '@/lib/supabase/client';
 import { logger } from '@mango/shared/utils';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { AttachmentWithPath } from '@/lib/storage/attachment-utils';
@@ -84,7 +84,7 @@ export function useStreamingMessage(conversationId: string | null) {
     new Map()
   );
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const supabase = createClient();
+  const supabase = getClient();
 
   // 更新流式消息内容
   const updateStreamingMessage = useCallback(

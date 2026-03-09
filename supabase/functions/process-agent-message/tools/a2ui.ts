@@ -7,37 +7,39 @@ import { tool } from 'https://esm.sh/ai@5.0.110';
 import { z } from 'https://esm.sh/zod@3.23.8';
 
 /**
- * A2UI 组件类型
+ * A2UI 组件类型 (使用 z.lazy 支持递归结构)
  */
-const A2UIComponentSchema = z.object({
-  id: z.string(),
-  type: z.enum([
-    'form',
-    'input',
-    'select',
-    'button',
-    'chart',
-    'table',
-    'card',
-    'tabs',
-    'list',
-    'grid',
-    'image',
-    'video',
-    'audio',
-  ]),
-  props: z.record(z.any()),
-  children: z.array(z.any()).optional(),
-  events: z
-    .array(
-      z.object({
-        event: z.string(),
-        action: z.string(),
-        payload: z.record(z.any()).optional(),
-      })
-    )
-    .optional(),
-});
+const A2UIComponentSchema: z.ZodType<any> = z.lazy(() =>
+  z.object({
+    id: z.string(),
+    type: z.enum([
+      'form',
+      'input',
+      'select',
+      'button',
+      'chart',
+      'table',
+      'card',
+      'tabs',
+      'list',
+      'grid',
+      'image',
+      'video',
+      'audio',
+    ]),
+    props: z.record(z.any()),
+    children: z.array(A2UIComponentSchema).optional(),
+    events: z
+      .array(
+        z.object({
+          event: z.string(),
+          action: z.string(),
+          payload: z.record(z.any()).optional(),
+        })
+      )
+      .optional(),
+  })
+);
 
 /**
  * 创建 A2UI 工具
