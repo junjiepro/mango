@@ -109,6 +109,7 @@ export class DeviceSecretManager {
    * 获取配置目录路径
    */
   getConfigDir(): string {
+    this.ensureConfigDir();
     return this.configDir;
   }
 

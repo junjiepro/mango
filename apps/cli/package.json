@@ -1,6 +1,6 @@
 {
   "name": "mango-ai-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "Mango CLI - 智能 Agent 对话平台设备服务",
   "bin": {
