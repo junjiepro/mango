@@ -9,10 +9,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const app = new Hono().basePath('/generate-skill-embedding');
 
 app.post('/extract', async (c) => {
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
+  const supabaseKey =
+    Deno.env.get('MANGO_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, supabaseKey);
 
   const { skill_id, name, description } = await c.req.json();
 
@@ -39,20 +39,17 @@ app.post('/extract', async (c) => {
 
 function extractKeywords(name: string, description: string): string[] {
   const text = `${name || ''} ${description || ''}`.toLowerCase();
-  const words = text.split(/[\s,，。.!！?？]+/).filter(w => w.length > 1);
+  const words = text.split(/[\s,，。.!！?？]+/).filter((w) => w.length > 1);
   return [...new Set(words)].slice(0, 20);
 }
 
 function extractTriggers(description: string): string[] {
   const triggers: string[] = [];
-  const patterns = [
-    /当.*时/g, /如果.*则/g, /用于.*/g,
-    /可以.*/g, /帮助.*/g, /生成.*/g
-  ];
+  const patterns = [/当.*时/g, /如果.*则/g, /用于.*/g, /可以.*/g, /帮助.*/g, /生成.*/g];
 
   for (const p of patterns) {
     const matches = description?.match(p) || [];
-    triggers.push(...matches.map(m => m.slice(0, 20)));
+    triggers.push(...matches.map((m) => m.slice(0, 20)));
   }
 
   return [...new Set(triggers)].slice(0, 10);

@@ -88,7 +88,9 @@ async function callMiniAppMCP(
   userId?: string
 ): Promise<any> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  const serviceKey =
+    Deno.env.get('MANGO_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

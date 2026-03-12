@@ -30,10 +30,10 @@ app.options('*', (c) => c.json({}, 200, corsHeaders));
 app.post('/mcp/:id', async (c) => {
   const miniAppId = c.req.param('id');
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
+  const supabaseKey =
+    Deno.env.get('MANGO_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, supabaseKey);
 
   // 获取 MiniApp
   const { data: miniApp, error } = await supabase
@@ -51,7 +51,7 @@ app.post('/mcp/:id', async (c) => {
   const server = await createMiniAppMCPServer(miniApp, context);
 
   // 处理 MCP 请求
-  const request = await c.req.json() as MCPRequest;
+  const request = (await c.req.json()) as MCPRequest;
   const response = await server.handleRequest(request);
 
   return c.json(response, 200, corsHeaders);
@@ -64,14 +64,16 @@ app.get('/mcp', async (c) => {
     return c.json({ error: 'Unauthorized' }, 401, corsHeaders);
   }
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
+  const supabaseKey =
+    Deno.env.get('MANGO_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, supabaseKey);
 
   // 验证 token 获取用户
   const token = authHeader.replace('Bearer ', '');
-  const { data: { user } } = await supabase.auth.getUser(token);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser(token);
 
   if (!user) {
     return c.json({ error: 'Invalid token' }, 401, corsHeaders);
@@ -98,10 +100,10 @@ app.get('/mcp', async (c) => {
 app.get('/mcp/:id', async (c) => {
   const miniAppId = c.req.param('id');
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
+  const supabaseKey =
+    Deno.env.get('MANGO_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, supabaseKey);
 
   const { data: miniApp } = await supabase
     .from('mini_apps')
@@ -113,12 +115,16 @@ app.get('/mcp/:id', async (c) => {
     return c.json({ error: 'Not found' }, 404, corsHeaders);
   }
 
-  return c.json({
-    name: `mango-miniapp-${miniApp.id}`,
-    version: miniApp.manifest?.version || '1.0.0',
-    protocolVersion: '2024-11-05',
-    description: miniApp.description,
-  }, 200, corsHeaders);
+  return c.json(
+    {
+      name: `mango-miniapp-${miniApp.id}`,
+      version: miniApp.manifest?.version || '1.0.0',
+      protocolVersion: '2024-11-05',
+      description: miniApp.description,
+    },
+    200,
+    corsHeaders
+  );
 });
 
 Deno.serve(app.fetch);

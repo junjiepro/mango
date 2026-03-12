@@ -65,12 +65,15 @@ async function resolveUser(c: Context, supabase: SupabaseClient): Promise<UserIn
 
   // Service-to-service 调用：使用 service_role key 认证时，
   // 通过 X-User-Id header 传递真实用户身份
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const serviceRoleKey =
+    Deno.env.get('MANGO_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const forwardedUserId = c.req.header('X-User-Id');
 
   if (token === serviceRoleKey && forwardedUserId) {
     // 信任内部调用传递的 userId，查询用户基本信息
-    const { data: { user } } = await supabase.auth.admin.getUserById(forwardedUserId);
+    const {
+      data: { user },
+    } = await supabase.auth.admin.getUserById(forwardedUserId);
     if (user) {
       return {
         id: user.id,
@@ -164,7 +167,9 @@ async function resolveInstallationId(
  */
 function assertInstallation(installationId: string | null): asserts installationId is string {
   if (!installationId) {
-    throw new Error('Storage unavailable: user not authenticated. Please log in to use this feature.');
+    throw new Error(
+      'Storage unavailable: user not authenticated. Please log in to use this feature.'
+    );
   }
 }
 
@@ -187,12 +192,15 @@ function createStorageAPI(supabase: SupabaseClient, installationId: string | nul
 
     async set(key: string, value: unknown) {
       assertInstallation(installationId);
-      const { error } = await supabase.from('mini_app_data').upsert({
-        installation_id: installationId,
-        key,
-        value,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'installation_id,key' });
+      const { error } = await supabase.from('mini_app_data').upsert(
+        {
+          installation_id: installationId,
+          key,
+          value,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'installation_id,key' }
+      );
       if (error) {
         throw new Error(`Storage write failed: ${error.message}`);
       }

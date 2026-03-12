@@ -27,10 +27,10 @@ interface LearningRule {
 }
 
 app.post('/extract', async (c) => {
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
+  const supabaseKey =
+    Deno.env.get('MANGO_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, supabaseKey);
 
   const { user_id } = await c.req.json();
 
@@ -102,10 +102,7 @@ function extractRules(feedbacks: FeedbackRecord[]): LearningRule[] {
   return rules;
 }
 
-function groupBy<T>(
-  items: T[],
-  keyFn: (item: T) => string
-): Record<string, T[]> {
+function groupBy<T>(items: T[], keyFn: (item: T) => string): Record<string, T[]> {
   const result: Record<string, T[]> = {};
   for (const item of items) {
     const key = keyFn(item);

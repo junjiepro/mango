@@ -84,10 +84,10 @@ Deno.serve(async (req) => {
     }
 
     // 2. 创建 Supabase 客户端（使用 service role key 以绕过 RLS）
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    const supabaseKey =
+      Deno.env.get('MANGO_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, supabaseKey);
 
     // 3. 验证 binding_code 和 device_id，并更新 device_url
     const now = new Date().toISOString();

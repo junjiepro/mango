@@ -9,10 +9,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const app = new Hono().basePath('/rag-search');
 
 app.post('/search', async (c) => {
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
+  const supabaseKey =
+    Deno.env.get('MANGO_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, supabaseKey);
 
   const { query, user_id, limit = 5 } = await c.req.json();
 

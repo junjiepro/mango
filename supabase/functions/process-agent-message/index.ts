@@ -52,7 +52,8 @@ Deno.serve(async (req) => {
   try {
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseKey =
+      Deno.env.get('MANGO_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Parse request
@@ -188,6 +189,8 @@ async function streamAgentResponse(
     runCount: number;
     partialContent?: string;
     totalTokens?: number;
+    a2uiComponents?: any[];
+    generatedFiles?: AttachmentWithPath[];
   },
   locale?: string
 ): Promise<void> {
@@ -195,7 +198,9 @@ async function streamAgentResponse(
   const runCount = continuationState?.runCount || 1;
   let fullContent = continuationState?.partialContent || '';
   let tokenCount = continuationState?.totalTokens || 0;
-  const a2uiComponents: any[] = [];
+  const a2uiComponents: any[] = continuationState?.a2uiComponents || [];
+  // 流式处理内容块（支持文本和多模态内容）
+  const generatedFiles: AttachmentWithPath[] = continuationState?.generatedFiles || [];
   const toolCallHistory: Array<{ tool: string; status: 'success' | 'error' }> = [];
   let lastToolCall: string | undefined;
 
@@ -256,6 +261,11 @@ async function streamAgentResponse(
         })
     );
 
+    // 继续处理之前的消息
+    if (fullContent) {
+      messages.push({ role: 'assistant', content: fullContent });
+    }
+
     // 加载用户学习上下文
     const learningContext = await loadLearningContext(supabase, userId);
 
@@ -290,9 +300,6 @@ async function streamAgentResponse(
       console.log('Received abort request for message:', messageId);
       abortController.abort();
     });
-
-    // 流式处理内容块（支持文本和多模态内容）
-    const generatedFiles: AttachmentWithPath[] = [];
 
     // 初始化 MCP 工具（包括用户设备的工具）
     console.log('Initializing MCP tools...');
@@ -908,15 +915,19 @@ ${mcpTools.length > 0 ? `- 可用工具: ${mcpTools.map((t: any) => t.name).join
             runCount: runCount + 1,
             partialContent: fullContent,
             totalTokens: tokenCount,
+            a2uiComponents: a2uiComponents.length ? a2uiComponents : undefined,
+            generatedFiles: generatedFiles.length ? generatedFiles : undefined,
           },
         };
 
         // 异步调用自己继续执行
+        const supabaseKey =
+          Deno.env.get('MANGO_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         fetch(`${supabaseUrl}/functions/v1/process-agent-message`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            Authorization: `Bearer ${supabaseKey}`,
           },
           body: JSON.stringify(continuationPayload),
         }).catch((err) => {
