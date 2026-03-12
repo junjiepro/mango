@@ -48,7 +48,12 @@ export class TempBindingManager {
    * 初始化 Supabase 客户端
    */
   initialize(supabaseUrl: string, supabaseAnonKey: string): void {
-    this.supabase = createClient(supabaseUrl, supabaseAnonKey);
+    this.supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      realtime: {
+        timeout: 30000,
+        heartbeatIntervalMs: 30000,
+      },
+    });
   }
 
   /**
@@ -88,7 +93,7 @@ export class TempBindingManager {
   }
 
   /**
-   * 建立 Realtime Channel 并发送设备 URL
+   * 建立 Realtime Channel 并发送设备 URL（含重试）
    */
   async publishDeviceUrls(
     tempCode: string,
@@ -99,51 +104,82 @@ export class TempBindingManager {
       throw new Error('Supabase client not initialized');
     }
 
-    try {
-      // 建立 Realtime Channel
-      const channel = this.supabase.channel(`binding:${tempCode}`);
+    const SUBSCRIBE_TIMEOUT_MS = 30000;
+    const MAX_RETRIES = 3;
 
-      // 保存绑定信息
-      const bindingInfo: TempBindingInfo = {
-        tempCode,
-        channel,
-        deviceUrls,
-        deviceInfo,
-        createdAt: new Date(),
-        isUsed: false,
-      };
+    let lastError: Error | undefined;
 
-      // 监听 Web 端的 URL 请求
-      channel.on('broadcast', { event: 'request_urls' }, async () => {
-        formatter.info(`Received URL request for temp code ${tempCode}, resending device URLs...`);
-        await this.sendDeviceUrls(tempCode);
-      });
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      let channel = this.supabase.channel(`binding:${tempCode}`);
 
-      // 订阅 Channel
-      await new Promise<void>((resolve, reject) => {
-        channel.subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            resolve();
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            reject(new Error(`Channel subscription failed: ${status}`));
-          }
+      try {
+        // 监听 Web 端的 URL 请求
+        channel.on('broadcast', { event: 'request_urls' }, async () => {
+          formatter.info(`Received URL request for temp code ${tempCode}, resending device URLs...`);
+          await this.sendDeviceUrls(tempCode);
         });
-      });
 
-      // 保存到 Map
-      this.bindings.set(tempCode, bindingInfo);
+        // 订阅 Channel，加外部超时保护
+        await Promise.race([
+          new Promise<void>((resolve, reject) => {
+            channel.subscribe((status) => {
+              if (status === 'SUBSCRIBED') {
+                resolve();
+              } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                reject(new Error(`Channel subscription failed: ${status}`));
+              }
+            });
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Channel subscription timed out')),
+              SUBSCRIBE_TIMEOUT_MS
+            )
+          ),
+        ]);
 
-      // 首次发送设备 URL 到 Channel
-      await this.sendDeviceUrls(tempCode);
+        // 保存绑定信息
+        const bindingInfo: TempBindingInfo = {
+          tempCode,
+          channel,
+          deviceUrls,
+          deviceInfo,
+          createdAt: new Date(),
+          isUsed: false,
+        };
+        this.bindings.set(tempCode, bindingInfo);
 
-      formatter.success(`Realtime Channel established: binding:${tempCode}`);
-      formatter.success('Device URLs published to channel');
-      formatter.info('Listening for URL requests from Web...');
-    } catch (error) {
-      throw new Error(
-        `Failed to publish device URLs: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+        // 首次发送设备 URL 到 Channel
+        await this.sendDeviceUrls(tempCode);
+
+        formatter.success(`Realtime Channel established: binding:${tempCode}`);
+        formatter.success('Device URLs published to channel');
+        formatter.info('Listening for URL requests from Web...');
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+        formatter.warning(
+          `Realtime Channel attempt ${attempt}/${MAX_RETRIES} failed: ${lastError.message}`
+        );
+
+        // 清理失败的 channel，避免泄漏
+        try {
+          await this.supabase.removeChannel(channel);
+        } catch {
+          // 忽略清理错误
+        }
+
+        if (attempt < MAX_RETRIES) {
+          const delay = 1000 * attempt;
+          formatter.info(`Retrying in ${delay / 1000}s...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
     }
+
+    throw new Error(
+      `Failed to publish device URLs after ${MAX_RETRIES} attempts: ${lastError?.message}`
+    );
   }
 
   /**
