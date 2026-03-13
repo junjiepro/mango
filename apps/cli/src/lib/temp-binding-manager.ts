@@ -68,9 +68,7 @@ export class TempBindingManager {
    * 获取所有活跃的临时绑定码
    */
   getActiveTempCodes(): string[] {
-    return Array.from(this.bindings.keys()).filter(
-      (code) => !this.bindings.get(code)?.isUsed
-    );
+    return Array.from(this.bindings.keys()).filter((code) => !this.bindings.get(code)?.isUsed);
   }
 
   /**
@@ -110,12 +108,14 @@ export class TempBindingManager {
     let lastError: Error | undefined;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      let channel = this.supabase.channel(`binding:${tempCode}`);
+      const channel = this.supabase.channel(`binding:${tempCode}`);
 
       try {
         // 监听 Web 端的 URL 请求
         channel.on('broadcast', { event: 'request_urls' }, async () => {
-          formatter.info(`Received URL request for temp code ${tempCode}, resending device URLs...`);
+          formatter.info(
+            `Received URL request for temp code ${tempCode}, resending device URLs...`
+          );
           await this.sendDeviceUrls(tempCode);
         });
 

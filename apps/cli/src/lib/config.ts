@@ -63,6 +63,7 @@ export class ConfigManager {
           // 缓存配置
           this.saveConfig({ appUrl, supabaseUrl, supabaseAnonKey });
         } catch (error) {
+          console.error(error);
           throw new Error(
             `Failed to fetch configuration from ${appUrl}/api/config\n` +
               'Please ensure the web application is running or provide configuration manually.'
