@@ -9,6 +9,7 @@
 
 import { randomBytes } from 'crypto';
 import { createClient, RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import { WebSocket as NodeWebSocket } from 'ws';
 import { formatter } from './formatter.js';
 import os from 'os';
 import type { DeviceUrls } from './device-urls.js';
@@ -44,10 +45,22 @@ export class TempBindingManager {
   initialize(supabaseUrl: string, supabaseAnonKey: string): void {
     this.supabase = createClient(supabaseUrl, supabaseAnonKey, {
       realtime: {
+        transport: NodeWebSocket,
         timeout: 30000,
         heartbeatIntervalMs: 30000,
+        logger: (kind: string, message: string, data?: unknown) => {
+          const suffix = data ? ` ${this.stringifyForLog(data)}` : '';
+          formatter.debug(`[realtime:${kind}] ${message}${suffix}`);
+        },
+        heartbeatCallback: (status) => {
+          formatter.debug(`[realtime:heartbeat] ${status}`);
+        },
       },
     });
+
+    formatter.debug(
+      `Realtime initialized for ${supabaseUrl} using ws transport on Node ${process.versions.node}`
+    );
   }
 
   /**
@@ -116,11 +129,15 @@ export class TempBindingManager {
         // 订阅 Channel，加外部超时保护
         await Promise.race([
           new Promise<void>((resolve, reject) => {
-            channel.subscribe((status) => {
+            channel.subscribe((status, err) => {
               if (status === 'SUBSCRIBED') {
                 resolve();
               } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                reject(new Error(`Channel subscription failed: ${status}`));
+                reject(
+                  new Error(
+                    `Channel subscription failed: ${status}${err ? ` - ${this.stringifyForLog(err)}` : ''}`
+                  )
+                );
               }
             });
           }),
@@ -247,6 +264,22 @@ export class TempBindingManager {
     const used = Array.from(this.bindings.values()).filter((b) => b.isUsed).length;
     const active = total - used;
     return { total, active, used };
+  }
+
+  private stringifyForLog(value: unknown): string {
+    if (value instanceof Error) {
+      return value.message;
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
   }
 }
 
