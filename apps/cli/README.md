@@ -77,13 +77,13 @@ cloudflared --version
 
 ```bash
 # 使用默认配置启动
-mango-ai-cli start --app-url https://mango.example.com
+mango start --app-url https://mango.example.com
 
 # 指定端口启动
-mango-ai-cli start --port 3200
+mango start --port 3200
 
 # 不自动打开浏览器
-mango-ai-cli start --ignore-open-bind-url
+mango start --ignore-open-bind-url
 ```
 
 启动后，CLI 会：
@@ -118,7 +118,7 @@ CLI 会自动加载并启动配置的 MCP 服务。
 ### `start` - 启动设备服务
 
 ```bash
-mango-ai-cli start [options]
+mango start [options]
 ```
 
 **选项:**
@@ -134,22 +134,22 @@ mango-ai-cli start [options]
 
 ```bash
 # 基本使用，默认连接本地 Mango 应用
-mango-ai-cli start
+mango start
 
 # 自定义端口
-mango-ai-cli start --port 3200
+mango start --port 3200
 
 # 指定 Mango 应用 URL
-mango-ai-cli start --app-url https://mango.example.com
+mango start --app-url https://mango.example.com
 
 # 不创建 Tunnel（仅本地访问）
-mango-ai-cli start --no-tunnel
+mango start --no-tunnel
 ```
 
 ### `status` - 查看设备状态
 
 ```bash
-mango-ai-cli status
+mango status
 ```
 
 显示信息：
@@ -162,21 +162,21 @@ mango-ai-cli status
 ### `version` - 显示版本信息
 
 ```bash
-mango-ai-cli version
+mango version
 ```
 
 ### `help` - 显示帮助信息
 
 ```bash
-mango-ai-cli help
+mango help
 ```
 
 ## 配置文件
 
 CLI 会在以下位置存储配置：
 
-- **Windows**: `%USERPROFILE%\.mango-ai-cli\`
-- **macOS/Linux**: `~/.mango-ai-cli/`
+- **Windows**: `%USERPROFILE%\.mango\`
+- **macOS/Linux**: `~/.mango/`
 
 配置文件包括：
 
@@ -240,7 +240,7 @@ export DEVICE_SECRET=your-device-secret
 3. 使用 `--no-tunnel` 选项跳过 Tunnel 创建:
 
    ```bash
-   mango-ai-cli start --no-tunnel
+   mango start --no-tunnel
    ```
 
 ### 问题: 设备绑定失败
