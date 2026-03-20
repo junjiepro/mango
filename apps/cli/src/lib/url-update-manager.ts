@@ -10,17 +10,11 @@
  */
 
 import { formatter } from './formatter.js';
-import type { BindingConfig } from './binding-code-manager.js';
+import type { DeviceUrls } from './device-urls.js';
 
 /**
  * 设备 URL 对象
  */
-export interface DeviceUrls {
-  cloudflare_url: string | null;
-  localhost_url: string | null;
-  hostname_url: string | null;
-  tailscale_url?: string | null;
-}
 
 /**
  * 绑定验证状态

@@ -15,20 +15,19 @@ import { bindingCodeManager } from '../lib/binding-code-manager.js';
 import { urlUpdateManager } from '../lib/url-update-manager.js';
 import { getDeviceInfoSummary, getLocalIpAddress, getTailscaleAddress } from '../lib/device-id.js';
 import { acpConnector } from '../lib/connectors/acp-connector.js';
+import {
+  buildDeviceUrls,
+  hasReachableDeviceUrl,
+  requiresSecureDeviceUrls,
+} from '../lib/device-urls.js';
 import open from 'open';
 import type { StartCommandOptions } from '../types/index.js';
 import { deviceSecretManager } from '../lib/device-secret.js';
 
 export let actualPort: number;
-let actualHttpsPort: number | undefined;
+export let actualHttpsPort: number | undefined;
 
 /** 生成 Tailscale URL，HTTPS 可用时使用 https 协议和 HTTPS 端口 */
-function buildTailscaleUrl(addr: string, httpPort: number, httpsPort?: number): string {
-  if (httpsPort) {
-    return `https://${addr}:${httpsPort}`;
-  }
-  return `http://${addr}:${httpPort}`;
-}
 
 /**
  * 启动设备服务
@@ -139,6 +138,15 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     formatter.newline();
     let tunnelUrl: string | null = null;
     const localIp = localIpForCert;
+    const getCurrentDeviceUrls = (currentTunnelUrl: string | null = tunnelUrl) =>
+      buildDeviceUrls({
+        appUrl: config.appUrl,
+        tunnelUrl: currentTunnelUrl,
+        httpPort: actualPort,
+        httpsPort: actualHttpsPort,
+        localIp,
+        tailscaleAddr,
+      });
 
     const cloudflaredInstalled = await tunnelManager.checkCloudflared();
     if (!cloudflaredInstalled) {
@@ -165,14 +173,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
             formatter.info('Tunnel URL changed, updating device bindings...');
 
             // 准备新的设备 URL 信息
-            const newDeviceUrls = {
-              cloudflare_url: newTunnelUrl,
-              localhost_url: `http://localhost:${actualPort}`,
-              hostname_url: `http://${localIp}:${actualPort}`,
-              ...(tailscaleAddr
-                ? { tailscale_url: buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort) }
-                : {}),
-            };
+            const newDeviceUrls = getCurrentDeviceUrls(newTunnelUrl);
 
             const existingConfig = bindingCodeManager.readConfig();
             const bindingCodes: string[] = Object.keys(existingConfig || {});
@@ -202,20 +203,25 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     }
 
     // 5. 初始 URL 更新（如果已绑定）
+    const currentDeviceUrls = getCurrentDeviceUrls();
+    if (requiresSecureDeviceUrls(config.appUrl) && !hasReachableDeviceUrl(currentDeviceUrls)) {
+      formatter.error(
+        `App URL ${config.appUrl} uses HTTPS, but no HTTPS device URL is available for binding`
+      );
+      formatter.error(
+        'Enable the CLI HTTPS endpoint or Cloudflare Tunnel before using the web app over HTTPS'
+      );
+      await cleanup();
+      process.exit(1);
+    }
+
     const updateUrl = async () => {
       formatter.newline();
       const updateSpinner = formatter.spinner('Updating device URLs in database...');
       let allUpdatesSucceeded = true;
 
       // 准备设备 URL 信息
-      const deviceUrls = {
-        cloudflare_url: tunnelUrl,
-        localhost_url: `http://localhost:${actualPort}`,
-        hostname_url: `http://${localIp}:${actualPort}`,
-        ...(tailscaleAddr
-          ? { tailscale_url: buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort) }
-          : {}),
-      };
+      const deviceUrls = getCurrentDeviceUrls();
 
       for (const bindingCode of bindingCodes) {
         const result = await urlUpdateManager.updateDeviceUrlWithRetry(
@@ -249,14 +255,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
       const channelSpinner = formatter.spinner('Establishing Realtime Channel...');
       try {
         // 准备设备 URL 信息
-        const deviceUrls = {
-          cloudflare_url: tunnelUrl,
-          localhost_url: `http://localhost:${actualPort}`,
-          hostname_url: `http://${localIp}:${actualPort}`,
-          ...(tailscaleAddr
-            ? { tailscale_url: buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort) }
-            : {}),
-        };
+        const deviceUrls = getCurrentDeviceUrls();
 
         // 准备设备信息
         const deviceInfoPayload = {
@@ -320,16 +319,17 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     formatter.success('Device service is ready!');
     formatter.newline();
 
-    if (tunnelUrl) {
-      formatter.labeled('Cloudflare URL', tunnelUrl);
+    if (currentDeviceUrls.cloudflare_url) {
+      formatter.labeled('Cloudflare URL', currentDeviceUrls.cloudflare_url);
     }
-    formatter.labeled('Localhost URL', `http://localhost:${actualPort}`);
-    formatter.labeled('Hostname URL', `http://${localIp}:${actualPort}`);
-    if (tailscaleAddr) {
-      formatter.labeled(
-        'Tailscale URL',
-        buildTailscaleUrl(tailscaleAddr, actualPort, actualHttpsPort)
-      );
+    if (currentDeviceUrls.localhost_url) {
+      formatter.labeled('Localhost URL', currentDeviceUrls.localhost_url);
+    }
+    if (currentDeviceUrls.hostname_url) {
+      formatter.labeled('Hostname URL', currentDeviceUrls.hostname_url);
+    }
+    if (currentDeviceUrls.tailscale_url) {
+      formatter.labeled('Tailscale URL', currentDeviceUrls.tailscale_url);
     }
 
     // 只在未绑定时显示绑定 URL

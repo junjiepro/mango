@@ -11,11 +11,12 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { getBrowserSafeDeviceUrls } from '@/lib/device-urls';
 
 export interface DeviceUrls {
   cloudflare_url: string | null;
-  localhost_url: string;
-  hostname_url: string;
+  localhost_url: string | null;
+  hostname_url: string | null;
   tailscale_url?: string | null;
 }
 
@@ -131,12 +132,16 @@ export function useDeviceBinding(tempCode: string | null) {
     }));
 
     // 按优先级遍历所有 URL，找到第一个可达的
-    const urlsToTry = [
-      urls.cloudflare_url,
-      urls.tailscale_url,
-      urls.hostname_url,
-      urls.localhost_url,
-    ].filter(Boolean) as string[];
+    const urlsToTry = getBrowserSafeDeviceUrls(urls);
+
+    if (urlsToTry.length === 0) {
+      setState((prev) => ({
+        ...prev,
+        healthCheckStatus: 'failed',
+        error: 'No browser-safe device URL is available for this page',
+      }));
+      return;
+    }
 
     for (const urlToCheck of urlsToTry) {
       try {
@@ -161,7 +166,7 @@ export function useDeviceBinding(tempCode: string | null) {
     setState((prev) => ({
       ...prev,
       healthCheckStatus: 'failed',
-      error: 'All device URLs unreachable',
+      error: 'All browser-safe device URLs are unreachable',
     }));
   };
 

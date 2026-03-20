@@ -12,7 +12,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, CheckCircle2, XCircle, Wifi, WifiOff } from 'lucide-react';
 import { useDeviceBinding } from '@/hooks/useDeviceBinding';
 import { createClient } from '@/lib/supabase/client';
+import { getPreferredBrowserSafeDeviceUrl } from '@/lib/device-urls';
 
 export default function DeviceBindPage() {
   const router = useRouter();
@@ -43,6 +44,7 @@ export default function DeviceBindPage() {
     error: channelError,
     retryHealthCheck,
   } = useDeviceBinding(tempCode);
+  const selectedDeviceUrl = deviceUrls ? getPreferredBrowserSafeDeviceUrl(deviceUrls) : null;
 
   const handleBind = async () => {
     if (!deviceUrls || healthCheckStatus !== 'success') {
@@ -64,7 +66,10 @@ export default function DeviceBindPage() {
       }
 
       // 1. 通过设备 URL 发送绑定请求到 CLI
-      const deviceUrl = deviceUrls.cloudflare_url || deviceUrls.localhost_url;
+      const deviceUrl = selectedDeviceUrl;
+      if (!deviceUrl) {
+        throw new Error('No browser-safe device URL is available for binding');
+      }
       const bindResponse = await fetch(`${deviceUrl}/bind`, {
         method: 'POST',
         headers: {
@@ -223,7 +228,7 @@ export default function DeviceBindPage() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Device URL:</span>
                       <span className="font-mono text-xs">
-                        {deviceUrls.cloudflare_url || deviceUrls.localhost_url}
+                        {selectedDeviceUrl || 'Unavailable'}
                       </span>
                     </div>
                   </div>

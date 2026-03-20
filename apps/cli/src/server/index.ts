@@ -17,10 +17,11 @@ import { serviceHealthChecker } from '../lib/service-health.js';
 import { findAvailablePort } from '../lib/port-utils.js';
 import { bindingCodeManager, BindingConfig } from '../lib/binding-code-manager.js';
 import { generateDeviceId, getLocalIpAddress, getTailscaleAddress } from '../lib/device-id.js';
+import { buildDeviceUrls } from '../lib/device-urls.js';
 import { tempBindingManager } from '../lib/temp-binding-manager.js';
 import { tunnelManager } from '../lib/tunnel-manager.js';
 import { randomBytes } from 'crypto';
-import { actualPort } from '../commands/start.js';
+import { actualHttpsPort, actualPort } from '../commands/start.js';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from 'node-pty';
 import { existsSync, mkdirSync } from 'fs';
@@ -122,12 +123,14 @@ export function createServer(config: CLIConfig) {
       const tunnelUrl = tunnelManager.getTunnelUrl();
       const localIp = getLocalIpAddress();
       const tailscaleAddr = getTailscaleAddress();
-      const deviceUrls = {
-        cloudflare_url: tunnelUrl,
-        localhost_url: `http://localhost:${actualPort}`,
-        hostname_url: `http://${localIp}:${actualPort}`,
-        ...(tailscaleAddr ? { tailscale_url: `http://${tailscaleAddr}:${actualPort}` } : {}),
-      };
+      const deviceUrls = buildDeviceUrls({
+        appUrl: config.appUrl,
+        tunnelUrl,
+        httpPort: actualPort,
+        httpsPort: actualHttpsPort,
+        localIp,
+        tailscaleAddr,
+      });
 
       // 准备设备信息
       const deviceId = generateDeviceId();

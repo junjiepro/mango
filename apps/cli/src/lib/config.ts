@@ -50,7 +50,7 @@ export class ConfigManager {
       } else {
         // 从 API 获取配置
         try {
-          const response = await axios.get(`${appUrl}/api/config`, { timeout: 5000 });
+          const response = await axios.get(`${appUrl}/api/config`, { timeout: 60000 });
           // 指定 appUrl，则需从 APII 获取
           if (options.appUrl) {
             supabaseUrl = response.data.supabaseUrl;

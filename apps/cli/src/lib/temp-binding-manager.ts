@@ -11,13 +11,7 @@ import { randomBytes } from 'crypto';
 import { createClient, RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import { formatter } from './formatter.js';
 import os from 'os';
-
-export interface DeviceUrls {
-  cloudflare_url: string | null;
-  localhost_url: string;
-  hostname_url: string;
-  tailscale_url?: string | null;
-}
+import type { DeviceUrls } from './device-urls.js';
 
 export interface DeviceInfo {
   platform: string;
