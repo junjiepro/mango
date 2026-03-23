@@ -32,6 +32,7 @@ import { clearFileCache } from './FileEditor.optimized';
 import { UnifiedFileViewer } from './UnifiedFileViewer';
 import { ResourcePreview } from './ResourcePreview';
 import { MiniAppViewer } from './MiniAppViewer';
+import { LinkPreviewer } from './previews/LinkPreviewer';
 import { clearModelCache } from './MonacoEditor';
 import { useFileWatcher, type FileChangeEvent } from '@/hooks/useFileWatcher';
 import type { EditorTab } from '@/hooks/useEditorTabs';
@@ -331,6 +332,11 @@ export function EnhancedEditorTabs({
                   miniApp={tab.miniApp}
                   isCreateMode={tab.isCreateMode}
                   isOwner={tab.isOwner}
+                />
+              ) : tab.type === 'webservice' && tab.webService ? (
+                <LinkPreviewer
+                  url={tab.webService.proxyUrl}
+                  title={tab.webService.title || `:${tab.webService.port}`}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">

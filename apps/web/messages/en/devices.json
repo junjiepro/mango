@@ -78,7 +78,21 @@
     "pleaseSelectTool": "Please select a tool",
     "argsJsonFormatError": "Invalid JSON format for arguments",
     "loadToolsFailed": "Failed to load tools",
-    "callFailed": "Call failed"
+    "callFailed": "Call failed",
+    "webServices": "Web Services",
+    "noWebServices": "No web services found",
+    "noWebServicesHint": "No running web services detected on the device",
+    "refreshServices": "Refresh",
+    "lastScan": "Last scan",
+    "openService": "Open",
+    "serviceOffline": "Offline",
+    "scanning": "Scanning...",
+    "portPlaceholder": "Enter port number...",
+    "probe": "Probe",
+    "probing": "Probing...",
+    "probeNotFound": "No web service found on port {port}",
+    "probeSuccess": "Service found, opening...",
+    "invalidPort": "Please enter a valid port number (1-65535)"
   },
   "management": {
     "title": "Device Management",

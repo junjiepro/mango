@@ -78,7 +78,21 @@
     "pleaseSelectTool": "请选择一个工具",
     "argsJsonFormatError": "参数 JSON 格式错误",
     "loadToolsFailed": "加载工具失败",
-    "callFailed": "调用失败"
+    "callFailed": "调用失败",
+    "webServices": "Web 服务发现",
+    "noWebServices": "未发现 Web 服务",
+    "noWebServicesHint": "设备上未检测到运行中的 Web 服务",
+    "refreshServices": "刷新服务",
+    "lastScan": "上次扫描",
+    "openService": "打开",
+    "serviceOffline": "离线",
+    "scanning": "扫描中...",
+    "portPlaceholder": "输入端口号...",
+    "probe": "探测",
+    "probing": "探测中...",
+    "probeNotFound": "端口 {port} 未发现 Web 服务",
+    "probeSuccess": "已发现服务，正在打开...",
+    "invalidPort": "请输入有效端口号 (1-65535)"
   },
   "management": {
     "title": "设备管理",

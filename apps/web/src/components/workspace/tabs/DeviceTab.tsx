@@ -22,6 +22,9 @@ import {
   Settings,
   Save,
   FolderOpen,
+  Globe,
+  ExternalLink,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +47,8 @@ import {
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { DeviceBinding } from '@/services/DeviceService';
+import type { DiscoveredWebService } from '@mango/shared/types/web-service.types';
+import { toast } from 'sonner';
 
 interface Tool {
   name: string;
@@ -54,9 +59,10 @@ interface Tool {
 interface DeviceTabProps {
   device?: DeviceBinding;
   onRefresh?: () => void;
+  onOpenWebService?: (service: DiscoveredWebService, proxyUrl: string) => void;
 }
 
-export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
+export function DeviceTab({ device, onRefresh, onOpenWebService }: DeviceTabProps) {
   const t = useTranslations('devices');
   // 状态检查
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
@@ -82,6 +88,16 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
   const [statusOpen, setStatusOpen] = useState(true);
   const [configOpen, setConfigOpen] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(true);
+  const [webServicesOpen, setWebServicesOpen] = useState(true);
+
+  // Web 服务发现状态
+  const [webServices, setWebServices] = useState<DiscoveredWebService[]>([]);
+  const [isLoadingServices, setIsLoadingServices] = useState(false);
+  const [lastScanAt, setLastScanAt] = useState<string | null>(null);
+  const [probePort, setProbePort] = useState('');
+  const [isProbing, setIsProbing] = useState(false);
+  const webServicesTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isOnlineRef = useRef(false);
 
   // 配置管理状态
   const [configLoading, setConfigLoading] = useState(false);
@@ -376,6 +392,102 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
     setResult(null);
   };
 
+  // 加载 Web 服务列表
+  const loadWebServices = async () => {
+    if (!onlineUrl || !device?.binding_code) return;
+    setIsLoadingServices(true);
+    try {
+      const response = await fetch(`${onlineUrl}/web-services`, {
+        headers: { Authorization: `Bearer ${device.binding_code}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setWebServices(data.services || []);
+        setLastScanAt(data.lastScanAt || null);
+      }
+    } catch (err) {
+      console.error('Failed to load web services:', err);
+    } finally {
+      setIsLoadingServices(false);
+    }
+  };
+
+  // Web 服务自动刷新（展开时每 15s）
+  useEffect(() => {
+    if (webServicesOpen && isOnlineRef.current && onlineUrl && device?.binding_code) {
+      loadWebServices();
+      webServicesTimerRef.current = setInterval(loadWebServices, 15000);
+    }
+    return () => {
+      if (webServicesTimerRef.current) {
+        clearInterval(webServicesTimerRef.current);
+        webServicesTimerRef.current = null;
+      }
+    };
+  }, [webServicesOpen, onlineUrl, device?.binding_code]);
+
+  // 手动探测端口
+  const handleProbe = async () => {
+    const port = parseInt(probePort, 10);
+    if (!port || port < 1 || port > 65535) {
+      toast.error(t('deviceTab.invalidPort'));
+      return;
+    }
+    if (!onlineUrl || !device?.binding_code) return;
+
+    setIsProbing(true);
+    try {
+      const response = await fetch(`${onlineUrl}/web-services/probe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${device.binding_code}`,
+        },
+        body: JSON.stringify({ port }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.service) {
+          toast.success(t('deviceTab.probeSuccess'));
+          // Refresh the service list
+          await loadWebServices();
+          // Auto-open the discovered service
+          openServiceWithToken(data.service);
+          setProbePort('');
+        } else {
+          toast.error(t('deviceTab.probeNotFound', { port: String(port) }));
+        }
+      }
+    } catch (err) {
+      console.error('Probe failed:', err);
+      toast.error(t('deviceTab.probeNotFound', { port: String(port) }));
+    } finally {
+      setIsProbing(false);
+    }
+  };
+
+  // 获取预览 token 并打开服务
+  const openServiceWithToken = async (service: DiscoveredWebService) => {
+    if (!onlineUrl || !device?.binding_code) return;
+    try {
+      const resp = await fetch(`${onlineUrl}/web-services/${service.id}/preview-session`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${device.binding_code}` },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const proxyUrl = `${onlineUrl}${data.previewUrl}`;
+        onOpenWebService?.(service, proxyUrl);
+      } else {
+        // Fallback: open without token (will work if Bearer auth works)
+        onOpenWebService?.(service, `${onlineUrl}/proxy/web/${service.id}/`);
+      }
+    } catch {
+      onOpenWebService?.(service, `${onlineUrl}/proxy/web/${service.id}/`);
+    }
+  };
+
   // 未选择设备时的空状态
   if (!device) {
     return (
@@ -392,6 +504,7 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
   }
 
   const isOnline = deviceStatus?.is_online ?? (device.online_urls && device.online_urls.length > 0);
+  isOnlineRef.current = !!isOnline;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -563,6 +676,125 @@ export function DeviceTab({ device, onRefresh }: DeviceTabProps) {
                   {t('deviceTab.saveConfig')}
                 </Button>
               </>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* Web 服务发现 */}
+        <Collapsible open={webServicesOpen} onOpenChange={(open) => {
+          setWebServicesOpen(open);
+        }}>
+          <CollapsibleTrigger asChild>
+            <button className="flex items-center gap-2 w-full text-left text-sm font-medium py-1.5 hover:text-primary transition-colors">
+              {webServicesOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              <Globe className="w-4 h-4" />
+              {t('deviceTab.webServices')}
+              {webServices.filter(s => s.status === 'online').length > 0 && (
+                <Badge variant="secondary" className="ml-auto text-xs px-1.5 py-0">
+                  {webServices.filter(s => s.status === 'online').length}
+                </Badge>
+              )}
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-2 pt-2">
+            {/* 刷新按钮 + 上次扫描时间 */}
+            <div className="flex items-center justify-between">
+              {lastScanAt && (
+                <span className="text-xs text-muted-foreground">
+                  {t('deviceTab.lastScan')}: {new Date(lastScanAt).toLocaleTimeString()}
+                </span>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 ml-auto"
+                onClick={loadWebServices}
+                disabled={isLoadingServices || !isOnline}
+              >
+                {isLoadingServices ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3 h-3" />
+                )}
+              </Button>
+            </div>
+
+            {/* 服务列表 */}
+            {!isOnline ? (
+              <p className="text-xs text-muted-foreground">{t('deviceTab.deviceOfflineCannotConnect')}</p>
+            ) : isLoadingServices && webServices.length === 0 ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-xs text-muted-foreground">{t('deviceTab.scanning')}</span>
+              </div>
+            ) : webServices.length === 0 ? (
+              <div className="text-center py-3">
+                <p className="text-xs text-muted-foreground">{t('deviceTab.noWebServices')}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('deviceTab.noWebServicesHint')}</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {webServices.map((service) => (
+                  <div
+                    key={service.id}
+                    className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 group"
+                  >
+                    <Circle className={`w-2 h-2 fill-current flex-shrink-0 ${
+                      service.status === 'online' ? 'text-green-500' : 'text-gray-400'
+                    }`} />
+                    <span className="text-xs font-mono flex-shrink-0">:{service.port}</span>
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 flex-shrink-0">
+                      {service.protocol.toUpperCase()}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground truncate flex-1">
+                      {service.title || `${service.protocol}://127.0.0.1:${service.port}`}
+                    </span>
+                    {service.status === 'online' ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                        onClick={() => openServiceWithToken(service)}
+                      >
+                        <ExternalLink className="w-3 h-3 mr-1" />
+                        <span className="text-xs">{t('deviceTab.openService')}</span>
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground flex-shrink-0">{t('deviceTab.serviceOffline')}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 手动探测端口 */}
+            {isOnline && (
+              <div className="flex items-center gap-2 pt-1 border-t">
+                <Input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={probePort}
+                  onChange={(e) => setProbePort(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleProbe(); }}
+                  placeholder={t('deviceTab.portPlaceholder')}
+                  className="h-7 text-xs flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-3"
+                  onClick={handleProbe}
+                  disabled={isProbing || !probePort}
+                >
+                  {isProbing ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Search className="w-3 h-3" />
+                  )}
+                  <span className="ml-1 text-xs">{isProbing ? t('deviceTab.probing') : t('deviceTab.probe')}</span>
+                </Button>
+              </div>
             )}
           </CollapsibleContent>
         </Collapsible>

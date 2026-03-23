@@ -15,6 +15,7 @@ import { bindingCodeManager } from '../lib/binding-code-manager.js';
 import { urlUpdateManager } from '../lib/url-update-manager.js';
 import { getDeviceInfoSummary, getLocalIpAddress, getTailscaleAddress } from '../lib/device-id.js';
 import { acpConnector } from '../lib/connectors/acp-connector.js';
+import { webServiceScanner } from '../lib/web-service-scanner.js';
 import {
   buildDeviceUrls,
   hasReachableDeviceUrl,
@@ -314,7 +315,15 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
       formatter.dim('No binding codes found, skipping MCP/ACP initialization');
     }
 
-    // 9. 显示绑定信息
+    // 9. 启动 Web 服务端口扫描
+    formatter.newline();
+    formatter.info('Starting web service scanner...');
+    webServiceScanner.start({
+      excludePorts: [actualPort, ...(actualHttpsPort ? [actualHttpsPort] : [])],
+    });
+    formatter.success('Web service scanner started (scanning every 15s)');
+
+    // 10. 显示绑定信息
     formatter.newline();
     formatter.success('Device service is ready!');
     formatter.newline();
@@ -341,7 +350,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     formatter.newline();
     formatter.dim('Press Ctrl+C to stop the service');
 
-    // 10. 自动打开浏览器（仅在未绑定且未禁用时）
+    // 11. 自动打开浏览器（仅在未绑定且未禁用时）
     if (!hasBindingCode && !options.ignoreOpenBindUrl && tempCode) {
       formatter.newline();
       const bindUrl = `${config.appUrl}/devices/bind?code=${tempCode}`;
@@ -375,6 +384,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
  * 清理资源
  */
 async function cleanup(): Promise<void> {
+  webServiceScanner.stop();
   await serviceInitializer.cleanup();
   await tempBindingManager.cleanup();
   tunnelManager.cleanup();

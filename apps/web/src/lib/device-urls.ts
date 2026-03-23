@@ -2,9 +2,9 @@ import type { DeviceUrls } from '@/hooks/useDeviceBinding';
 
 const DEVICE_URL_PRIORITY: Array<keyof DeviceUrls> = [
   'cloudflare_url',
-  'tailscale_url',
   'hostname_url',
   'localhost_url',
+  'tailscale_url', // 浏览器通常无法解析 Tailscale MagicDNS (*.ts.net)，作为最后手段
 ];
 
 function getPageProtocol(pageProtocol?: string): string | null {

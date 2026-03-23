@@ -26,6 +26,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from 'node-pty';
 import { existsSync, mkdirSync } from 'fs';
 import { fileWatcherManager, type FileChangeEvent } from '../lib/file-watcher.js';
+import { webServiceScanner } from '../lib/web-service-scanner.js';
 import { convertToModelMessages, streamText } from 'ai';
 import { planEntrySchema } from '@agentclientprotocol/sdk';
 import z from 'zod';
@@ -39,6 +40,43 @@ export interface TlsOptions {
 export interface ServerResult {
   httpPort: number;
   httpsPort?: number;
+}
+
+// Preview token management for iframe access
+const PREVIEW_TOKEN_TTL_MS = 5 * 60_000;
+const previewSessions = new Map<string, { bindingCode: string; serviceId: string; expiresAt: number }>();
+
+function createPreviewToken(bindingCode: string, serviceId: string): string {
+  // Clean expired tokens
+  const now = Date.now();
+  for (const [token, session] of previewSessions) {
+    if (session.expiresAt <= now) previewSessions.delete(token);
+  }
+  const token = randomBytes(24).toString('base64url');
+  previewSessions.set(token, { bindingCode, serviceId, expiresAt: now + PREVIEW_TOKEN_TTL_MS });
+  return token;
+}
+
+function validatePreviewToken(token: string | undefined, serviceId: string): boolean {
+  if (!token) return false;
+  const session = previewSessions.get(token);
+  if (!session || session.serviceId !== serviceId || session.expiresAt <= Date.now()) {
+    if (session) previewSessions.delete(token);
+    return false;
+  }
+  return true;
+}
+
+function hasActivePreviewSession(serviceId: string): boolean {
+  const now = Date.now();
+  for (const [token, session] of previewSessions) {
+    if (session.expiresAt <= now) {
+      previewSessions.delete(token);
+      continue;
+    }
+    if (session.serviceId === serviceId) return true;
+  }
+  return false;
 }
 
 const getBindingCodeAndCheckFromHeader = (
@@ -307,6 +345,297 @@ export function createServer(config: CLIConfig) {
     } catch (error) {
       console.error('Failed to save binding configuration:', error);
       return c.json({ error: 'Failed to save configuration' }, 500);
+    }
+  });
+
+  // Web 服务发现端点 - 获取已发现的服务列表
+  app.get('/web-services', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      return c.json({
+        services: webServiceScanner.getServices(),
+        lastScanAt: webServiceScanner.getLastScanAt(),
+        scanConfig: webServiceScanner.getScanConfig(),
+      });
+    } catch (error) {
+      console.error('Web services list error:', error);
+      return c.json({ error: 'Failed to list web services' }, 500);
+    }
+  });
+
+  // Web 服务发现端点 - 手动刷新扫描
+  app.post('/web-services/refresh', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const services = await webServiceScanner.refresh();
+      return c.json({
+        services,
+        lastScanAt: webServiceScanner.getLastScanAt(),
+      });
+    } catch (error) {
+      console.error('Web services refresh error:', error);
+      return c.json({ error: 'Failed to refresh web services' }, 500);
+    }
+  });
+
+  // Web 服务发现端点 - 手动探测单个端口
+  app.post('/web-services/probe', async (c) => {
+    try {
+      const [_, __, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const body = await c.req.json();
+      const { port } = body;
+
+      if (!port || typeof port !== 'number' || port < 1 || port > 65535) {
+        return c.json({ error: 'Invalid port number (1-65535)' }, 400);
+      }
+
+      const service = await webServiceScanner.probePort(port);
+      return c.json({ service });
+    } catch (error) {
+      console.error('Web services probe error:', error);
+      return c.json({ error: 'Failed to probe port' }, 500);
+    }
+  });
+
+  // Web 服务预览会话端点 - 生成短期 token 供 iframe 使用
+  app.post('/web-services/:serviceId/preview-session', async (c) => {
+    try {
+      const [bindingCode, _, errorResponse] = getBindingCodeAndCheckFromHeader(c);
+      if (errorResponse) return errorResponse;
+
+      const { serviceId } = c.req.param();
+      const service = webServiceScanner.getServiceById(serviceId);
+
+      if (!service) {
+        return c.json({ error: 'Service not found' }, 404);
+      }
+      if (service.status !== 'online') {
+        return c.json({ error: 'Service is offline' }, 503);
+      }
+
+      const token = createPreviewToken(bindingCode, serviceId);
+      return c.json({
+        previewUrl: `/proxy/web/${serviceId}/?_preview_token=${token}`,
+        token,
+        expiresInMs: PREVIEW_TOKEN_TTL_MS,
+      });
+    } catch (error) {
+      console.error('Web service preview session error:', error);
+      return c.json({ error: 'Failed to create preview session' }, 500);
+    }
+  });
+
+  // Web 服务代理端点 - 反向代理到本地服务
+  app.all('/proxy/web/:serviceId/*', async (c) => {
+    try {
+      const { serviceId } = c.req.param();
+      const authHeader = c.req.header('Authorization');
+      const reqPath = c.req.path;
+
+      console.log(`[proxy] >>> ${c.req.method} ${reqPath}`);
+
+      // Extract _preview_token from raw URL
+      let previewToken: string | undefined;
+      const rawUrl = c.req.url;
+      const tokenMatch = rawUrl.match(/[?&]_preview_token=([^&]+)/);
+      if (tokenMatch) {
+        previewToken = decodeURIComponent(tokenMatch[1]);
+      }
+
+      // Auth: preview token > active session > binding_code header
+      let authorized = false;
+
+      if (previewToken && validatePreviewToken(previewToken, serviceId)) {
+        authorized = true;
+      } else if (hasActivePreviewSession(serviceId)) {
+        authorized = true;
+      } else if (authHeader?.startsWith('Bearer ')) {
+        const bindingCode = authHeader.replace('Bearer ', '');
+        const bconfig = bindingCodeManager.readConfig();
+        if (bconfig?.[bindingCode]) {
+          authorized = true;
+        }
+      }
+
+      console.log(`[proxy] auth=${authorized} token=${!!previewToken} session=${hasActivePreviewSession(serviceId)} mapSize=${previewSessions.size}`);
+
+      if (!authorized) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+
+      const service = webServiceScanner.getServiceById(serviceId);
+
+      if (!service) {
+        return c.json({ error: 'Service not found' }, 404);
+      }
+      if (service.status !== 'online') {
+        return c.json({ error: 'Service is offline' }, 503);
+      }
+
+      // Build target URL — extract path from c.req.path (c.req.param('*') is unreliable)
+      const proxyPrefix = `/proxy/web/${serviceId}/`;
+      const fullPath = c.req.path;
+      const pathParam = fullPath.startsWith(proxyPrefix) ? fullPath.slice(proxyPrefix.length) : '';
+      const targetUrl = `${service.protocol}://127.0.0.1:${service.port}/${pathParam}`;
+
+      // Forward headers (exclude host, connection)
+      const forwardHeaders: Record<string, string> = {};
+      c.req.raw.headers.forEach((value, key) => {
+        const lower = key.toLowerCase();
+        if (lower !== 'host' && lower !== 'connection' && lower !== 'authorization') {
+          forwardHeaders[key] = value;
+        }
+      });
+      forwardHeaders['host'] = `127.0.0.1:${service.port}`;
+
+      // Forward request
+      const method = c.req.method;
+      const body = ['GET', 'HEAD'].includes(method)
+        ? undefined
+        : await c.req.arrayBuffer();
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      try {
+        const proxyResp = await fetch(targetUrl, {
+          method,
+          headers: forwardHeaders,
+          body: body ? Buffer.from(body) : undefined,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        console.log(`[proxy] target ${targetUrl} => ${proxyResp.status}`);
+
+        const proxyPrefix = `/proxy/web/${serviceId}`;
+        const tokenQs = previewToken ? `_preview_token=${previewToken}` : '';
+
+        // Build response headers, removing iframe-blocking headers
+        const respHeaders = new Headers();
+        proxyResp.headers.forEach((value, key) => {
+          const lower = key.toLowerCase();
+          if (lower === 'x-frame-options') return;
+          if (lower === 'content-security-policy') {
+            const cleaned = value.replace(/frame-ancestors\s+[^;]+;?/gi, '').trim();
+            if (cleaned) respHeaders.set(key, cleaned);
+            return;
+          }
+          if (lower === 'transfer-encoding') return;
+
+          // Rewrite Location header for redirects
+          if (lower === 'location') {
+            let loc = value;
+            // Absolute path: /foo → /proxy/web/ws-8080/foo
+            if (loc.startsWith('/') && !loc.startsWith('//')) {
+              loc = `${proxyPrefix}${loc}`;
+              if (tokenQs) loc += (loc.includes('?') ? '&' : '?') + tokenQs;
+            }
+            // Absolute URL pointing to the target service
+            const targetOrigin = `${service.protocol}://127.0.0.1:${service.port}`;
+            if (loc.startsWith(targetOrigin)) {
+              loc = `${proxyPrefix}${loc.slice(targetOrigin.length)}`;
+              if (tokenQs) loc += (loc.includes('?') ? '&' : '?') + tokenQs;
+            }
+            respHeaders.set(key, loc);
+            return;
+          }
+
+          // Rewrite Set-Cookie path to include proxy prefix
+          if (lower === 'set-cookie') {
+            const rewritten = value.replace(
+              /;\s*path=\/?([^;]*)/gi,
+              (_m, p) => `; path=${proxyPrefix}/${p}`
+            );
+            respHeaders.append(key, rewritten);
+            return;
+          }
+
+          respHeaders.set(key, value);
+        });
+
+        // For HTML responses, rewrite URLs and inject fetch/XHR interceptor
+        const contentType = proxyResp.headers.get('content-type') || '';
+        if (contentType.includes('text/html')) {
+          let html = await proxyResp.text();
+
+          // Build token suffix for sub-resource URLs
+          const tokenSuffix = previewToken ? `?_preview_token=${previewToken}` : '';
+
+          // Inject script to intercept fetch() and XMLHttpRequest for dynamic requests
+          const interceptorScript = `<script>(function(){
+var P="${proxyPrefix}",T="${previewToken || ''}";
+function r(u){
+if(typeof u!=="string")return u;
+if(u.startsWith("/")&&!u.startsWith("//")&&!u.startsWith(P+"/")){
+u=P+u;if(T){u+=(u.includes("?")?"&":"?")+"_preview_token="+T}
+}return u}
+var _f=window.fetch;
+window.fetch=function(u,o){
+if(typeof u==="string")u=r(u);
+else if(u instanceof Request){var nu=r(u.url);if(nu!==u.url)u=new Request(nu,u)}
+return _f.call(this,u,o)};
+var _o=XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open=function(m,u){
+arguments[1]=r(u);return _o.apply(this,arguments)};
+})();</script>`;
+
+          // Inject interceptor right after <head> (or at start if no <head>)
+          const headIdx = html.search(/<head[^>]*>/i);
+          if (headIdx !== -1) {
+            const headEnd = html.indexOf('>', headIdx) + 1;
+            html = html.slice(0, headEnd) + interceptorScript + html.slice(headEnd);
+          } else {
+            html = interceptorScript + html;
+          }
+
+          // Rewrite absolute paths in src, href, action attributes
+          html = html.replace(
+            /(\s(?:src|href|action)=["'])\/(?!\/)(.*?)(["'])/g,
+            (_match, prefix, path, quote) => {
+              if (path.startsWith('#')) return `${prefix}/${path}${quote}`;
+              const separator = path.includes('?') ? '&' : '';
+              const token = tokenSuffix ? (separator ? tokenSuffix.replace('?', '&') : tokenSuffix) : '';
+              return `${prefix}${proxyPrefix}/${path}${token}${quote}`;
+            }
+          );
+
+          // Rewrite url() in inline styles
+          html = html.replace(
+            /url\(["']?\/(?!\/)/g,
+            `url(${proxyPrefix}/`
+          );
+
+          // Update content-length
+          const encoded = new TextEncoder().encode(html);
+          respHeaders.set('content-length', String(encoded.length));
+
+          return new Response(encoded, {
+            status: proxyResp.status,
+            headers: respHeaders,
+          });
+        }
+
+        const respBody = await proxyResp.arrayBuffer();
+        return new Response(respBody, {
+          status: proxyResp.status,
+          headers: respHeaders,
+        });
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        console.error('Proxy fetch error:', fetchError);
+        return c.json({ error: 'Failed to reach target service' }, 502);
+      }
+    } catch (error) {
+      console.error('Proxy error:', error);
+      return c.json({ error: 'Proxy error' }, 500);
     }
   });
 

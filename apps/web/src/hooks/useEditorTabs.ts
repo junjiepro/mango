@@ -10,16 +10,18 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { FileNode } from '@/hooks/useDeviceFiles';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
 import type { Database } from '@/types/database.types';
+import type { DiscoveredWebService } from '@mango/shared/types/web-service.types';
 
 type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
 
 export interface EditorTab {
   id: string;
-  type: 'file' | 'resource' | 'miniapp';
+  type: 'file' | 'resource' | 'miniapp' | 'webservice';
   title: string;
   file?: FileNode;
   resource?: DetectedResource;
   miniApp?: MiniApp;
+  webService?: { id: string; port: number; protocol: string; title?: string; proxyUrl: string };
   isDirty?: boolean;
   isCreateMode?: boolean;
   isOwner?: boolean;
@@ -161,6 +163,43 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
     setActiveTabId(tabId);
   }, []);
 
+  // 打开 Web 服务预览标签页
+  const openWebServiceTab = useCallback(
+    (service: DiscoveredWebService, proxyUrl: string) => {
+      const tabId = `webservice-${service.id}`;
+
+      setTabs((prevTabs) => {
+        const existingTab = prevTabs.find((t) => t.id === tabId);
+        if (existingTab) {
+          // Update proxyUrl in case token refreshed
+          const updated = prevTabs.map((t) =>
+            t.id === tabId ? { ...t, webService: { ...t.webService!, proxyUrl } } : t
+          );
+          setActiveTabId(tabId);
+          return updated;
+        }
+
+        const newTab: EditorTab = {
+          id: tabId,
+          type: 'webservice',
+          title: service.title || `:${service.port}`,
+          webService: {
+            id: service.id,
+            port: service.port,
+            protocol: service.protocol,
+            title: service.title,
+            proxyUrl,
+          },
+        };
+
+        return [...prevTabs, newTab];
+      });
+
+      setActiveTabId(tabId);
+    },
+    []
+  );
+
   // 关闭标签页
   const closeTab = useCallback((tabId: string) => {
     setTabs((prevTabs) => {
@@ -243,6 +282,7 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
     openResourceTab,
     openMiniAppTab,
     openCreateMiniAppTab,
+    openWebServiceTab,
     closeTab,
     markTabDirty,
     closeAllTabs,

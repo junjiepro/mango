@@ -108,6 +108,9 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
+      vitest:
+        specifier: ^4.0.14
+        version: 4.0.14(@opentelemetry/api@1.9.0)(@types/node@20.19.25)(@vitest/ui@4.0.14)(happy-dom@20.0.10)(jiti@1.21.7)(jsdom@23.2.0)(msw@2.12.3(@types/node@20.19.25)(typescript@5.9.3))(tsx@4.20.6)
 
   apps/web:
     dependencies:

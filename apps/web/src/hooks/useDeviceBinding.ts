@@ -30,6 +30,7 @@ export interface DeviceBindingState {
   deviceUrls: DeviceUrls | null;
   deviceInfo: DeviceInfo | null;
   healthCheckStatus: 'pending' | 'checking' | 'success' | 'failed';
+  reachableUrl: string | null;
   isConnected: boolean;
   error: string | null;
 }
@@ -42,6 +43,7 @@ export function useDeviceBinding(tempCode: string | null) {
     deviceUrls: null,
     deviceInfo: null,
     healthCheckStatus: 'pending',
+    reachableUrl: null,
     isConnected: false,
     error: null,
   });
@@ -154,6 +156,7 @@ export function useDeviceBinding(tempCode: string | null) {
           setState((prev) => ({
             ...prev,
             healthCheckStatus: 'success',
+            reachableUrl: urlToCheck,
           }));
           return;
         }

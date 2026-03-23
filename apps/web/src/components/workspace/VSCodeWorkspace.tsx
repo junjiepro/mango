@@ -91,6 +91,7 @@ export function VSCodeWorkspace({
     openResourceTab,
     openMiniAppTab,
     openCreateMiniAppTab,
+    openWebServiceTab,
     closeTab,
     closeAllTabs,
     closeOtherTabs,
@@ -352,7 +353,13 @@ export function VSCodeWorkspace({
         return <ResourceTab resources={resources} onResourceClick={openResourceTab} />;
       case 'devices':
         return (
-          <DeviceTab device={selectedDevice} onRefresh={() => deviceId && loadDevice(deviceId)} />
+          <DeviceTab
+            device={selectedDevice}
+            onRefresh={() => deviceId && loadDevice(deviceId)}
+            onOpenWebService={(service, proxyUrl) => {
+              openWebServiceTab(service, proxyUrl);
+            }}
+          />
         );
       case 'files':
         return (

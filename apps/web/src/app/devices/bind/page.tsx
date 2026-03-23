@@ -40,11 +40,12 @@ export default function DeviceBindPage() {
     deviceUrls,
     deviceInfo,
     healthCheckStatus,
+    reachableUrl,
     isConnected,
     error: channelError,
     retryHealthCheck,
   } = useDeviceBinding(tempCode);
-  const selectedDeviceUrl = deviceUrls ? getPreferredBrowserSafeDeviceUrl(deviceUrls) : null;
+  const selectedDeviceUrl = reachableUrl || (deviceUrls ? getPreferredBrowserSafeDeviceUrl(deviceUrls) : null);
 
   const handleBind = async () => {
     if (!deviceUrls || healthCheckStatus !== 'success') {
