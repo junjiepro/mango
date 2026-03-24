@@ -27,6 +27,18 @@
     "disconnected": "Terminal connection disconnected",
     "cannotConnect": "Cannot connect to terminal"
   },
+  "linkPreview": {
+    "showAddressBar": "Show address bar",
+    "hideAddressBar": "Hide address bar"
+  },
+  "resourceTab": {
+    "openWebsite": "Open website",
+    "inputLinkPlaceholder": "Enter a URL, e.g. https://example.com",
+    "openLink": "Open",
+    "invalidLink": "Please enter a valid URL",
+    "empty": "No resources yet",
+    "emptyHint": "Files, links, and other resources from the conversation will appear here"
+  },
   "fileExplorer": {
     "title": "File Explorer",
     "loading": "Loading...",

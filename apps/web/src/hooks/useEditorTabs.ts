@@ -91,6 +91,11 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
   // 打开资源标签页
   const openResourceTab = useCallback((resource: DetectedResource) => {
     const tabId = `resource-${resource.id}`;
+    const title =
+      resource.metadata?.filename ||
+      resource.metadata?.title ||
+      resource.metadata?.domain ||
+      resource.type;
 
     setTabs((prevTabs) => {
       const existingTab = prevTabs.find((t) => t.id === tabId);
@@ -102,7 +107,7 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
       const newTab: EditorTab = {
         id: tabId,
         type: 'resource',
-        title: resource.metadata?.filename || resource.type,
+        title,
         resource,
       };
 

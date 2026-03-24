@@ -28,6 +28,13 @@ interface ResourcePreviewDialogProps {
   className?: string;
 }
 
+function normalizeLinkUrl(value?: string): string {
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  if (/^www\./i.test(value)) return `https://${value}`;
+  return '';
+}
+
 /**
  * 判断资源是否支持弹窗预览
  */
@@ -54,6 +61,7 @@ export function ResourcePreviewDialog({
   const [viewMode, setViewMode] = useState<'preview' | 'source'>('preview');
   const [copied, setCopied] = useState(false);
   const t = useTranslations('conversations');
+  const linkUrl = normalizeLinkUrl(resource?.metadata?.url || resource?.content || '');
 
   // HTML preview URL memoization
   const htmlPreviewUrl = useMemo(() => {
@@ -78,7 +86,7 @@ export function ResourcePreviewDialog({
     if (resource.metadata?.filename) return resource.metadata.filename;
     if (resource.metadata?.title) return resource.metadata.title;
     if (resource.type === 'image') return t('resourcePreview.imagePreview');
-    if (resource.type === 'link') return t('resourcePreview.linkPreview');
+    if (resource.type === 'link') return resource.metadata?.title || resource.metadata?.domain || t('resourcePreview.linkPreview');
     if (resource.type === 'miniapp') return resource.metadata?.name || t('resourcePreview.miniApp');
     if (resource.type === 'html') return t('resourcePreview.htmlPreview');
     if (resource.metadata?.isA2UI) return t('resourcePreview.a2uiComponent');
@@ -193,7 +201,7 @@ export function ResourcePreviewDialog({
     }
 
     // 链接预览
-    if (resource.type === 'link' && resource.metadata?.url) {
+    if (resource.type === 'link' && linkUrl) {
       return (
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* 视图切换和外部链接按钮 */}
@@ -220,7 +228,7 @@ export function ResourcePreviewDialog({
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => window.open(resource.metadata?.url, '_blank')}
+              onClick={() => window.open(linkUrl, '_blank')}
               className="h-8 px-3"
             >
               <ExternalLinkIcon className="size-4 mr-1" />
@@ -232,10 +240,10 @@ export function ResourcePreviewDialog({
           {viewMode === 'preview' ? (
             <div className="flex-1 overflow-hidden">
               <iframe
-                src={resource.metadata.url}
+                src={linkUrl}
                 className="w-full h-full border-0"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                title={resource.metadata.title || t('resourcePreview.linkPreview')}
+                title={resource.metadata.title || resource.metadata.domain || t('resourcePreview.linkPreview')}
               />
             </div>
           ) : (
@@ -246,12 +254,12 @@ export function ResourcePreviewDialog({
                     {t('resourcePreview.linkUrl')}
                   </h3>
                   <a
-                    href={resource.metadata.url}
+                    href={linkUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary hover:underline break-all"
                   >
-                    {resource.metadata.url}
+                    {linkUrl}
                   </a>
                 </div>
                 {resource.metadata.domain && (

@@ -114,6 +114,8 @@
     "unknown": "未知",
     "copyMessage": "复制消息",
     "regenerate": "重新生成",
+    "showActions": "展开操作",
+    "hideActions": "收起操作",
     "toolRunning": "执行中",
     "toolSuccess": "成功",
     "toolError": "失败",

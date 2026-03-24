@@ -34,6 +34,13 @@ interface ResourcePreviewProps {
   className?: string;
 }
 
+function normalizeLinkUrl(value?: string): string {
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  if (/^www\./i.test(value)) return `https://${value}`;
+  return '';
+}
+
 // 资源类型图标映射
 function getResourceIcon(type: string) {
   switch (type) {
@@ -53,6 +60,8 @@ function getResourceIcon(type: string) {
 }
 
 export function ResourcePreview({ resource, className = '' }: ResourcePreviewProps) {
+  const linkUrl = normalizeLinkUrl(resource.metadata?.url || resource.content);
+
   // A2UI 组件预览
   if (resource.metadata?.isA2UI && resource.metadata?.a2uiSchema) {
     return <A2UIPreview resource={resource} className={className} />;
@@ -84,7 +93,7 @@ export function ResourcePreview({ resource, className = '' }: ResourcePreviewPro
   }
 
   // 链接预览
-  if (resource.type === 'link' && resource.metadata?.url) {
+  if (resource.type === 'link' && linkUrl) {
     return <LinkResourcePreview resource={resource} className={className} />;
   }
 
@@ -311,8 +320,8 @@ function LinkResourcePreview({ resource, className }: ResourcePreviewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const url = resource.metadata?.url || '';
-  const title = resource.metadata?.title || '链接';
+  const url = normalizeLinkUrl(resource.metadata?.url || resource.content);
+  const title = resource.metadata?.title || resource.metadata?.domain || '链接';
   const domain = resource.metadata?.domain || '';
 
   const deviceWidths = {

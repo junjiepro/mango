@@ -6,9 +6,22 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Link2, ExternalLink, RefreshCw, Copy, Check, Globe, Smartphone, Monitor, Tablet } from 'lucide-react';
+import {
+  Link2,
+  ExternalLink,
+  RefreshCw,
+  Copy,
+  Check,
+  Globe,
+  Smartphone,
+  Monitor,
+  Tablet,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useTranslations } from 'next-intl';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { PreviewContainer, PreviewLoading, PreviewError } from './PreviewContainer';
@@ -28,9 +41,11 @@ interface LinkPreviewerProps {
 }
 
 export function LinkPreviewer({ url, title, className = '' }: LinkPreviewerProps) {
+  const t = useTranslations('workspace');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
+  const [showAddressBar, setShowAddressBar] = useState(false);
   const [copied, setCopied] = useState(false);
   const [key, setKey] = useState(0);
   const [inputUrl, setInputUrl] = useState(url);
@@ -146,6 +161,22 @@ export function LinkPreviewer({ url, title, className = '' }: LinkPreviewerProps
 
         <div className="w-px h-4 bg-border mx-1" />
 
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={showAddressBar ? 'secondary' : 'ghost'}
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setShowAddressBar((prev) => !prev)}
+            >
+              {showAddressBar ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {showAddressBar ? t('linkPreview.hideAddressBar') : t('linkPreview.showAddressBar')}
+          </TooltipContent>
+        </Tooltip>
+
         {/* 复制 */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -188,18 +219,20 @@ export function LinkPreviewer({ url, title, className = '' }: LinkPreviewerProps
     >
       <div className="flex flex-col h-full">
         {/* URL 输入栏 */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/10">
-          <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
-          <Input
-            type="url"
-            value={inputUrl}
-            onChange={(e) => setInputUrl(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={handleNavigate}
-            placeholder="输入 URL..."
-            className="h-7 text-sm flex-1"
-          />
-        </div>
+        {showAddressBar && (
+          <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/10">
+            <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Input
+              type="url"
+              value={inputUrl}
+              onChange={(e) => setInputUrl(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={handleNavigate}
+              placeholder="输入 URL..."
+              className="h-7 text-sm flex-1"
+            />
+          </div>
+        )}
 
         {/* 预览区域 */}
         <div className="flex-1 overflow-hidden flex items-stretch justify-center">

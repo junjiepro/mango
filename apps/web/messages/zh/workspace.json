@@ -27,6 +27,18 @@
     "disconnected": "终端连接已断开",
     "cannotConnect": "无法连接到终端"
   },
+  "linkPreview": {
+    "showAddressBar": "显示地址栏",
+    "hideAddressBar": "隐藏地址栏"
+  },
+  "resourceTab": {
+    "openWebsite": "打开网站",
+    "inputLinkPlaceholder": "输入链接，例如 https://example.com",
+    "openLink": "打开",
+    "invalidLink": "请输入有效链接",
+    "empty": "暂无资源",
+    "emptyHint": "对话中的文件、链接等资源会显示在这里"
+  },
   "fileExplorer": {
     "title": "文件浏览器",
     "loading": "加载中...",

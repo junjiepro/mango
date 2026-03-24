@@ -114,6 +114,8 @@
     "unknown": "Unknown",
     "copyMessage": "Copy message",
     "regenerate": "Regenerate",
+    "showActions": "Show actions",
+    "hideActions": "Hide actions",
     "toolRunning": "Running",
     "toolSuccess": "Success",
     "toolError": "Failed",

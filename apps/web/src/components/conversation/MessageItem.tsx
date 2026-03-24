@@ -18,7 +18,14 @@ import {
   MessageAttachments,
   MessageAttachment,
 } from '@/components/ai-elements/message';
-import { CopyIcon, RefreshCcwIcon, AlertCircleIcon, ClockIcon } from 'lucide-react';
+import {
+  CopyIcon,
+  RefreshCcwIcon,
+  AlertCircleIcon,
+  ClockIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from 'lucide-react';
 import type { FileUIPart } from 'ai';
 import {
   smartRefreshAttachmentUrls,
@@ -30,6 +37,7 @@ import { HtmlContentRenderer, isHtmlContent, parseContentSegments } from './Html
 import { MiniAppReference } from './MiniAppReference';
 import { A2UIRenderer } from '@/components/a2ui/A2UIRenderer';
 import { FeedbackButton } from '@/components/feedback/FeedbackButton';
+import { Button } from '@/components/ui/button';
 
 type MessageType = Database['public']['Tables']['messages']['Row'];
 type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
@@ -121,6 +129,7 @@ export const MessageItem = React.memo(function MessageItem({
   const isSystem = message.sender_type === 'system';
   const isMiniApp = message.sender_type === 'miniapp';
   const t = useTranslations('conversations');
+  const [actionsCollapsed, setActionsCollapsed] = useState(false);
 
   // 确定消息角色
   const messageRole = isUser ? 'user' : 'assistant';
@@ -287,6 +296,10 @@ export const MessageItem = React.memo(function MessageItem({
     () => contentSegments.some((segment) => segment.type === 'html'),
     [contentSegments]
   );
+
+  useEffect(() => {
+    setActionsCollapsed(hasHtmlContent);
+  }, [message.id, hasHtmlContent]);
 
   // 检测消息中是否包含 A2UI 组件
   const a2uiComponents = useMemo(() => {
@@ -609,21 +622,43 @@ export const MessageItem = React.memo(function MessageItem({
 
         {/* 消息操作按钮 */}
         {showActions && !isUser && message.status === 'sent' && (
-          <MessageActions>
-            <MessageAction tooltip={t('messageItem.copyMessage')} onClick={handleCopy}>
-              <CopyIcon className="size-4" />
-            </MessageAction>
-            {onRetry && (
-              <MessageAction tooltip={t('messageItem.regenerate')} onClick={onRetry}>
-                <RefreshCcwIcon className="size-4" />
+          actionsCollapsed ? (
+            <div className="mt-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground"
+                onClick={() => setActionsCollapsed(false)}
+              >
+                <ChevronDownIcon className="size-3.5 mr-1" />
+                {t('messageItem.showActions')}
+              </Button>
+            </div>
+          ) : (
+            <MessageActions>
+              <MessageAction tooltip={t('messageItem.copyMessage')} onClick={handleCopy}>
+                <CopyIcon className="size-4" />
               </MessageAction>
-            )}
-            <FeedbackButton
-              messageId={message.id}
-              conversationId={message.conversation_id}
-              size="sm"
-            />
-          </MessageActions>
+              {onRetry && (
+                <MessageAction tooltip={t('messageItem.regenerate')} onClick={onRetry}>
+                  <RefreshCcwIcon className="size-4" />
+                </MessageAction>
+              )}
+              <FeedbackButton
+                messageId={message.id}
+                conversationId={message.conversation_id}
+                size="sm"
+              />
+              {hasHtmlContent && (
+                <MessageAction
+                  tooltip={t('messageItem.hideActions')}
+                  onClick={() => setActionsCollapsed(true)}
+                >
+                  <ChevronUpIcon className="size-4" />
+                </MessageAction>
+              )}
+            </MessageActions>
+          )
         )}
 
         {/* 消息状态指示器 */}

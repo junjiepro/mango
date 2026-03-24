@@ -73,13 +73,23 @@ export class ResourceDetector {
    */
   private extractMetadata(type: ResourceType, match: RegExpMatchArray): Record<string, unknown> {
     switch (type) {
-      case 'link':
+      case 'link': {
+        const rawUrl = match[0];
+        const normalizedUrl = rawUrl.startsWith('www.') ? `https://${rawUrl}` : rawUrl;
         try {
-          const url = new URL(match[0]);
-          return { domain: url.hostname };
+          const url = new URL(normalizedUrl);
+          return {
+            url: normalizedUrl,
+            title: url.hostname,
+            domain: url.hostname,
+          };
         } catch {
-          return { domain: match[0] };
+          return {
+            url: normalizedUrl,
+            domain: rawUrl,
+          };
         }
+      }
       case 'file':
         return {
           filename: match[1] || 'unknown',
