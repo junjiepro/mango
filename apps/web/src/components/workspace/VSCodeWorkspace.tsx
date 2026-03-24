@@ -57,6 +57,7 @@ export function VSCodeWorkspace({
   const isInitializedRef = useRef(false);
   const isRestoringRef = useRef(false); // 标记是否正在恢复状态
   const lastPreviewRefreshUrlRef = useRef<string | null>(null);
+  const [activeDevicePreviewUrl, setActiveDevicePreviewUrl] = useState<string | undefined>(undefined);
 
   // 工作区状态持久化
   const { getInitialState, saveState } = useWorkspaceState(conversationId);
@@ -281,6 +282,7 @@ export function VSCodeWorkspace({
 
   React.useEffect(() => {
     lastPreviewRefreshUrlRef.current = null;
+    setActiveDevicePreviewUrl(undefined);
   }, [deviceId]);
 
   // 定期检查设备 URL 可达性，不可达时重新加载设备数据
@@ -299,14 +301,8 @@ export function VSCodeWorkspace({
     return () => clearInterval(timer);
   }, [deviceId, selectedDevice?.online_urls]);
 
-  const handleDeviceUrlChange = useCallback(
-    async (newOnlineUrl: string) => {
-      if (lastPreviewRefreshUrlRef.current === newOnlineUrl) {
-        return;
-      }
-
-      lastPreviewRefreshUrlRef.current = newOnlineUrl;
-
+  const refreshWebServicePreviewSessions = useCallback(
+    async (onlineUrl: string) => {
       const bindingCode = selectedDevice?.binding_code;
       if (!bindingCode) return;
 
@@ -316,13 +312,13 @@ export function VSCodeWorkspace({
       for (const tab of wsTabs) {
         const sid = tab.webService!.id;
         try {
-          const resp = await fetch(`${newOnlineUrl}/web-services/${sid}/preview-session`, {
+          const resp = await fetch(`${onlineUrl}/web-services/${sid}/preview-session`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${bindingCode}` },
           });
           if (resp.ok) {
             const data = await resp.json();
-            const newProxyUrl = `${newOnlineUrl}${data.previewUrl}`;
+            const newProxyUrl = `${onlineUrl}${data.previewUrl}`;
             updateAllWebServiceUrls((oldUrl, id) => (id === sid ? newProxyUrl : oldUrl));
           }
         } catch {
@@ -331,6 +327,33 @@ export function VSCodeWorkspace({
       }
     },
     [selectedDevice?.binding_code, tabs, updateAllWebServiceUrls]
+  );
+
+  useEffect(() => {
+    if (!activeDevicePreviewUrl) return;
+
+    const wsTabs = tabs.filter((t) => t.type === 'webservice' && t.webService);
+    if (wsTabs.length === 0) return;
+
+    const refreshTimer = window.setInterval(() => {
+      void refreshWebServicePreviewSessions(activeDevicePreviewUrl);
+    }, 4 * 60_000);
+
+    return () => window.clearInterval(refreshTimer);
+  }, [activeDevicePreviewUrl, tabs, refreshWebServicePreviewSessions]);
+
+  const handleDeviceUrlChange = useCallback(
+    async (newOnlineUrl: string) => {
+      setActiveDevicePreviewUrl(newOnlineUrl);
+
+      if (lastPreviewRefreshUrlRef.current === newOnlineUrl) {
+        return;
+      }
+
+      lastPreviewRefreshUrlRef.current = newOnlineUrl;
+      await refreshWebServicePreviewSessions(newOnlineUrl);
+    },
+    [refreshWebServicePreviewSessions]
   );
 
   // 获取侧边栏标题
