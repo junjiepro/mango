@@ -31,6 +31,7 @@ export function Terminal({ deviceId, device, className }: TerminalProps) {
 
   useEffect(() => {
     if (!terminalRef.current || !deviceId || !client) return;
+    let disposed = false;
 
     // 创建终端实例
     const xterm = new XTerm({
@@ -71,9 +72,14 @@ export function Terminal({ deviceId, device, className }: TerminalProps) {
 
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
+    const inputDisposable = xterm.onData((data) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'input', data }));
+      }
+    });
 
     // 连接 WebSocket
-    connectWebSocket(xterm, deviceId);
+    void connectWebSocket(xterm, () => disposed);
 
     // 使用 ResizeObserver 监听容器尺寸变化
     const resizeObserver = new ResizeObserver(() => {
@@ -99,29 +105,51 @@ export function Terminal({ deviceId, device, className }: TerminalProps) {
     }
 
     return () => {
+      disposed = true;
       resizeObserver.disconnect();
+      inputDisposable.dispose();
       wsRef.current?.close();
       xterm.dispose();
     };
   }, [deviceId, client]);
 
-  const connectWebSocket = async (xterm: XTerm, deviceId: string) => {
+  const connectWebSocket = async (
+    xterm: XTerm,
+    isDisposed: () => boolean,
+    allowRecovery = true
+  ) => {
     if (!client) return;
 
     try {
+      if (allowRecovery) {
+        await client.reconnect().catch(() => false);
+      }
+
       // 使用 client 获取 WebSocket URL 和认证信息
       const wsUrl = client.terminal.getWebSocketUrl();
       const token = client.terminal.getAuthToken();
 
       // 连接到设备的 WebSocket
       const ws = new WebSocket(wsUrl);
+      let recoveryStarted = false;
 
-      // 提前注册键盘输入监听器，确保用户输入能被捕获
-      xterm.onData((data) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'input', data }));
+      const recoverConnection = async () => {
+        if (isDisposed() || recoveryStarted || !allowRecovery) return;
+        recoveryStarted = true;
+        wsRef.current = null;
+
+        const refreshed = await client.reconnect().catch(() => false);
+        if (!refreshed || isDisposed()) {
+          return;
         }
-      });
+
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        if (!isDisposed()) {
+          await connectWebSocket(xterm, isDisposed, false);
+        }
+      };
+
+      wsRef.current = ws;
 
       ws.onopen = () => {
         // 发送认证信息
@@ -148,13 +176,16 @@ export function Terminal({ deviceId, device, className }: TerminalProps) {
 
       ws.onerror = () => {
         xterm.writeln('\r\n' + t('terminal.connectionError'));
+        void recoverConnection();
       };
 
       ws.onclose = () => {
         xterm.writeln('\r\n' + t('terminal.disconnected'));
+        if (wsRef.current === ws) {
+          wsRef.current = null;
+        }
+        void recoverConnection();
       };
-
-      wsRef.current = ws;
     } catch (error) {
       xterm.writeln('\r\n' + t('terminal.cannotConnect'));
       console.error('Terminal connection error:', error);

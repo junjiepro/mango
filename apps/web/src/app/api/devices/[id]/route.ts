@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AppError, ErrorType, normalizeError } from '@mango/shared/utils';
 import { logger } from '@mango/shared/utils';
 import { DeviceUrls } from '@/hooks/useDeviceBinding';
+import { getBrowserSafeDeviceUrls } from '@/lib/device-urls';
 
 /**
  * GET /api/devices/[id]
@@ -59,21 +60,25 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     // 检查设备在线状态
-    // online_urls 供浏览器直连设备，排除 tailscale_url（浏览器通常无法解析 *.ts.net 域名）
+    // online_urls 始终返回浏览器可尝试的候选地址，is_online 基于本次健康检查结果
     let healthCheckError = null;
-    const onlineUrls: string[] = [];
+    let candidateOnlineUrls: string[] = [];
+    const reachableOnlineUrls: string[] = [];
 
     if (binding.status === 'active' && binding.device_url) {
       try {
         const deviceUrls = binding.device_url as unknown as DeviceUrls;
-        const orderedUrls = [
-          deviceUrls.cloudflare_url,
-          deviceUrls.hostname_url,
-          deviceUrls.localhost_url,
-        ].filter(Boolean) as string[];
+        candidateOnlineUrls = getBrowserSafeDeviceUrls(
+          deviceUrls,
+          request.nextUrl.protocol
+        );
+
+        if (candidateOnlineUrls.length === 0) {
+          healthCheckError = 'No browser-safe device URL is available';
+        }
 
         const results = await Promise.allSettled(
-          orderedUrls.map(async (url) => {
+          candidateOnlineUrls.map(async (url) => {
             const resp = await fetch(`${url}/health`, {
               method: 'GET',
               signal: AbortSignal.timeout(5000),
@@ -84,13 +89,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
         for (const r of results) {
           if (r.status === 'fulfilled' && r.value.ok) {
-            onlineUrls.push(r.value.url);
+            reachableOnlineUrls.push(r.value.url);
           } else if (r.status === 'fulfilled') {
             healthCheckError = `Health check failed with status ${r.value.status}`;
           }
         }
 
-        if (onlineUrls.length > 0) {
+        if (reachableOnlineUrls.length > 0) {
           healthCheckError = null;
         }
       } catch (error) {
@@ -101,8 +106,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     return NextResponse.json({
       device: {
         ...binding,
-        online_urls: onlineUrls,
-        is_online: onlineUrls.length > 0,
+        online_urls: candidateOnlineUrls,
+        reachable_online_urls: reachableOnlineUrls,
+        is_online: reachableOnlineUrls.length > 0,
         health_check_error: healthCheckError,
         last_check_at: new Date().toISOString(),
       },

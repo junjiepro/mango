@@ -544,18 +544,19 @@ export function createUrlRefresher(deviceId: string): () => Promise<RefreshUrlRe
 
       const data = await response.json();
       const device = data.device;
+      const urls = Array.isArray(device?.online_urls) ? device.online_urls : [];
 
-      if (!device || !device.is_online) {
+      if (!device || urls.length === 0) {
         return {
           success: false,
           urls: [],
-          error: '设备离线',
+          error: '没有可用的设备 URL 候选项',
         };
       }
 
       return {
         success: true,
-        urls: device.online_urls || [],
+        urls,
       };
     } catch (error) {
       return {
@@ -577,9 +578,11 @@ export function createResilientConfig(
   // 使用类型断言来访问扩展属性
   const extendedDevice = device as DeviceBinding & {
     online_urls?: string[];
+    reachable_online_urls?: string[];
   };
 
-  const deviceUrl = extendedDevice.online_urls?.[0];
+  const deviceUrl =
+    extendedDevice.reachable_online_urls?.[0] ?? extendedDevice.online_urls?.[0];
 
   if (!deviceUrl || !device.binding_code) {
     return null;

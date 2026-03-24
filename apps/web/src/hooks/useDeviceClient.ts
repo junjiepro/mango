@@ -399,6 +399,7 @@ export interface UseDeviceClientReturn {
  */
 interface ExtendedDeviceBinding extends DeviceBinding {
   online_urls?: string[];
+  reachable_online_urls?: string[];
 }
 
 /**
@@ -443,7 +444,13 @@ export function useDeviceClient(device?: DeviceBinding): UseDeviceClientReturn {
     return () => {
       resilientClientRef.current = null;
     };
-  }, [device?.id, (device as ExtendedDeviceBinding)?.online_urls?.[0], device?.binding_code, handleConnectionStatusChange]);
+  }, [
+    device?.id,
+    (device as ExtendedDeviceBinding)?.reachable_online_urls?.[0],
+    (device as ExtendedDeviceBinding)?.online_urls?.[0],
+    device?.binding_code,
+    handleConnectionStatusChange,
+  ]);
 
   // 手动重连函数
   const reconnect = useCallback(async (): Promise<boolean> => {

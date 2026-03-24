@@ -110,6 +110,7 @@ export function DeviceTab({ device, onRefresh, onOpenWebService, onDeviceUrlChan
   const [mcpServicesJson, setMcpServicesJson] = useState('{}');
   const [mcpJsonError, setMcpJsonError] = useState<string | null>(null);
   const clientRef = useRef<Client | null>(null);
+  const lastNotifiedUrlRef = useRef<string | undefined>(undefined);
   const [onlineUrl, setOnlineUrl] = useState<string | undefined>(
     device?.online_urls?.[0]
   );
@@ -140,10 +141,9 @@ export function DeviceTab({ device, onRefresh, onOpenWebService, onDeviceUrlChan
           // 不可达，继续下一个
         }
       }
-      // 全部不可达 → 触发刷新设备数据（URL 可能已更新）
+      // 全部不可达 → 保持空状态，父组件的周期刷新会重新拉取最新设备 URL
       if (!cancelled) {
         setOnlineUrl(undefined);
-        onRefresh?.();
       }
     })();
 
@@ -152,9 +152,17 @@ export function DeviceTab({ device, onRefresh, onOpenWebService, onDeviceUrlChan
 
   // 通知父组件设备 URL 变化
   useEffect(() => {
-    if (onlineUrl) {
-      onDeviceUrlChange?.(onlineUrl);
+    if (!onlineUrl) {
+      lastNotifiedUrlRef.current = undefined;
+      return;
     }
+
+    if (lastNotifiedUrlRef.current === onlineUrl) {
+      return;
+    }
+
+    lastNotifiedUrlRef.current = onlineUrl;
+    onDeviceUrlChange?.(onlineUrl);
   }, [onlineUrl, onDeviceUrlChange]);
 
   // 清理客户端连接

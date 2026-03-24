@@ -56,6 +56,7 @@ export function VSCodeWorkspace({
   const [selectedDevice, setSelectedDevice] = useState<DeviceBinding | undefined>(undefined);
   const isInitializedRef = useRef(false);
   const isRestoringRef = useRef(false); // 标记是否正在恢复状态
+  const lastPreviewRefreshUrlRef = useRef<string | null>(null);
 
   // 工作区状态持久化
   const { getInitialState, saveState } = useWorkspaceState(conversationId);
@@ -278,6 +279,10 @@ export function VSCodeWorkspace({
     if (deviceId) loadDevice(deviceId);
   }, [deviceId]);
 
+  React.useEffect(() => {
+    lastPreviewRefreshUrlRef.current = null;
+  }, [deviceId]);
+
   // 定期检查设备 URL 可达性，不可达时重新加载设备数据
   React.useEffect(() => {
     if (!deviceId || !selectedDevice?.online_urls?.length) return;
@@ -293,6 +298,40 @@ export function VSCodeWorkspace({
     }, 15000);
     return () => clearInterval(timer);
   }, [deviceId, selectedDevice?.online_urls]);
+
+  const handleDeviceUrlChange = useCallback(
+    async (newOnlineUrl: string) => {
+      if (lastPreviewRefreshUrlRef.current === newOnlineUrl) {
+        return;
+      }
+
+      lastPreviewRefreshUrlRef.current = newOnlineUrl;
+
+      const bindingCode = selectedDevice?.binding_code;
+      if (!bindingCode) return;
+
+      const wsTabs = tabs.filter((t) => t.type === 'webservice' && t.webService);
+      if (wsTabs.length === 0) return;
+
+      for (const tab of wsTabs) {
+        const sid = tab.webService!.id;
+        try {
+          const resp = await fetch(`${newOnlineUrl}/web-services/${sid}/preview-session`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${bindingCode}` },
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            const newProxyUrl = `${newOnlineUrl}${data.previewUrl}`;
+            updateAllWebServiceUrls((oldUrl, id) => (id === sid ? newProxyUrl : oldUrl));
+          }
+        } catch {
+          // Ignore - tab will show error state if service unreachable
+        }
+      }
+    },
+    [selectedDevice?.binding_code, tabs, updateAllWebServiceUrls]
+  );
 
   // 获取侧边栏标题
   const getSidebarTitle = () => {
@@ -376,31 +415,7 @@ export function VSCodeWorkspace({
             onOpenWebService={(service, proxyUrl) => {
               openWebServiceTab(service, proxyUrl);
             }}
-            onDeviceUrlChange={async (newOnlineUrl) => {
-              // When device URL changes (e.g. tunnel restart), refresh tokens for open webservice tabs
-              const bindingCode = selectedDevice?.binding_code;
-              if (!bindingCode) return;
-              const wsTabs = tabs.filter((t) => t.type === 'webservice' && t.webService);
-              if (wsTabs.length === 0) return;
-
-              // Fetch new preview tokens for each open service
-              for (const tab of wsTabs) {
-                const sid = tab.webService!.id;
-                try {
-                  const resp = await fetch(`${newOnlineUrl}/web-services/${sid}/preview-session`, {
-                    method: 'POST',
-                    headers: { Authorization: `Bearer ${bindingCode}` },
-                  });
-                  if (resp.ok) {
-                    const data = await resp.json();
-                    const newProxyUrl = `${newOnlineUrl}${data.previewUrl}`;
-                    updateAllWebServiceUrls((_, id) => (id === sid ? newProxyUrl : _));
-                  }
-                } catch {
-                  // Ignore - tab will show error state if service unreachable
-                }
-              }
-            }}
+            onDeviceUrlChange={handleDeviceUrlChange}
           />
         );
       case 'files':

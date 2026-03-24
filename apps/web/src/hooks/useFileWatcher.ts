@@ -49,6 +49,7 @@ interface UseFileWatcherReturn {
  */
 interface ExtendedDeviceBinding extends DeviceBinding {
   online_urls?: string[];
+  reachable_online_urls?: string[];
 }
 
 export function useFileWatcher({
@@ -63,6 +64,7 @@ export function useFileWatcher({
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const connectionAttemptRef = useRef(0);
   const onFileChangeRef = useRef(onFileChange);
   const watchPathRef = useRef(watchPath);
   const enabledRef = useRef(enabled);
@@ -110,17 +112,34 @@ export function useFileWatcher({
     }
 
     const extDevice = device as ExtendedDeviceBinding;
-    const httpUrl = extDevice.online_urls?.[0];
+    const httpUrl =
+      extDevice.reachable_online_urls?.[0] ?? extDevice.online_urls?.[0];
     if (!httpUrl || !device.binding_code) {
       return;
     }
 
     const wsUrl = httpUrl.replace(/^http/, 'ws') + '/ws/files';
+    const attemptId = ++connectionAttemptRef.current;
+    let isActive = true;
 
     const connect = () => {
+      if (!isActive || connectionAttemptRef.current !== attemptId) {
+        return;
+      }
+
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+
       // 清理旧连接
       if (wsRef.current) {
+        wsRef.current.onopen = null;
+        wsRef.current.onmessage = null;
+        wsRef.current.onerror = null;
+        wsRef.current.onclose = null;
         wsRef.current.close();
+        wsRef.current = null;
       }
 
       try {
@@ -129,12 +148,19 @@ export function useFileWatcher({
         wsRef.current = ws;
 
         ws.onopen = () => {
+          if (!isActive || connectionAttemptRef.current !== attemptId || wsRef.current !== ws) {
+            ws.close();
+            return;
+          }
           console.log('[useFileWatcher] Connected, authenticating...');
           setError(null);
           ws.send(JSON.stringify({ type: 'auth', token: device.binding_code }));
         };
 
         ws.onmessage = (event) => {
+          if (!isActive || connectionAttemptRef.current !== attemptId || wsRef.current !== ws) {
+            return;
+          }
           try {
             const msg = JSON.parse(event.data);
             console.log('[useFileWatcher] Received:', msg.type);
@@ -174,20 +200,30 @@ export function useFileWatcher({
         };
 
         ws.onerror = (err) => {
+          if (!isActive || connectionAttemptRef.current !== attemptId || wsRef.current !== ws) {
+            return;
+          }
           console.error('[useFileWatcher] WebSocket error:', err);
           setError('连接错误');
         };
 
         ws.onclose = () => {
+          if (!isActive || connectionAttemptRef.current !== attemptId) {
+            return;
+          }
           console.log('[useFileWatcher] Disconnected');
           setIsConnected(false);
           setIsSubscribed(false);
-          wsRef.current = null;
+          if (wsRef.current === ws) {
+            wsRef.current = null;
+          }
 
           // 自动重连
-          if (enabledRef.current && deviceRef.current) {
+          if (enabledRef.current && deviceRef.current && isActive) {
             reconnectTimerRef.current = setTimeout(() => {
-              connect();
+              if (isActive && connectionAttemptRef.current === attemptId) {
+                connect();
+              }
             }, 3000);
           }
         };
@@ -200,16 +236,27 @@ export function useFileWatcher({
     connect();
 
     return () => {
+      isActive = false;
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
       if (wsRef.current) {
+        wsRef.current.onopen = null;
+        wsRef.current.onmessage = null;
+        wsRef.current.onerror = null;
+        wsRef.current.onclose = null;
         wsRef.current.close();
         wsRef.current = null;
       }
     };
-  }, [enabled, device?.id, device?.binding_code, (device as ExtendedDeviceBinding)?.online_urls?.[0]]);
+  }, [
+    enabled,
+    device?.id,
+    device?.binding_code,
+    (device as ExtendedDeviceBinding)?.reachable_online_urls?.[0],
+    (device as ExtendedDeviceBinding)?.online_urls?.[0],
+  ]);
 
   // 监听 watchPath 变化，重新订阅
   useEffect(() => {
