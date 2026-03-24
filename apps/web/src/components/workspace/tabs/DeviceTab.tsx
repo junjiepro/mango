@@ -60,9 +60,10 @@ interface DeviceTabProps {
   device?: DeviceBinding;
   onRefresh?: () => void;
   onOpenWebService?: (service: DiscoveredWebService, proxyUrl: string) => void;
+  onDeviceUrlChange?: (newOnlineUrl: string) => void;
 }
 
-export function DeviceTab({ device, onRefresh, onOpenWebService }: DeviceTabProps) {
+export function DeviceTab({ device, onRefresh, onOpenWebService, onDeviceUrlChange }: DeviceTabProps) {
   const t = useTranslations('devices');
   // 状态检查
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
@@ -88,7 +89,7 @@ export function DeviceTab({ device, onRefresh, onOpenWebService }: DeviceTabProp
   const [statusOpen, setStatusOpen] = useState(true);
   const [configOpen, setConfigOpen] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(true);
-  const [webServicesOpen, setWebServicesOpen] = useState(true);
+  const [webServicesOpen, setWebServicesOpen] = useState(false);
 
   // Web 服务发现状态
   const [webServices, setWebServices] = useState<DiscoveredWebService[]>([]);
@@ -139,12 +140,22 @@ export function DeviceTab({ device, onRefresh, onOpenWebService }: DeviceTabProp
           // 不可达，继续下一个
         }
       }
-      // 全部不可达，回退到第一个（保持显示用）
-      if (!cancelled) setOnlineUrl(urls[0]);
+      // 全部不可达 → 触发刷新设备数据（URL 可能已更新）
+      if (!cancelled) {
+        setOnlineUrl(undefined);
+        onRefresh?.();
+      }
     })();
 
     return () => { cancelled = true; };
   }, [device?.online_urls]);
+
+  // 通知父组件设备 URL 变化
+  useEffect(() => {
+    if (onlineUrl) {
+      onDeviceUrlChange?.(onlineUrl);
+    }
+  }, [onlineUrl, onDeviceUrlChange]);
 
   // 清理客户端连接
   useEffect(() => {

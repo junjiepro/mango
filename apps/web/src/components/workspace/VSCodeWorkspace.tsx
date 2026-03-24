@@ -92,6 +92,7 @@ export function VSCodeWorkspace({
     openMiniAppTab,
     openCreateMiniAppTab,
     openWebServiceTab,
+    updateAllWebServiceUrls,
     closeTab,
     closeAllTabs,
     closeOtherTabs,
@@ -277,6 +278,22 @@ export function VSCodeWorkspace({
     if (deviceId) loadDevice(deviceId);
   }, [deviceId]);
 
+  // 定期检查设备 URL 可达性，不可达时重新加载设备数据
+  React.useEffect(() => {
+    if (!deviceId || !selectedDevice?.online_urls?.length) return;
+    const timer = setInterval(async () => {
+      const urls = selectedDevice.online_urls || [];
+      for (const url of urls) {
+        try {
+          const resp = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
+          if (resp.ok) return;
+        } catch { /* 继续 */ }
+      }
+      loadDevice(deviceId);
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [deviceId, selectedDevice?.online_urls]);
+
   // 获取侧边栏标题
   const getSidebarTitle = () => {
     switch (activeItem) {
@@ -358,6 +375,31 @@ export function VSCodeWorkspace({
             onRefresh={() => deviceId && loadDevice(deviceId)}
             onOpenWebService={(service, proxyUrl) => {
               openWebServiceTab(service, proxyUrl);
+            }}
+            onDeviceUrlChange={async (newOnlineUrl) => {
+              // When device URL changes (e.g. tunnel restart), refresh tokens for open webservice tabs
+              const bindingCode = selectedDevice?.binding_code;
+              if (!bindingCode) return;
+              const wsTabs = tabs.filter((t) => t.type === 'webservice' && t.webService);
+              if (wsTabs.length === 0) return;
+
+              // Fetch new preview tokens for each open service
+              for (const tab of wsTabs) {
+                const sid = tab.webService!.id;
+                try {
+                  const resp = await fetch(`${newOnlineUrl}/web-services/${sid}/preview-session`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${bindingCode}` },
+                  });
+                  if (resp.ok) {
+                    const data = await resp.json();
+                    const newProxyUrl = `${newOnlineUrl}${data.previewUrl}`;
+                    updateAllWebServiceUrls((_, id) => (id === sid ? newProxyUrl : _));
+                  }
+                } catch {
+                  // Ignore - tab will show error state if service unreachable
+                }
+              }
             }}
           />
         );

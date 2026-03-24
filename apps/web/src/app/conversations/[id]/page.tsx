@@ -154,6 +154,23 @@ function ConversationDetailContent() {
     if (selectedDeviceId) loadDevice(selectedDeviceId);
   }, [selectedDeviceId]);
 
+  // 定期检查设备 URL 可达性，不可达时重新加载设备数据
+  React.useEffect(() => {
+    if (!selectedDeviceId || !selectedDevice?.online_urls?.length) return;
+    const timer = setInterval(async () => {
+      const urls = selectedDevice.online_urls || [];
+      for (const url of urls) {
+        try {
+          const resp = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
+          if (resp.ok) return; // 可达，无需刷新
+        } catch { /* 继续下一个 */ }
+      }
+      // 全部不可达，重新加载设备数据获取最新 URL
+      loadDevice(selectedDeviceId);
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [selectedDeviceId, selectedDevice?.online_urls]);
+
   // 标记布局初始化完成
   React.useEffect(() => {
     isLayoutInitializedRef.current = true;

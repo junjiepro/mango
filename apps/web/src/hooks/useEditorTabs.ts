@@ -243,6 +243,21 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
     );
   }, []);
 
+  // 批量更新所有 webservice 标签页的 proxyUrl（设备 URL 变化时）
+  const updateAllWebServiceUrls = useCallback(
+    (urlUpdater: (oldUrl: string, serviceId: string) => string) => {
+      setTabs((prevTabs) =>
+        prevTabs.map((tab) => {
+          if (tab.type !== 'webservice' || !tab.webService) return tab;
+          const newUrl = urlUpdater(tab.webService.proxyUrl, tab.webService.id);
+          if (newUrl === tab.webService.proxyUrl) return tab;
+          return { ...tab, webService: { ...tab.webService, proxyUrl: newUrl } };
+        })
+      );
+    },
+    []
+  );
+
   // 关闭所有标签页
   const closeAllTabs = useCallback(() => {
     setTabs([]);
@@ -283,6 +298,7 @@ export function useEditorTabs(options: UseEditorTabsOptions = {}) {
     openMiniAppTab,
     openCreateMiniAppTab,
     openWebServiceTab,
+    updateAllWebServiceUrls,
     closeTab,
     markTabDirty,
     closeAllTabs,

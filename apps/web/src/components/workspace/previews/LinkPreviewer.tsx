@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Link2, ExternalLink, RefreshCw, Copy, Check, Globe, Smartphone, Monitor, Tablet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +35,17 @@ export function LinkPreviewer({ url, title, className = '' }: LinkPreviewerProps
   const [key, setKey] = useState(0);
   const [inputUrl, setInputUrl] = useState(url);
   const [currentUrl, setCurrentUrl] = useState(url);
+
+  // Sync with prop changes (e.g. device URL change, token refresh)
+  useEffect(() => {
+    if (url !== currentUrl) {
+      setCurrentUrl(url);
+      setInputUrl(url);
+      setIsLoading(true);
+      setError(null);
+      setKey((prev) => prev + 1);
+    }
+  }, [url]);
 
   // 复制 URL
   const handleCopy = useCallback(async () => {
@@ -191,7 +202,7 @@ export function LinkPreviewer({ url, title, className = '' }: LinkPreviewerProps
         </div>
 
         {/* 预览区域 */}
-        <div className="flex-1 overflow-auto flex items-start justify-center p-4 bg-muted/20">
+        <div className="flex-1 overflow-hidden flex items-stretch justify-center">
           {error ? (
             <PreviewError
               message="无法加载页面"
@@ -200,12 +211,9 @@ export function LinkPreviewer({ url, title, className = '' }: LinkPreviewerProps
             />
           ) : (
             <div
-              className="relative bg-background shadow-lg rounded-lg overflow-hidden transition-all duration-300"
+              className="relative overflow-hidden transition-all duration-300 w-full h-full"
               style={{
-                width: DEVICE_SIZES[deviceMode].width,
-                maxWidth: '100%',
-                height: deviceMode === 'desktop' ? '100%' : 'auto',
-                minHeight: deviceMode !== 'desktop' ? '600px' : undefined,
+                maxWidth: DEVICE_SIZES[deviceMode].width,
               }}
             >
               {isLoading && (
@@ -224,9 +232,6 @@ export function LinkPreviewer({ url, title, className = '' }: LinkPreviewerProps
                   setError('页面加载失败');
                 }}
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                style={{
-                  minHeight: deviceMode !== 'desktop' ? '600px' : '100%',
-                }}
               />
             </div>
           )}
