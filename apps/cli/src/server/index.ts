@@ -9,7 +9,9 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { serve } from '@hono/node-server';
 import https from 'https';
+import path from 'path';
 import os from 'os';
+import { createRequire } from 'module';
 import type { CLIConfig } from '../types/index.js';
 import { mcpConnector } from '../lib/connectors/mcp-connector.js';
 import { acpConnector } from '../lib/connectors/acp-connector.js';
@@ -25,6 +27,7 @@ import { actualHttpsPort, actualPort } from '../commands/start.js';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from 'node-pty';
 import { existsSync, mkdirSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { fileWatcherManager, type FileChangeEvent } from '../lib/file-watcher.js';
 import { webServiceScanner } from '../lib/web-service-scanner.js';
 import { convertToModelMessages, streamText } from 'ai';
@@ -43,8 +46,115 @@ export interface ServerResult {
 }
 
 // Preview token management for iframe access
-const PREVIEW_TOKEN_TTL_MS = 5 * 60_000;
-const previewSessions = new Map<string, { bindingCode: string; serviceId: string; expiresAt: number }>();
+const PREVIEW_TOKEN_TTL_MS = 8 * 60 * 60_000;
+const previewSessions = new Map<
+  string,
+  { bindingCode: string; serviceId: string; expiresAt: number }
+>();
+const runtimeRequire = createRequire(import.meta.url);
+
+const PAGE_AGENT_RUNTIME = (() => {
+  try {
+    const pageAgentEntry = runtimeRequire.resolve('page-agent');
+    const pageAgentEntryDir = path.dirname(pageAgentEntry);
+    const chalkEntry = runtimeRequire.resolve('chalk');
+    const zodPackageJson = runtimeRequire.resolve('zod/package.json');
+
+    return {
+      modules: {
+        'page-agent.js': pageAgentEntry,
+        'core.js': runtimeRequire.resolve('@page-agent/core', { paths: [pageAgentEntryDir] }),
+        'page-controller.js': runtimeRequire.resolve('@page-agent/page-controller', {
+          paths: [pageAgentEntryDir],
+        }),
+        'ui.js': runtimeRequire.resolve('@page-agent/ui', { paths: [pageAgentEntryDir] }),
+        'llms.js': runtimeRequire.resolve('@page-agent/llms', { paths: [pageAgentEntryDir] }),
+      },
+      vendorRoots: {
+        zod: path.dirname(zodPackageJson),
+        chalk: path.resolve(path.dirname(chalkEntry), '..'),
+      },
+    };
+  } catch (error) {
+    console.warn('[page-agent runtime] failed to resolve local runtime modules:', error);
+    return null;
+  }
+})();
+
+function rewriteRuntimeImports(code: string, replacements: Record<string, string>): string {
+  return Object.entries(replacements).reduce((nextCode, [from, to]) => {
+    return nextCode.replaceAll(`'${from}'`, `'${to}'`).replaceAll(`"${from}"`, `"${to}"`);
+  }, code);
+}
+
+async function loadPageAgentRuntimeModule(moduleName: string): Promise<string | null> {
+  if (!PAGE_AGENT_RUNTIME) {
+    return null;
+  }
+
+  const absolutePath =
+    PAGE_AGENT_RUNTIME.modules[moduleName as keyof typeof PAGE_AGENT_RUNTIME.modules];
+  if (!absolutePath) {
+    return null;
+  }
+
+  const source = await readFile(absolutePath, 'utf8');
+  const replacementsByModule: Record<string, Record<string, string>> = {
+    'page-agent.js': {
+      '@page-agent/core': '/page-agent/runtime/modules/core.js',
+      '@page-agent/page-controller': '/page-agent/runtime/modules/page-controller.js',
+      '@page-agent/ui': '/page-agent/runtime/modules/ui.js',
+    },
+    'core.js': {
+      '@page-agent/llms': '/page-agent/runtime/modules/llms.js',
+      chalk: '/page-agent/runtime/vendor/chalk/source/index.js',
+      'zod/v4': '/page-agent/runtime/vendor/zod/v4/index.js',
+    },
+    'llms.js': {
+      chalk: '/page-agent/runtime/vendor/chalk/source/index.js',
+      'zod/v4': '/page-agent/runtime/vendor/zod/v4/index.js',
+    },
+  };
+
+  return rewriteRuntimeImports(source, replacementsByModule[moduleName] || {});
+}
+
+async function loadPageAgentRuntimeVendorFile(
+  vendor: 'zod' | 'chalk',
+  relativePath: string
+): Promise<string | null> {
+  if (!PAGE_AGENT_RUNTIME) {
+    return null;
+  }
+
+  if (!relativePath || relativePath.includes('..')) {
+    return null;
+  }
+
+  const root = PAGE_AGENT_RUNTIME.vendorRoots[vendor];
+  const absolutePath = path.resolve(root, relativePath);
+  if (!absolutePath.startsWith(root)) {
+    return null;
+  }
+
+  let source: string;
+  try {
+    source = await readFile(absolutePath, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+  if (vendor === 'chalk') {
+    return rewriteRuntimeImports(source, {
+      '#ansi-styles': '/page-agent/runtime/vendor/chalk/source/vendor/ansi-styles/index.js',
+      '#supports-color': '/page-agent/runtime/vendor/chalk/source/vendor/supports-color/browser.js',
+    });
+  }
+
+  return source;
+}
 
 function createPreviewToken(bindingCode: string, serviceId: string): string {
   // Clean expired tokens
@@ -57,14 +167,33 @@ function createPreviewToken(bindingCode: string, serviceId: string): string {
   return token;
 }
 
-function validatePreviewToken(token: string | undefined, serviceId: string): boolean {
-  if (!token) return false;
-  const session = previewSessions.get(token);
-  if (!session || session.serviceId !== serviceId || session.expiresAt <= Date.now()) {
-    if (session) previewSessions.delete(token);
-    return false;
+function getPreviewSession(
+  token: string | undefined,
+  serviceId?: string
+): { bindingCode: string; serviceId: string; expiresAt: number } | null {
+  if (!token) {
+    return null;
   }
-  return true;
+
+  const session = previewSessions.get(token);
+  if (!session) {
+    return null;
+  }
+
+  if (session.expiresAt <= Date.now()) {
+    previewSessions.delete(token);
+    return null;
+  }
+
+  if (serviceId && session.serviceId !== serviceId) {
+    return null;
+  }
+
+  return session;
+}
+
+function validatePreviewToken(token: string | undefined, serviceId: string): boolean {
+  return Boolean(getPreviewSession(token, serviceId));
 }
 
 function hasActivePreviewSession(serviceId: string): boolean {
@@ -77,6 +206,331 @@ function hasActivePreviewSession(serviceId: string): boolean {
     if (session.serviceId === serviceId) return true;
   }
   return false;
+}
+
+function getPreviewTokenFromRequest(c: Context): string | undefined {
+  const requestUrl = new URL(c.req.url);
+  const directToken = requestUrl.searchParams.get('_preview_token');
+  if (directToken) {
+    return directToken;
+  }
+
+  const referer = c.req.header('referer');
+  if (!referer) {
+    return undefined;
+  }
+
+  try {
+    return new URL(referer).searchParams.get('_preview_token') || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function getServiceIdFromReferer(referer: string | undefined): string | undefined {
+  if (!referer) {
+    return undefined;
+  }
+
+  try {
+    const pathname = new URL(referer).pathname;
+    const match = pathname.match(/^\/proxy\/web\/([^/]+)(?:\/|$)/);
+    return match?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+export function createWebPreviewBridgeScript(): string {
+  const llmProxyBase = '/page-agent/llm';
+  const moduleUrls = ['/page-agent/runtime/modules/page-agent.js'];
+  return `<script>(function(){
+if(window.__MANGO_PREVIEW_BRIDGE_INSTALLED__)return;
+window.__MANGO_PREVIEW_BRIDGE_INSTALLED__=true;
+var MODULE_URLS=${JSON.stringify(moduleUrls)};
+var LLM_PROXY_BASE=${JSON.stringify(llmProxyBase)};
+var DEBUG_PREFIX='[mango page-agent]';
+var runtime={
+  executor:null,
+  stopCurrentTask:null,
+  setExecutor:function(fn){
+    this.executor=typeof fn==='function'?fn:null;
+    notify('preview/runtime',{available:!!this.executor});
+  },
+  setStopHandler:function(fn){
+    this.stopCurrentTask=typeof fn==='function'?fn:null;
+  }
+};
+var agentPromise=null;
+var agentInstance=null;
+var constructorPromise=null;
+window.__MANGO_PAGE_AGENT_BRIDGE__=runtime;
+function debug(){
+  try{
+    var args=[DEBUG_PREFIX];
+    for(var index=0;index<arguments.length;index+=1){
+      args.push(arguments[index]);
+    }
+    console.log.apply(console,args);
+  }catch(_err){}
+}
+function summary(){
+  return {
+    title:document.title||'',
+    url:location.href,
+    forms:document.forms.length,
+    inputs:document.querySelectorAll('input, textarea, select').length,
+    buttons:document.querySelectorAll('button, [role="button"]').length,
+    runtimeAvailable:typeof runtime.executor==='function'
+  };
+}
+function post(message){
+  try{
+    window.parent.postMessage(Object.assign({
+      source:'mango-web-preview',
+      version:'1.0'
+    },message),'*');
+  }catch(_err){}
+}
+function notify(event,payload){
+  post({kind:'event',event:event,payload:payload,timestamp:Date.now()});
+}
+function respond(id,result,error){
+  post({kind:'response',id:id,result:result,error:error,timestamp:Date.now()});
+}
+function normalizeResult(result){
+  if(result===undefined)return { ok:true };
+  try{
+    return JSON.parse(JSON.stringify(result));
+  }catch(_err){
+    return { value:String(result) };
+  }
+}
+function getGlobalPageAgentCtor(){
+  if(typeof window.PageAgent==='function') return window.PageAgent;
+  if(window.pageAgent&&typeof window.pageAgent.PageAgent==='function') return window.pageAgent.PageAgent;
+  if(window.PageAgent&&typeof window.PageAgent.PageAgent==='function') return window.PageAgent.PageAgent;
+  return null;
+}
+function resolvePageAgentCtor(moduleValue){
+  debug('resolvePageAgentCtor',{
+    moduleKeys:moduleValue&&typeof moduleValue==='object'?Object.keys(moduleValue):[],
+    defaultKeys:moduleValue&&moduleValue.default&&typeof moduleValue.default==='object'
+      ? Object.keys(moduleValue.default)
+      : []
+  });
+  if(moduleValue&&typeof moduleValue.PageAgent==='function') return moduleValue.PageAgent;
+  if(moduleValue&&moduleValue.default){
+    if(typeof moduleValue.default==='function') return moduleValue.default;
+    if(typeof moduleValue.default.PageAgent==='function') return moduleValue.default.PageAgent;
+  }
+  return getGlobalPageAgentCtor();
+}
+async function ensurePageAgentCtor(){
+  var existingCtor=getGlobalPageAgentCtor();
+  if(existingCtor){
+    debug('using existing global PageAgent ctor');
+    return existingCtor;
+  }
+  if(!constructorPromise){
+    constructorPromise=(async function(){
+      var errors=[];
+      for(var index=0;index<MODULE_URLS.length;index+=1){
+        var url=MODULE_URLS[index];
+        try{
+          debug('importing page-agent module',url);
+          var moduleValue=await import(url);
+          var ctor=resolvePageAgentCtor(moduleValue);
+          if(typeof ctor==='function'){
+            debug('resolved PageAgent ctor from module',{
+              url:url,
+              ctorName:ctor.name||'anonymous'
+            });
+            return ctor;
+          }
+          errors.push('PageAgent export not found after importing '+url);
+        }catch(err){
+          debug('failed to import page-agent module',{
+            url:url,
+            message:err&&err.message?err.message:String(err),
+            stack:err&&err.stack?String(err.stack):null
+          });
+          errors.push(err&&err.message?err.message:String(err));
+        }
+      }
+      throw new Error(errors.join(' | '));
+    })().catch(function(err){
+      constructorPromise=null;
+      throw err;
+    });
+  }
+  return constructorPromise;
+}
+async function getAgent(){
+  if(agentInstance)return agentInstance;
+  if(!agentPromise){
+    agentPromise=ensurePageAgentCtor()
+      .then(function(PageAgentCtor){
+        debug('creating PageAgent instance',{
+          ctorName:PageAgentCtor&&PageAgentCtor.name?PageAgentCtor.name:'anonymous',
+          baseURL:LLM_PROXY_BASE,
+          model:'default'
+        });
+        agentInstance=new PageAgentCtor({
+          model:'default',
+          baseURL:LLM_PROXY_BASE,
+          apiKey:'mango-server-proxy',
+          language:document.documentElement.lang||navigator.language||'zh-CN',
+          enableMask:false,
+          onDispose: function() {
+            agentInstance = null;
+            agentPromise=null;
+          }
+        });
+        debug('PageAgent instance created',{
+          prototypeMethods:agentInstance
+            ? Object.getOwnPropertyNames(Object.getPrototypeOf(agentInstance)).slice(0,20)
+            : []
+        });
+        return agentInstance;
+      })
+      .catch(function(err){
+        debug('failed to create PageAgent instance',{
+          message:err&&err.message?err.message:String(err),
+          stack:err&&err.stack?String(err.stack):null
+        });
+        agentPromise=null;
+        throw err;
+      });
+  }
+  return agentPromise;
+}
+runtime.setExecutor(async function(params){
+  var task=String(params&&params.task||'').trim();
+  if(!task){
+    throw new Error('Missing task');
+  }
+  debug('executor start',{ task:task });
+  var abortController=new AbortController();
+  var agent=await getAgent();
+  var originalFetch=window.fetch.bind(window);
+  runtime.setStopHandler(function(){
+    debug('stop requested by host');
+    agent.stop();
+    abortController.abort(new Error('Page Agent task aborted by user'));
+  });
+  window.fetch=function(input,init){
+    var requestUrl=typeof input==='string'
+      ? input
+      : input instanceof Request
+        ? input.url
+        : String(input);
+    var nextInit=init?Object.assign({},init):{};
+    if(
+      requestUrl.indexOf(LLM_PROXY_BASE)===0 ||
+      requestUrl.indexOf('/page-agent/llm')===0
+    ){
+      debug('forwarding LLM request through preview proxy',requestUrl);
+      nextInit.signal=nextInit.signal||abortController.signal;
+    }
+    return originalFetch(input,nextInit);
+  };
+  try{
+    debug('calling agent.execute');
+    var result=await agent.execute(task);
+    debug('agent.execute resolved',{
+      resultType:typeof result,
+      hasResult:result!==undefined&&result!==null
+    });
+    return {
+      ok:true,
+      task:task,
+      result:normalizeResult(result),
+      summary:summary()
+    };
+  }finally{
+    debug('executor cleanup');
+    window.fetch=originalFetch;
+    runtime.setStopHandler(null);
+  }
+});
+window.addEventListener('message',function(event){
+  if(event.source!==window.parent)return;
+  var data=event.data;
+  if(!data||data.source!=='mango-web-preview-host'||data.kind!=='request')return;
+  var id=data.id;
+  var method=data.method;
+  var params=data.params||{};
+  debug('received host request',{ id:id, method:method });
+  if(method==='bridge/ping'){
+    respond(id,{ok:true,summary:summary()});
+    return;
+  }
+  if(method==='page-agent/execute'){
+    if(typeof runtime.executor!=='function'){
+      var unavailable='page-agent runtime unavailable in preview iframe';
+      notify('preview/error',{message:unavailable});
+      respond(id,null,{code:'runtime_unavailable',message:unavailable});
+      return;
+    }
+    notify('page-agent/status',{state:'running',task:String(params.task||'')});
+    Promise.resolve()
+      .then(function(){ return runtime.executor(params); })
+      .then(function(result){
+        notify('page-agent/status',{state:'idle'});
+        respond(id,result||{ok:true});
+      })
+      .catch(function(err){
+        var message=err&&err.message?err.message:String(err);
+        debug('page-agent execution failed',{
+          message:message,
+          stack:err&&err.stack?String(err.stack):null
+        });
+        if(
+          message.indexOf('aborted by user')!==-1 ||
+          message.indexOf('AbortError')!==-1 ||
+          message.indexOf('aborted')!==-1
+        ){
+          notify('page-agent/status',{state:'aborted',message:message});
+          respond(id,{ok:false,aborted:true,message:message});
+          return;
+        }
+        notify('preview/error',{message:message});
+        notify('page-agent/status',{state:'error',message:message});
+        respond(id,null,{code:'execution_failed',message:message});
+      });
+    return;
+  }
+  if(method==='page-agent/stop'){
+    if(typeof runtime.stopCurrentTask==='function'){
+      debug('invoking runtime stop handler');
+      runtime.stopCurrentTask();
+      notify('page-agent/status',{state:'aborted'});
+      respond(id,{ok:true});
+      return;
+    }
+    respond(id,{ok:true});
+    return;
+  }
+  respond(id,null,{code:'method_not_found',message:'Unknown method: '+method});
+});
+getAgent();
+debug('preview bridge installed',{
+  moduleUrls:MODULE_URLS,
+  llmProxyBase:LLM_PROXY_BASE,
+  url:location.href
+});
+window.addEventListener('error',function(event){
+  notify('preview/error',{message:event.message||'Unknown preview error'});
+});
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',function(){
+    notify('preview/ready',{summary:summary()});
+  },{once:true});
+}else{
+  notify('preview/ready',{summary:summary()});
+}
+})();</script>`;
 }
 
 const getBindingCodeAndCheckFromHeader = (
@@ -432,6 +886,177 @@ export function createServer(config: CLIConfig) {
   });
 
   // Web 服务代理端点 - 反向代理到本地服务
+  const handlePageAgentLlmProxy = async (c: Context) => {
+    try {
+      if (c.req.method === 'OPTIONS') {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'content-type, authorization',
+          },
+        });
+      }
+
+      const requestUrl = new URL(c.req.url);
+      const referer = c.req.header('referer');
+      const previewToken = getPreviewTokenFromRequest(c);
+      const previewServiceId = getServiceIdFromReferer(referer);
+      const authHeader = c.req.header('Authorization');
+      const bindingConfig = bindingCodeManager.readConfig();
+      let bindingCode: string | undefined;
+
+      if (authHeader?.startsWith('Bearer ')) {
+        const candidate = authHeader.replace('Bearer ', '').trim();
+        if (candidate && bindingConfig?.[candidate]) {
+          bindingCode = candidate;
+        } else {
+          console.warn('[page-agent proxy] rejected unknown binding code from authorization header');
+        }
+      }
+
+      if (!bindingCode && previewToken) {
+        const previewSession = getPreviewSession(previewToken, previewServiceId);
+        if (previewSession) {
+          bindingCode = previewSession.bindingCode;
+        }
+      }
+
+      if (!bindingCode) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+
+      const suffix = requestUrl.pathname.startsWith('/page-agent/llm')
+        ? requestUrl.pathname.slice('/page-agent/llm'.length)
+        : '';
+      const upstreamSearchParams = new URLSearchParams(requestUrl.search);
+      upstreamSearchParams.delete('_preview_token');
+      const search = upstreamSearchParams.toString();
+      const upstreamUrl = `${config.appUrl.replace(/\/$/, '')}/api/page-agent/llm${suffix}${
+        search ? `?${search}` : ''
+      }`;
+      console.log('[page-agent proxy] upstream:', upstreamUrl, {
+        viaPreviewSession: Boolean(previewToken),
+        previewServiceId,
+      });
+
+      const forwardHeaders = new Headers();
+      c.req.raw.headers.forEach((value, key) => {
+        const lower = key.toLowerCase();
+        if (
+          lower === 'host' ||
+          lower === 'connection' ||
+          lower === 'content-length' ||
+          lower === 'origin' ||
+          lower === 'referer' ||
+          lower === 'authorization'
+        ) {
+          return;
+        }
+        forwardHeaders.set(key, value);
+      });
+      forwardHeaders.set('Authorization', `Bearer ${bindingCode}`);
+
+      const contentType = c.req.header('content-type') || '';
+      const body =
+        c.req.method === 'GET' || c.req.method === 'HEAD'
+          ? undefined
+          : contentType.includes('application/json') || contentType.includes('text/')
+            ? await c.req.text()
+            : new Uint8Array(await c.req.arrayBuffer());
+
+      const upstreamResponse = await fetch(upstreamUrl, {
+        method: c.req.method,
+        headers: forwardHeaders,
+        body,
+      });
+      console.log(
+        '[page-agent proxy] response:',
+        upstreamResponse.status,
+        upstreamResponse.url,
+        upstreamResponse.redirected
+      );
+
+      const responseHeaders = new Headers();
+      upstreamResponse.headers.forEach((value, key) => {
+        if (key.toLowerCase() === 'content-length') {
+          return;
+        }
+        responseHeaders.set(key, value);
+      });
+
+      const responseBody = await upstreamResponse.arrayBuffer();
+      return new Response(responseBody, {
+        status: upstreamResponse.status,
+        headers: responseHeaders,
+      });
+    } catch (error) {
+      console.error('Page-agent LLM proxy error:', error);
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : 'Failed to proxy page-agent LLM request',
+        },
+        502
+      );
+    }
+  };
+
+  app.all('/page-agent/llm', handlePageAgentLlmProxy);
+  app.all('/page-agent/llm/*', handlePageAgentLlmProxy);
+
+  app.get('/page-agent/runtime/modules/:moduleName', async (c) => {
+    try {
+      const moduleName = c.req.param('moduleName');
+      const source = await loadPageAgentRuntimeModule(moduleName);
+
+      if (!source) {
+        return c.json({ error: 'Page-agent runtime module not found' }, 404);
+      }
+
+      return new Response(source, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/javascript; charset=utf-8',
+          'Cache-Control': 'public, max-age=300',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    } catch (error) {
+      console.error('Page-agent runtime module error:', error);
+      return c.json({ error: 'Failed to load page-agent runtime module' }, 500);
+    }
+  });
+
+  app.get('/page-agent/runtime/vendor/:vendor/*', async (c) => {
+    try {
+      const vendor = c.req.param('vendor');
+      if (vendor !== 'zod' && vendor !== 'chalk') {
+        return c.json({ error: 'Unsupported page-agent runtime vendor' }, 404);
+      }
+
+      const prefix = `/page-agent/runtime/vendor/${vendor}/`;
+      const relativePath = c.req.path.startsWith(prefix) ? c.req.path.slice(prefix.length) : '';
+      const source = await loadPageAgentRuntimeVendorFile(vendor, relativePath);
+
+      if (!source) {
+        return c.json({ error: 'Page-agent runtime vendor file not found' }, 404);
+      }
+
+      return new Response(source, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/javascript; charset=utf-8',
+          'Cache-Control': 'public, max-age=300',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    } catch (error) {
+      console.error('Page-agent runtime vendor error:', error);
+      return c.json({ error: 'Failed to load page-agent runtime vendor file' }, 500);
+    }
+  });
+
   app.all('/proxy/web/:serviceId/*', async (c) => {
     try {
       const { serviceId } = c.req.param();
@@ -463,7 +1088,9 @@ export function createServer(config: CLIConfig) {
         }
       }
 
-      console.log(`[proxy] auth=${authorized} token=${!!previewToken} session=${hasActivePreviewSession(serviceId)} mapSize=${previewSessions.size}`);
+      console.log(
+        `[proxy] auth=${authorized} token=${!!previewToken} session=${hasActivePreviewSession(serviceId)} mapSize=${previewSessions.size}`
+      );
 
       if (!authorized) {
         return c.json({ error: 'Unauthorized' }, 401);
@@ -496,9 +1123,7 @@ export function createServer(config: CLIConfig) {
 
       // Forward request
       const method = c.req.method;
-      const body = ['GET', 'HEAD'].includes(method)
-        ? undefined
-        : await c.req.arrayBuffer();
+      const body = ['GET', 'HEAD'].includes(method) ? undefined : await c.req.arrayBuffer();
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -523,9 +1148,10 @@ export function createServer(config: CLIConfig) {
         proxyResp.headers.forEach((value, key) => {
           const lower = key.toLowerCase();
           if (lower === 'x-frame-options') return;
-          if (lower === 'content-security-policy') {
-            const cleaned = value.replace(/frame-ancestors\s+[^;]+;?/gi, '').trim();
-            if (cleaned) respHeaders.set(key, cleaned);
+          if (
+            lower === 'content-security-policy' ||
+            lower === 'content-security-policy-report-only'
+          ) {
             return;
           }
           if (lower === 'transfer-encoding') return;
@@ -565,6 +1191,10 @@ export function createServer(config: CLIConfig) {
         const contentType = proxyResp.headers.get('content-type') || '';
         if (contentType.includes('text/html')) {
           let html = await proxyResp.text();
+          html = html.replace(
+            /<meta[^>]+http-equiv=["']content-security-policy(?:-report-only)?["'][^>]*>/gi,
+            ''
+          );
 
           // Build token suffix for sub-resource URLs
           const tokenSuffix = previewToken ? `?_preview_token=${previewToken}` : '';
@@ -572,8 +1202,12 @@ export function createServer(config: CLIConfig) {
           // Inject script to intercept fetch() and XMLHttpRequest for dynamic requests
           const interceptorScript = `<script>(function(){
 var P="${proxyPrefix}",T="${previewToken || ''}";
+function s(u){
+return u==="/page-agent/llm"||u.startsWith("/page-agent/llm/")||u.startsWith("/page-agent/")
+}
 function r(u){
 if(typeof u!=="string")return u;
+if(s(u))return u;
 if(u.startsWith("/")&&!u.startsWith("//")&&!u.startsWith(P+"/")){
 u=P+u;if(T){u+=(u.includes("?")?"&":"?")+"_preview_token="+T}
 }return u}
@@ -586,14 +1220,19 @@ var _o=XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open=function(m,u){
 arguments[1]=r(u);return _o.apply(this,arguments)};
 })();</script>`;
+          const previewBridgeScript = createWebPreviewBridgeScript();
 
           // Inject interceptor right after <head> (or at start if no <head>)
           const headIdx = html.search(/<head[^>]*>/i);
           if (headIdx !== -1) {
             const headEnd = html.indexOf('>', headIdx) + 1;
-            html = html.slice(0, headEnd) + interceptorScript + html.slice(headEnd);
+            html =
+              html.slice(0, headEnd) +
+              interceptorScript +
+              previewBridgeScript +
+              html.slice(headEnd);
           } else {
-            html = interceptorScript + html;
+            html = interceptorScript + previewBridgeScript + html;
           }
 
           // Rewrite absolute paths in src, href, action attributes
@@ -602,16 +1241,17 @@ arguments[1]=r(u);return _o.apply(this,arguments)};
             (_match, prefix, path, quote) => {
               if (path.startsWith('#')) return `${prefix}/${path}${quote}`;
               const separator = path.includes('?') ? '&' : '';
-              const token = tokenSuffix ? (separator ? tokenSuffix.replace('?', '&') : tokenSuffix) : '';
+              const token = tokenSuffix
+                ? separator
+                  ? tokenSuffix.replace('?', '&')
+                  : tokenSuffix
+                : '';
               return `${prefix}${proxyPrefix}/${path}${token}${quote}`;
             }
           );
 
           // Rewrite url() in inline styles
-          html = html.replace(
-            /url\(["']?\/(?!\/)/g,
-            `url(${proxyPrefix}/`
-          );
+          html = html.replace(/url\(["']?\/(?!\/)/g, `url(${proxyPrefix}/`);
 
           // Update content-length
           const encoded = new TextEncoder().encode(html);

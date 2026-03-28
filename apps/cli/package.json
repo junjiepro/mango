@@ -1,6 +1,6 @@
 {
   "name": "mango-ai-cli",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "description": "Mango CLI - 智能 Agent 对话平台设备服务",
   "bin": {
@@ -42,6 +42,7 @@
     "node-pty": "^1.1.0",
     "open": "^10.0.3",
     "ora": "^8.0.1",
+    "page-agent": "1.6.2",
     "ws": "^8.19.0",
     "zod": "^3.22.4"
   },

@@ -52,6 +52,7 @@ export const AUTH_CONSTANTS = {
     '/auth/reset-password',
     '/auth/verify-email',
     '/api/config',
+    '/api/page-agent/llm',
   ],
 } as const;
 

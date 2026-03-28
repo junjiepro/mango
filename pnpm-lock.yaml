@@ -77,6 +77,9 @@ importers:
       ora:
         specifier: ^8.0.1
         version: 8.2.0
+      page-agent:
+        specifier: 1.6.2
+        version: 1.6.2(zod@3.25.76)
       ws:
         specifier: ^8.19.0
         version: 8.19.0
@@ -1232,6 +1235,22 @@ packages:
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
     engines: {node: '>=8.0.0'}
+
+  '@page-agent/core@1.6.2':
+    resolution: {integrity: sha512-SG63qGNN+7/fXQhR2zudsyNCsFJYWhnHqbqtmZcWQyray/ttC31swqd9YWXUixKnm9Nk4U5HDyM/Zs1jeHZ0IA==}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
+  '@page-agent/llms@1.6.2':
+    resolution: {integrity: sha512-GnkqTg1fDnbDsQf3i2XOeIVwLlNcMRj+4VFQUgPzZI7cCOD2uvMNAzmjRsbHPS5vZiRNWlbvUEwdl73CjhOwUg==}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
+  '@page-agent/page-controller@1.6.2':
+    resolution: {integrity: sha512-H3Pxi7uNp8q0EeRTMjxrDkLhJ1n+EFo13ubSqK3BYZCKBcEqDIfZes/uWj9wA/GGxrM3BkRYeP074jl9WSzghA==}
+
+  '@page-agent/ui@1.6.2':
+    resolution: {integrity: sha512-jbdACSWv9dm1NVwwQ2hyjYeR52B+3ijcOHfyUrj0X/O/7xPXWoMNxGdfmnu9hhz4A8+9XmD94Ylz6YlJ+2W97w==}
 
   '@parcel/watcher-android-arm64@2.5.6':
     resolution: {integrity: sha512-YQxSS34tPF/6ZG7r/Ih9xy+kP/WwediEUsqmtf0cuCV5TPPKw/PQHRhueUo6JdeFJaqV3pyjm0GdYjZotbRt/A==}
@@ -2656,6 +2675,9 @@ packages:
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
+
+  ai-motion@0.4.8:
+    resolution: {integrity: sha512-9nQVjf8lrYQWSW0sZdb9bES4x8Ei1w9C0S62po2KvRbMjslmjm0WMeszyW771SEauDnu4YGWqurLZ/gCkCTosQ==}
 
   ai@6.0.30:
     resolution: {integrity: sha512-66FVOxNTogAkOK3Xx6vR+9l1Ze1bamQl6qmeRONpReqFEBnFInCEFX1EcJVW++BBtfYJ1pPWl5RTDk3BOyCN8w==}
@@ -5031,6 +5053,11 @@ packages:
   package-manager-detector@1.6.0:
     resolution: {integrity: sha512-61A5ThoTiDG/C8s8UMZwSorAGwMJ0ERVGj2OjoW5pAalsNOg15+iQiPzrLJ4jhZ1HJzmC2PIHT2oEiH3R5fzNA==}
 
+  page-agent@1.6.2:
+    resolution: {integrity: sha512-USjF6CMSSe2MeFqVLMRS2aCI6zLdhBdnZd6OKCrCFHjZiK22jvlGL6HJON4THQjsCeMfG0Y2NDwJ7LUreezNEw==}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
   pako@1.0.11:
     resolution: {integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==}
 
@@ -7252,6 +7279,24 @@ snapshots:
 
   '@opentelemetry/api@1.9.0': {}
 
+  '@page-agent/core@1.6.2(zod@3.25.76)':
+    dependencies:
+      '@page-agent/llms': 1.6.2(zod@3.25.76)
+      '@page-agent/page-controller': 1.6.2
+      chalk: 5.6.2
+      zod: 3.25.76
+
+  '@page-agent/llms@1.6.2(zod@3.25.76)':
+    dependencies:
+      chalk: 5.6.2
+      zod: 3.25.76
+
+  '@page-agent/page-controller@1.6.2':
+    dependencies:
+      ai-motion: 0.4.8
+
+  '@page-agent/ui@1.6.2': {}
+
   '@parcel/watcher-android-arm64@2.5.6':
     optional: true
 
@@ -8606,6 +8651,8 @@ snapshots:
   adler-32@1.3.1: {}
 
   agent-base@7.1.4: {}
+
+  ai-motion@0.4.8: {}
 
   ai@6.0.30(zod@3.25.76):
     dependencies:
@@ -11572,6 +11619,15 @@ snapshots:
       p-limit: 3.1.0
 
   package-manager-detector@1.6.0: {}
+
+  page-agent@1.6.2(zod@3.25.76):
+    dependencies:
+      '@page-agent/core': 1.6.2(zod@3.25.76)
+      '@page-agent/llms': 1.6.2(zod@3.25.76)
+      '@page-agent/page-controller': 1.6.2
+      '@page-agent/ui': 1.6.2
+      chalk: 5.6.2
+      zod: 3.25.76
 
   pako@1.0.11: {}
 

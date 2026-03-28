@@ -20,10 +20,7 @@ import { GitTab } from './tabs/GitTab';
 import { MiniAppTab } from './tabs/MiniAppTab';
 import dynamic from 'next/dynamic';
 
-const Terminal = dynamic(
-  () => import('./Terminal').then(mod => mod.Terminal),
-  { ssr: false }
-);
+const Terminal = dynamic(() => import('./Terminal').then((mod) => mod.Terminal), { ssr: false });
 import { EditorTabs } from './EditorTabs';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
 import { DeviceBinding } from '@/services/DeviceService';
@@ -57,7 +54,9 @@ export function VSCodeWorkspace({
   const isInitializedRef = useRef(false);
   const isRestoringRef = useRef(false); // 标记是否正在恢复状态
   const lastPreviewRefreshUrlRef = useRef<string | null>(null);
-  const [activeDevicePreviewUrl, setActiveDevicePreviewUrl] = useState<string | undefined>(undefined);
+  const [activeDevicePreviewUrl, setActiveDevicePreviewUrl] = useState<string | undefined>(
+    undefined
+  );
 
   // 工作区状态持久化
   const { getInitialState, saveState } = useWorkspaceState(conversationId);
@@ -148,9 +147,7 @@ export function VSCodeWorkspace({
         resetEditorState(savedState.tabs, savedState.activeTabId);
 
         // 异步刷新 miniapp 标签页的数据，确保内容是最新的
-        const miniAppTabs = savedState.tabs.filter(
-          (t) => t.type === 'miniapp' && t.miniApp?.id
-        );
+        const miniAppTabs = savedState.tabs.filter((t) => t.type === 'miniapp' && t.miniApp?.id);
         for (const tab of miniAppTabs) {
           fetch(`/api/miniapps/${tab.miniApp!.id}`)
             .then((res) => res.json())
@@ -294,7 +291,9 @@ export function VSCodeWorkspace({
         try {
           const resp = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
           if (resp.ok) return;
-        } catch { /* 继续 */ }
+        } catch {
+          /* 继续 */
+        }
       }
       loadDevice(deviceId);
     }, 15000);
@@ -335,9 +334,12 @@ export function VSCodeWorkspace({
     const wsTabs = tabs.filter((t) => t.type === 'webservice' && t.webService);
     if (wsTabs.length === 0) return;
 
-    const refreshTimer = window.setInterval(() => {
-      void refreshWebServicePreviewSessions(activeDevicePreviewUrl);
-    }, 4 * 60_000);
+    const refreshTimer = window.setInterval(
+      () => {
+        void refreshWebServicePreviewSessions(activeDevicePreviewUrl);
+      },
+      7 * 60 * 60_000
+    );
 
     return () => window.clearInterval(refreshTimer);
   }, [activeDevicePreviewUrl, tabs, refreshWebServicePreviewSessions]);
