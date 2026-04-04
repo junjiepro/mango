@@ -35,6 +35,18 @@ export class ConversationService {
       throw new AppError('User not authenticated', ErrorType.AUTH_UNAUTHORIZED, 401);
     }
 
+    // 校验 device_id 属于当前用户，防止跨用户缓存残留导致 FK 约束失败
+    let validDeviceId: string | null = null;
+    if (data.device_id) {
+      const { data: binding } = await this.supabase
+        .from('device_bindings')
+        .select('id')
+        .eq('id', data.device_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      validDeviceId = binding?.id ?? null;
+    }
+
     const conversationData: ConversationInsert = {
       user_id: user.id,
       title: data.title,
@@ -46,7 +58,7 @@ export class ConversationService {
         system_prompt: null,
       },
       status: 'active',
-      device_id: data.device_id || null,
+      device_id: validDeviceId,
     };
 
     const { data: conversation, error } = await this.supabase

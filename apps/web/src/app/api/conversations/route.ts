@@ -94,6 +94,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 校验 device_id 属于当前用户
+    let validDeviceId: string | null = null
+    if (device_id) {
+      const { data: binding } = await supabase
+        .from('device_bindings')
+        .select('id')
+        .eq('id', device_id)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      validDeviceId = binding?.id ?? null
+    }
+
     // 创建对话
     const { data: conversation, error } = await supabase
       .from('conversations')
@@ -108,7 +120,7 @@ export async function POST(request: NextRequest) {
           system_prompt: null,
         },
         status: 'active',
-        device_id: device_id || null,
+        device_id: validDeviceId,
       })
       .select()
       .single()

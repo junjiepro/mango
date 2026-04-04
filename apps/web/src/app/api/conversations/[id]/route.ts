@@ -93,7 +93,20 @@ export async function PATCH(
     if (body.description !== undefined) updates.description = body.description
     if (body.context !== undefined) updates.context = body.context
     if (body.status !== undefined) updates.status = body.status
-    if (body.device_id !== undefined) updates.device_id = body.device_id
+    if (body.device_id !== undefined) {
+      // 校验 device_id 属于当前用户
+      if (body.device_id) {
+        const { data: binding } = await supabase
+          .from('device_bindings')
+          .select('id')
+          .eq('id', body.device_id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+        updates.device_id = binding?.id ?? null
+      } else {
+        updates.device_id = null
+      }
+    }
     if (body.metadata !== undefined) updates.metadata = body.metadata
 
     // 更新对话
