@@ -133,6 +133,14 @@ describe('FeedbackService', () => {
 
       expect(result).toEqual([]);
     });
+
+    it('应该在数据库错误时抛出错误', async () => {
+      mockSupabase.from().select().eq().order.mockResolvedValue(mockDatabaseError('Query failed'));
+
+      await expect(feedbackService.getFeedbackByConversation('conv-123')).rejects.toMatchObject({
+        message: 'Query failed',
+      });
+    });
   });
 
   describe('getUserFeedback', () => {
@@ -159,6 +167,26 @@ describe('FeedbackService', () => {
       await feedbackService.getUserFeedback(10);
 
       expect(mockSupabase.from().limit).toHaveBeenCalledWith(10);
+    });
+
+    it('应该在用户未认证时抛出错误', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue(mockUnauthenticatedUser());
+
+      await expect(feedbackService.getUserFeedback()).rejects.toThrow('User not authenticated');
+    });
+
+    it('应该在数据库错误时抛出错误', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue(mockAuthenticatedUser());
+      mockSupabase
+        .from()
+        .select()
+        .eq()
+        .order()
+        .limit.mockResolvedValue(mockDatabaseError('Query failed'));
+
+      await expect(feedbackService.getUserFeedback()).rejects.toMatchObject({
+        message: 'Query failed',
+      });
     });
   });
 
