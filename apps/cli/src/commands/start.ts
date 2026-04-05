@@ -61,7 +61,7 @@ export async function startDeviceService(options: StartCommandOptions): Promise<
     formatter.dim(`Hostname: ${deviceInfo.hostname}`);
 
     // 2.5 初始化 URL 更新管理器
-    urlUpdateManager.initialize(config.supabaseUrl);
+    urlUpdateManager.initialize(config.supabaseUrl, config.supabaseAnonKey);
 
     // 2.6 检查是否已有正式绑定码
     const existingConfig = bindingCodeManager.readConfig();

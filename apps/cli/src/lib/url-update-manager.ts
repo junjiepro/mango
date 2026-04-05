@@ -45,6 +45,7 @@ interface UpdateResult {
  */
 export class UrlUpdateManager {
   private supabaseUrl: string = '';
+  private supabaseAnonKey: string = '';
   private bindingStatuses: Map<string, BindingValidationStatus> = new Map();
   private updateInProgress: Map<string, boolean> = new Map();
   private maxRetries: number = 3;
@@ -53,8 +54,9 @@ export class UrlUpdateManager {
   /**
    * 初始化管理器
    */
-  initialize(supabaseUrl: string): void {
+  initialize(supabaseUrl: string, supabaseAnonKey: string): void {
     this.supabaseUrl = supabaseUrl;
+    this.supabaseAnonKey = supabaseAnonKey;
     formatter.debug('URL Update Manager initialized');
   }
 
@@ -105,6 +107,7 @@ export class UrlUpdateManager {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.supabaseAnonKey}`,
         },
         body: JSON.stringify({
           binding_code: bindingCode,
@@ -138,9 +141,7 @@ export class UrlUpdateManager {
         // 如果超过最大重试次数，标记为无效
         if (status.retryCount >= this.maxRetries) {
           status.isValid = false;
-          formatter.warning(
-            `Binding marked as invalid after ${this.maxRetries} failed attempts`
-          );
+          formatter.warning(`Binding marked as invalid after ${this.maxRetries} failed attempts`);
         }
 
         this.bindingStatuses.set(bindingCode, status);
