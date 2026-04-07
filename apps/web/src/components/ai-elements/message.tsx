@@ -8,7 +8,12 @@ import type { FileUIPart, UIMessage } from 'ai';
 import { ChevronLeftIcon, ChevronRightIcon, PaperclipIcon, XIcon } from 'lucide-react';
 import type { ComponentProps, HTMLAttributes, ReactElement } from 'react';
 import { createContext, memo, useContext, useEffect, useState } from 'react';
-import { Streamdown } from 'streamdown';
+import dynamic from 'next/dynamic';
+
+const Streamdown = dynamic(
+  () => import('streamdown').then(mod => ({ default: mod.Streamdown })),
+  { ssr: false }
+);
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage['role'];
@@ -259,7 +264,9 @@ export const MessageBranchPage = ({ className, ...props }: MessageBranchPageProp
   );
 };
 
-export type MessageResponseProps = ComponentProps<typeof Streamdown>;
+export type MessageResponseProps = HTMLAttributes<HTMLDivElement> & {
+  children?: string;
+};
 
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (

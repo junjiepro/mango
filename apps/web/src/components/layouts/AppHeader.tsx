@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -27,7 +27,7 @@ export function AppHeader({ className = '' }: AppHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const t = useTranslations('common');
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 

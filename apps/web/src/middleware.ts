@@ -103,8 +103,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // 如果用户已登录但访问登录/注册页,重定向到首页
-  if (session && (pathname === '/auth/login' || pathname === '/auth/signup')) {
+  // 如果用户已登录但访问首页/登录/注册页,重定向到对话页
+  if (session && (pathname === '/' || pathname === '/auth/login' || pathname === '/auth/signup')) {
     const homeUrl = new URL(getRedirectUrl('HOME'), request.url)
     return NextResponse.redirect(homeUrl)
   }

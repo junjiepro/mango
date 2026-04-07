@@ -61,7 +61,7 @@
     --ring: var(--mango-orange);
     
     /* Typography */
-    --font-sans: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-sans: var(--font-poppins, "Poppins"), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --font-serif: "Lora", Georgia, "Times New Roman", Times, serif;
     --font-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
     

@@ -11,7 +11,15 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb',
     },
+    optimizePackageImports: [
+      'lucide-react',
+      'recharts',
+      '@radix-ui/react-icons',
+      'date-fns',
+    ],
+    esmExternals: true,
   },
+  transpilePackages: ['streamdown', 'shiki', 'mermaid'],
   images: {
     remotePatterns: [
       {

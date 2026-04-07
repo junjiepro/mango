@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationProvider, useConversation } from '@/contexts/ConversationContext';
 import { MessageList } from '@/components/conversation/MessageList';
@@ -13,31 +14,44 @@ import { MessageInput } from '@/components/conversation/MessageInput';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { MiniAppWindow } from '@/components/miniapp/MiniAppWindow';
 import { ResourceQuickAccess } from '@/components/conversation/ResourceQuickAccess';
 import {
-  ResourcePreviewDialog,
   canPreviewInDialog,
 } from '@/components/conversation/ResourcePreviewDialog';
 import { Package } from 'lucide-react';
-import type { Database } from '@/types/database.types';
 import type { DetectedResource } from '@mango/shared/types/resource.types';
-import { DeviceCache } from '@/lib/deviceCache';
 import { ChatLayout } from '@/components/layouts/ChatLayout';
 import { useResourceSniffer } from '@/hooks/useResourceSniffer';
 import { useSessionManager } from '@/hooks/useSessionManager';
 import { useWorkspaceState } from '@/hooks/useWorkspaceState';
-import { ACPSessionCreateDialog } from '@/components/conversation/ACPSessionCreateDialog';
 import { ACPChatWrapper } from '@/components/acp/ACPChatWrapper';
 import { useACPSession } from '@/hooks/useACPSession';
 import { useDeviceClient } from '@/hooks/useDeviceClient';
 import type { ACPAgent } from '@/hooks/useACPSession';
-import { WorkingDirectorySwitchDialog } from '@/components/workspace/WorkingDirectorySwitchDialog';
 import { ConversationHeader } from '@/components/conversation/ConversationHeader';
+import { useDeviceManager } from '@/hooks/useDeviceManager';
+import { useMiniAppManager } from '@/hooks/useMiniAppManager';
 
-type MiniApp = Database['public']['Tables']['mini_apps']['Row'];
-type MiniAppInstallation = Database['public']['Tables']['mini_app_installations']['Row'];
-type DeviceBinding = Database['public']['Tables']['device_bindings']['Row'];
+// 弹窗组件动态导入 — 仅在用户交互时加载
+const MiniAppWindow = dynamic(
+  () => import('@/components/miniapp/MiniAppWindow').then(m => m.MiniAppWindow),
+  { ssr: false }
+);
+const ResourcePreviewDialog = dynamic(
+  () => import('@/components/conversation/ResourcePreviewDialog').then(m => m.ResourcePreviewDialog),
+  { ssr: false }
+);
+const ACPSessionCreateDialog = dynamic(
+  () => import('@/components/conversation/ACPSessionCreateDialog').then(m => m.ACPSessionCreateDialog),
+  { ssr: false }
+);
+const WorkingDirectorySwitchDialog = dynamic(
+  () => import('@/components/workspace/WorkingDirectorySwitchDialog').then(m => m.WorkingDirectorySwitchDialog),
+  { ssr: false }
+);
+
+type MiniApp = Parameters<ReturnType<typeof useMiniAppManager>['handleOpenMiniApp']>[0];
+type MiniAppInstallation = Parameters<ReturnType<typeof useMiniAppManager>['handleOpenMiniApp']>[1];
 
 /**
  * 对话详情内容组件
@@ -63,16 +77,30 @@ function ConversationDetailContent() {
   const urlWorkspace = searchParams.get('workspace');
   const urlMiniAppId = searchParams.get('miniAppId');
 
-  const [miniAppDialogOpen, setMiniAppDialogOpen] = useState(false);
-  const [selectedMiniApp, setSelectedMiniApp] = useState<{
-    miniApp: MiniApp;
-    installation: MiniAppInstallation;
-  } | null>(null);
-  const [installations, setInstallations] = useState<any[]>([]);
-  const [loadingInstallations, setLoadingInstallations] = useState(false);
-  const [devices, setDevices] = useState<DeviceBinding[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
-  const [loadingDevices, setLoadingDevices] = useState(false);
+  // 设备管理
+  const {
+    devices,
+    selectedDeviceId,
+    selectedDevice,
+    loadingDevices,
+    loadDevices,
+    handleDeviceChange,
+  } = useDeviceManager({ conversationId: currentConversation?.id });
+
+  // MiniApp 管理
+  const {
+    miniAppDialogOpen,
+    setMiniAppDialogOpen,
+    selectedMiniApp,
+    setSelectedMiniApp,
+    installations,
+    loadingInstallations,
+    loadInstallations,
+    handleOpenMiniAppSelector,
+    handleSelectMiniApp,
+    handleOpenMiniApp,
+  } = useMiniAppManager();
+
   // 工作区应用管理状态
   const [selectedWorkspaceMiniAppId, setSelectedWorkspaceMiniAppId] = useState<string | null>(
     urlMiniAppId
@@ -129,47 +157,6 @@ function ConversationDetailContent() {
     sessionName: string;
   } | null>(null);
 
-  // 获取当前选中的设备对象
-  const [selectedDevice, setSelectedDevice] = useState<DeviceBinding | undefined>(undefined);
-
-  const loadDevice = async (id: string) => {
-    try {
-      const response = await fetch(`/api/devices/${id}`);
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('设备未找到');
-        }
-        throw new Error('加载设备信息失败');
-      }
-
-      const data = await response.json();
-      setSelectedDevice(data.device);
-    } catch (err) {
-      console.error('Failed to load device:', id, err);
-    }
-  };
-
-  React.useEffect(() => {
-    if (selectedDeviceId) loadDevice(selectedDeviceId);
-  }, [selectedDeviceId]);
-
-  // 定期检查设备 URL 可达性，不可达时重新加载设备数据
-  React.useEffect(() => {
-    if (!selectedDeviceId || !selectedDevice?.online_urls?.length) return;
-    const timer = setInterval(async () => {
-      const urls = selectedDevice.online_urls || [];
-      for (const url of urls) {
-        try {
-          const resp = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
-          if (resp.ok) return; // 可达，无需刷新
-        } catch { /* 继续下一个 */ }
-      }
-      // 全部不可达，重新加载设备数据获取最新 URL
-      loadDevice(selectedDeviceId);
-    }, 15000);
-    return () => clearInterval(timer);
-  }, [selectedDeviceId, selectedDevice?.online_urls]);
 
   // 标记布局初始化完成
   React.useEffect(() => {
@@ -210,100 +197,6 @@ function ConversationDetailContent() {
 
   // 资源嗅探
   const { resources } = useResourceSniffer(messages);
-
-  // 加载设备列表
-  const loadDevices = async () => {
-    setLoadingDevices(true);
-    try {
-      const response = await fetch('/api/devices');
-      const result = await response.json();
-
-      if (response.ok && result.devices) {
-        setDevices(result.devices || []);
-
-        // 初始化设备选择:优先使用会话保存的设备,其次使用缓存的默认设备
-        if (currentConversation?.device_id) {
-          setSelectedDeviceId(currentConversation.device_id);
-        } else {
-          const cachedDeviceId = DeviceCache.getDefaultDeviceId();
-          if (cachedDeviceId) {
-            setSelectedDeviceId(cachedDeviceId);
-          }
-        }
-      } else {
-        console.error('Failed to load devices:', result.error);
-      }
-    } catch (error) {
-      console.error('Failed to load devices:', error);
-    } finally {
-      setLoadingDevices(false);
-    }
-  };
-
-  // 处理设备选择变化
-  const handleDeviceChange = async (deviceId: string) => {
-    const actualDeviceId = deviceId === 'none' ? '' : deviceId;
-    setSelectedDeviceId(actualDeviceId);
-
-    // 保存到本地缓存
-    DeviceCache.setDefaultDeviceId(actualDeviceId);
-
-    // 保存到数据库
-    if (currentConversation?.id) {
-      try {
-        const response = await fetch(`/api/conversations/${currentConversation.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            device_id: actualDeviceId || null,
-          }),
-        });
-
-        if (!response.ok) {
-          console.error('Failed to save device selection to conversation');
-        }
-      } catch (error) {
-        console.error('Failed to save device selection:', error);
-      }
-    }
-  };
-
-  // 加载已安装的 MiniApp
-  const loadInstallations = async () => {
-    setLoadingInstallations(true);
-    try {
-      const response = await fetch('/api/miniapps/installations');
-      const result = await response.json();
-
-      if (result.success) {
-        setInstallations(result.data);
-      }
-    } catch (error) {
-      console.error('Failed to load installations:', error);
-    } finally {
-      setLoadingInstallations(false);
-    }
-  };
-
-  // 打开 MiniApp 选择器
-  const handleOpenMiniAppSelector = () => {
-    loadInstallations();
-    setMiniAppDialogOpen(true);
-  };
-
-  // 选择 MiniApp
-  const handleSelectMiniApp = (installation: any) => {
-    setSelectedMiniApp({
-      miniApp: installation.mini_app,
-      installation: installation,
-    });
-    setMiniAppDialogOpen(false);
-  };
-
-  // 打开 MiniApp（从消息或快速访问栏）
-  const handleOpenMiniApp = (miniApp: MiniApp, installation: MiniAppInstallation) => {
-    setSelectedMiniApp({ miniApp, installation });
-  };
 
   // 处理资源点击
   const handleResourceClick = (resource: DetectedResource) => {
@@ -538,7 +431,7 @@ function ConversationDetailContent() {
 
   React.useEffect(() => {
     loadInstallations();
-    loadDevices();
+    loadDevices(currentConversation?.device_id || undefined);
   }, []);
 
   // 处理 URL 参数：自动打开工作区和选中 MiniApp
@@ -652,9 +545,9 @@ function ConversationDetailContent() {
             </div>
           </div>
 
-          {/* ACP 会话列表 - 所有会话保持挂载，支持后台运行 */}
+          {/* ACP 会话 - 仅挂载当前活跃会话，减少初始化开销 */}
           {sessions
-            .filter((session) => session.type === 'acp')
+            .filter((session) => session.type === 'acp' && activeSessionId === session.id)
             .map((session) => (
               <ACPChatWrapper
                 key={session.id}
@@ -666,7 +559,7 @@ function ConversationDetailContent() {
                 onMessagesChange={(msgs) => updateSessionMessages(session.id, msgs)}
                 onStatusChange={(status) => updateSessionRunningStatus(session.id, status)}
                 isActivated={session.isActivated ?? true}
-                isVisible={activeSessionId === session.id}
+                isVisible={true}
                 sessionWorkingDirectory={session.workingDirectory}
                 currentWorkingDirectory={currentWorkingDirectory}
                 onSwitchToSessionDirectory={() => {
