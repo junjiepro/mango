@@ -30,7 +30,7 @@ import { existsSync, mkdirSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { fileWatcherManager, type FileChangeEvent } from '../lib/file-watcher.js';
 import { webServiceScanner } from '../lib/web-service-scanner.js';
-import { convertToModelMessages, streamText } from 'ai';
+import { convertToModelMessages, stepCountIs, streamText } from 'ai';
 import { planEntrySchema } from '@agentclientprotocol/sdk';
 import z from 'zod';
 
@@ -1623,68 +1623,25 @@ arguments[1]=r(u);return _o.apply(this,arguments)};
         // 使用 ACP provider 的 streamText
         const result = streamText({
           model: session.provider!.languageModel(),
+          tools: session.provider!.tools,
+          stopWhen: stepCountIs(20),
           // Ensure raw chunks like agent plan are included for streaming
           includeRawChunks: true,
-          messages: await convertToModelMessages(messages),
+          messages: await convertToModelMessages(messages, {
+            tools: session.provider!.tools,
+            ignoreIncompleteToolCalls: true,
+          }),
           onError: (error) => {
             console.error('Error occurred while streaming text:', error);
           },
-          onFinish: ({ response }) => {
-            // 流完成后，将助手响应追加到消息并保存
-            // response.messages 包含了本次生成的消息
-            if (response.messages && response.messages.length > 0) {
-              // 获取当前已保存的消息
-              const currentMessages = acpConnector.getSessionMessages(sessionId);
-
-              // 将 CoreMessage 转换为 UIMessage 格式并追加
-              for (const msg of response.messages) {
-                if (msg.role === 'assistant') {
-                  const uiMessage = {
-                    id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    role: 'assistant' as const,
-                    content: typeof msg.content === 'string' ? msg.content : '',
-                    parts:
-                      typeof msg.content === 'string'
-                        ? [{ type: 'text' as const, text: msg.content }]
-                        : Array.isArray(msg.content)
-                          ? msg.content.map((part: any) => {
-                              if (typeof part === 'string') {
-                                return { type: 'text' as const, text: part };
-                              }
-                              // Convert raw parts to metadata for easier UI access
-                              if (part.type === 'raw' && part.rawValue) {
-                                try {
-                                  const data = JSON.parse(part.rawValue as string);
-                                  switch (data.type) {
-                                    case 'plan':
-                                      return { plan: data.entries };
-                                    case 'diff':
-                                      return { diffs: [data] }; // Accumulate multiple diffs
-                                    case 'terminal':
-                                      return { terminals: [data] }; // Accumulate terminal outputs
-                                  }
-                                } catch {
-                                  // 忽略解析错误
-                                }
-                              }
-                              return part;
-                            })
-                          : [],
-                    createdAt: new Date(),
-                  };
-                  currentMessages.push(uiMessage as any);
-                }
-              }
-
-              // 更新持久化存储
-              acpConnector.updateSessionMessages(sessionId, currentMessages);
-              console.log(`Saved ${currentMessages.length} messages for session ${sessionId}`);
-            }
-          },
-          tools: session.provider!.tools,
         });
 
         return result.toUIMessageStreamResponse({
+          originalMessages: messages,
+          onFinish: ({ messages: updatedMessages }) => {
+            acpConnector.updateSessionMessages(sessionId, updatedMessages as UIMessage[]);
+            console.log(`Saved ${updatedMessages.length} messages for session ${sessionId}`);
+          },
           messageMetadata: ({ part }) => {
             // Convert raw parts to metadata for easier UI access
             if (part.type === 'raw' && part.rawValue) {
