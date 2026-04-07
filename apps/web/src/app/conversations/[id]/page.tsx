@@ -494,6 +494,12 @@ function ConversationDetailContent() {
       />
 
       {/* 主要内容区域 - ChatLayout 在外层，会话内容在内部切换 */}
+      {sessionsError && (
+        <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          {sessionsError}
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 overflow-hidden">
         <ChatLayout
           resources={resources}

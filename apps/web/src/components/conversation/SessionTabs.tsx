@@ -15,7 +15,7 @@ interface SessionTabsProps {
   sessions: SessionTab[];
   activeSessionId: string;
   onSessionChange: (sessionId: string) => void;
-  onSessionClose: (sessionId: string) => void;
+  onSessionClose: (sessionId: string) => void | Promise<void>;
   onCreateACPSession: () => void;
   className?: string;
   compact?: boolean;
@@ -75,7 +75,9 @@ export function SessionTabs({
                   )}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onSessionClose(session.id);
+                    Promise.resolve(onSessionClose(session.id)).catch((error) => {
+                      console.error('Failed to close session:', error);
+                    });
                   }}
                 >
                   <X className="h-3 w-3" />

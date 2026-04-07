@@ -159,26 +159,28 @@ export function useSessionManager(conversationId: string) {
 
       const session = sessions.find((s) => s.id === sessionId);
 
-      // 先从本地状态移除
+      // 如果是持久化的 ACP 会话，先删服务端（服务端会继续同步删 CLI）
+      if (session?.type === 'acp' && session.persistedId) {
+        const response = await fetch(`/api/conversations/${conversationId}/acp-sessions/${session.persistedId}`, {
+          method: 'DELETE',
+        });
+
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          const message = result.error || 'Failed to delete persisted session';
+          setError(message);
+          throw new Error(message);
+        }
+      }
+
+      // 服务端删除成功后，再更新本地状态
       setSessions((prev) => {
         const filtered = prev.filter((s) => s.id !== sessionId);
-        // 如果删除的是当前活跃会话，切换到第一个会话
         if (sessionId === activeSessionId && filtered.length > 0) {
           setActiveSessionId(filtered[0].id);
         }
         return filtered;
       });
-
-      // 如果是持久化的 ACP 会话,从数据库删除
-      if (session?.type === 'acp' && session.persistedId) {
-        try {
-          await fetch(`/api/conversations/${conversationId}/acp-sessions/${session.persistedId}`, {
-            method: 'DELETE',
-          });
-        } catch (err) {
-          console.error('Failed to delete persisted session:', err);
-        }
-      }
     },
     [activeSessionId, conversationId, sessions]
   );

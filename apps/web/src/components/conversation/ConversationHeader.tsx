@@ -77,7 +77,7 @@ interface ConversationHeaderProps {
   sessions: SessionTab[];
   activeSessionId: string;
   onSessionChange: (sessionId: string) => void;
-  onSessionClose: (sessionId: string) => void;
+  onSessionClose: (sessionId: string) => void | Promise<void>;
   onCreateACPSession: () => void;
 
   // 设备相关
@@ -590,7 +590,9 @@ export function ConversationHeader({
                             className="h-5 w-5 ml-2"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onSessionClose(session.id);
+                              Promise.resolve(onSessionClose(session.id)).catch((error) => {
+                                console.error('Failed to close session:', error);
+                              });
                             }}
                           >
                             <X className="h-3 w-3" />
